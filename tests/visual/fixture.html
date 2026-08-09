@@ -221,6 +221,30 @@ end</code></pre>
     </article>
   </div>
 
+  <!-- Luau code intelligence. Generated from the real `segment()` output for a
+       snippet taken off the forum, so the token classes here are exactly the
+       ones the extension emits — see .tmp/emit.ts in the commit that added it.
+       This is what makes the harness cover code colouring across themes. -->
+  <div class="topic-post clearfix regular">
+    <article class="boxed onscreen-post" data-post-id="9">
+      <div class="row">
+        <div class="topic-body clearfix">
+          <div class="regular contents">
+            <div class="cooked">
+              <pre><code class="dfp-luau lang-lua"><span class="dfp-tok-kw">local</span> killbrick <span class="dfp-tok-op">=</span> <a class="dfp-tok-builtin" href="#" data-dfp-api="Script">script</a>.<a class="dfp-tok-prop" href="#" data-dfp-api="Script.Parent">Parent</a>
+killbrick.<span class="dfp-tok-prop">Touched</span>:<span class="dfp-tok-method">Connect</span>(<span class="dfp-tok-kw">function</span>(otherpart)
+	<span class="dfp-tok-kw">local</span> humanoid <span class="dfp-tok-op">=</span> otherpart.<span class="dfp-tok-prop">Parent</span>:<span class="dfp-tok-method">FindFirstChild</span>(<span class="dfp-tok-str">"Humanoid"</span>)
+	<span class="dfp-tok-kw">if</span> humanoid <span class="dfp-tok-kw">then</span>
+		humanoid.<span class="dfp-tok-prop">Health</span> <span class="dfp-tok-op">=</span> <span class="dfp-tok-num">0</span>
+	<span class="dfp-tok-kw">end</span>
+<span class="dfp-tok-kw">end</span>)</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
   <!-- Accepted answer -->
   <div class="topic-post clearfix accepted-answer regular">
     <article id="post_2" class="boxed onscreen-post" data-post-id="2">

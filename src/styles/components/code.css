@@ -171,6 +171,34 @@ html[data-dfp] code.dfp-luau .dfp-tok-op {
   color: var(--dfp-text-2);
 }
 
+/* Fields and methods — everything after a `.` or a `:`.
+ *
+ * These were plain `ident` and rendered the same white as a local, so
+ * `killbrick.Touched:Connect(…)` gave no clue which name was the variable and
+ * which two were the API. In a language written almost entirely as `a.b:c()`,
+ * that is the colour that carries the most meaning per pixel.
+ *
+ * Mixed from existing tokens rather than declared as new hex, so both stay
+ * theme-aware and inherit the ramp's contrast behaviour: mixing toward
+ * `--dfp-text` lightens on the dark themes and darkens on light, which is the
+ * right direction in both. Pale blue for data and pale gold for behaviour is
+ * the convention most editors settled on, and it keeps them clear of the
+ * saturated accent (builtins) and warning (numbers) they are derived from. */
+
+/* Mixed at 80/20 rather than the 55/45 this started at. The first attempt
+ * measured 1.47:1 against plain identifier text — technically a different hue,
+ * but at 13px on a dark background a pale blue that close to #eff4fc simply
+ * reads as white, and the colour that was supposed to name every member of
+ * every expression did nothing. Keeping most of the source hue is what makes
+ * `killbrick.Touched` legible as variable-then-member at a glance. */
+html[data-dfp] code.dfp-luau .dfp-tok-prop {
+  color: color-mix(in oklab, var(--dfp-accent) 80%, var(--dfp-text));
+}
+
+html[data-dfp] code.dfp-luau .dfp-tok-method {
+  color: color-mix(in oklab, var(--dfp-warning) 80%, var(--dfp-text));
+}
+
 /* ── Deprecation marks ───────────────────────────────────────────────────
  * A wavy underline, not a highlight. These sit in other people's posts —
  * often years old and uneditable — so the mark has to be findable without
@@ -260,10 +288,22 @@ html[data-dfp] .dfp-code-lang {
   font-family: var(--dfp-mono);
   font-size: var(--dfp-fs-xs);
   letter-spacing: 0.02em;
-  /* Always readable — it labels the block rather than acting on it, so it does
-   * not hide until hover the way the buttons do. */
-  opacity: 0.75;
   user-select: none;
+  /* Hidden at rest, like the buttons beside it.
+   *
+   * It used to sit at 0.75 opacity permanently, on the reasoning that it labels
+   * the block rather than acting on it. In practice that put a small grey
+   * "luau" in the corner of every single code block on the page — a caption
+   * nobody asked for, repeated down the whole thread, on the one element that
+   * should be nothing but code. The language is already obvious from the code;
+   * the label is a confirmation, and a confirmation can wait for the pointer. */
+  opacity: 0;
+  transition: opacity var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .cooked pre:hover .dfp-code-lang,
+html[data-dfp] .codeblock-button-wrapper:focus-within .dfp-code-lang {
+  opacity: 0.75;
 }
 
 html[data-dfp] .dfp-code-btn {

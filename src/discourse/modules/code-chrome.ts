@@ -173,7 +173,14 @@ function enhance(root: HTMLElement): void {
     // Only where it would change anything.
     const stripped = stripComments(source);
     if (stripped !== source && stripped.trim() !== "") {
-      const bare = button("copy bare", "Copy without comments", "dfp-code-bare");
+      /* Named for what it does, not for what it produces. "copy bare" read as
+       * jargon next to Discourse's own copy button and gave no clue how the two
+       * differed — which is the only thing a second copy button has to say. */
+      const bare = button(
+        "copy without comments",
+        "Copy the code with comment lines removed",
+        "dfp-code-bare",
+      );
       bare.addEventListener("click", () => void copy(stripped, bare, "copied"));
       // Immediately before Discourse's copy, so the two copies sit together.
       prepend(bare);

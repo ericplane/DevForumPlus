@@ -1,5 +1,6 @@
 import { API_INDEX, deprecatedOn, type ApiEntry } from "./api-index.generated";
 import { tokenize, type Token } from "./tokenizer";
+import { memberType, eventParamTypes } from "./member-types.generated";
 
 /**
  * Find deprecated API usage in a Luau snippet.
@@ -61,19 +62,52 @@ export const GLOBAL_TYPES: Record<string, string> = {
 };
 
 /**
+ * Functions whose string argument IS the class of what they return.
+ *
+ * Exact only. The engine resolves each of these by class, so the argument is a
+ * type and there is nothing else it could be.
+ *
+ * `FindFirstChild("Humanoid")` and `WaitForChild("Humanoid")` are deliberately
+ * NOT here. They resolve by *name*: the argument is whatever the author called
+ * the instance, and a part named "Humanoid" is a part. Typing from them links
+ * roughly-usually-correctly, which is the worst thing an annotation like this
+ * can be — a reader cannot tell the confident links from the lucky ones, so the
+ * confident ones stop being worth anything. If it is not provable, it does not
+ * get underlined.
+ */
+const CLASS_TYPED_CALLS = new Set([
+  "FindFirstChildOfClass",
+  "FindFirstChildWhichIsA",
+  "FindFirstAncestorOfClass",
+  "FindFirstAncestorWhichIsA",
+]);
+
+/** Statement keywords that end the right-hand side we are willing to scan. */
+const STOPS = new Set(["local", "if", "then", "end", "return", "while", "for", "function", "do"]);
+
+/**
  * Guess the class of each local, so a member can be checked against the class
  * that actually declares it rather than against every class at once.
  *
- * Deliberately shallow. It resolves the two forms that account for nearly all
- * receivers in forum code:
+ * Deliberately shallow, but no longer as shallow as two shapes. It resolves:
  *
  *     local part = Instance.new("Part")
  *     local rs   = game:GetService("RunService")
+ *     local hum  = char:FindFirstChildOfClass("Humanoid")
+ *     local hum: Humanoid = …                             -- the author said so
  *
- * and nothing else. It does not follow `.Parent`, function returns, or table
- * fields. A receiver it cannot resolve yields no dump-derived finding — that is
- * the point. Guessing wrong here means underlining correct code in someone
- * else's post, which costs more than the finding was worth.
+ * The chained form matters more than it looks: the earlier version only checked
+ * the token immediately after `=`, so `otherpart.Parent:FindFirstChild("X")`
+ * — a receiver reached through one hop, which is most real code — resolved to
+ * nothing at all, and every member on that local stayed unlinked.
+ *
+ * It still does not follow `.Parent`, plain function returns, or table fields.
+ * A receiver it cannot resolve yields no dump-derived finding — that is the
+ * point. Guessing wrong here means underlining correct code in someone else's
+ * post, which costs more than the finding was worth.
+ *
+ * Everything returned here is validated by the caller against the real docs
+ * name sets, so an unknown or misspelled class simply never links.
  */
 export function inferLocalTypes(tokens: Token[]): Map<string, string> {
   const types = new Map<string, string>();
@@ -92,33 +126,273 @@ export function inferLocalTypes(tokens: Token[]): Map<string, string> {
 
     const name = sig(i + 1);
     if (!name || name.tok.kind !== "ident") continue;
+
+    /* `local hum: Humanoid = …`. An annotation outranks anything inferred from
+     * the right-hand side, because the author stated it outright. Told apart
+     * from `local x = a:b()` by the colon sitting directly after the name. */
+    const colon = sig(name.i + 1);
+    if (colon && colon.tok.value === ":") {
+      const ann = sig(colon.i + 1);
+      if (ann && (ann.tok.kind === "ident" || ann.tok.kind === "builtin")) {
+        types.set(name.tok.value, ann.tok.value);
+        continue;
+      }
+    }
+
     const eq = sig(name.i + 1);
     if (!eq || eq.tok.value !== "=") continue;
 
-    const head = sig(eq.i + 1);
-    if (!head) continue;
+    /* Walk the right-hand side for `<.|:> <fn> ( "<string>"`, rather than only
+     * looking immediately after `=`. That is what lets a receiver reached
+     * through a hop resolve — `otherpart.Parent:FindFirstChild("Humanoid")` —
+     * where before only a call sitting flush against `=` was ever seen.
+     *
+     * Bounded by the next statement keyword so this never runs away down the
+     * file, and by a token budget for pathological one-liners. */
+    let j = eq.i + 1;
+    let budget = 24;
+    while (budget-- > 0) {
+      const step = sig(j);
+      if (!step) break;
+      if (step.tok.kind === "keyword" && STOPS.has(step.tok.value)) break;
 
-    // Instance.new("ClassName") / game:GetService("ClassName") share a shape:
-    //   <ident> <.|:> <ident> ( "<string>"
-    const dot = sig(head.i + 1);
-    if (!dot || (dot.tok.value !== "." && dot.tok.value !== ":")) continue;
-    const fn = sig(dot.i + 1);
-    if (!fn) continue;
+      const sep = step.tok.value;
+      if (sep !== "." && sep !== ":") {
+        j = step.i + 1;
+        continue;
+      }
 
-    const isNew = head.tok.value === "Instance" && fn.tok.value === "new";
-    const isService =
-      fn.tok.value === "GetService" && GLOBAL_TYPES[head.tok.value] === "DataModel";
-    if (!isNew && !isService) continue;
+      const fn = sig(step.i + 1);
+      if (!fn) break;
+      const paren = sig(fn.i + 1);
+      const arg = paren && paren.tok.value === "(" ? sig(paren.i + 1) : null;
+      if (!arg || arg.tok.kind !== "string") {
+        j = fn.i + 1;
+        continue;
+      }
 
-    const paren = sig(fn.i + 1);
-    if (!paren || paren.tok.value !== "(") continue;
-    const arg = sig(paren.i + 1);
-    if (!arg || arg.tok.kind !== "string") continue;
+      const recvName = recvValue(tokens, step.i);
+      const fnName = fn.tok.value;
 
-    types.set(name.tok.value, stringValue(arg.tok));
+      const isNew = recvName === "Instance" && fnName === "new";
+      const isService = fnName === "GetService" && GLOBAL_TYPES[recvName ?? ""] === "DataModel";
+
+      if (isNew || isService || CLASS_TYPED_CALLS.has(fnName)) {
+        types.set(name.tok.value, stringValue(arg.tok));
+        break;
+      }
+
+      j = fn.i + 1;
+    }
+  }
+
+  /* Second phase: propagate through member chains and event handlers.
+   *
+   * Run to a fixed point rather than once, because these feed each other — a
+   * service resolves a local, the local's property resolves another local, and
+   * a handler bound off that one names its parameter. Three passes covers the
+   * depth real forum snippets reach; the loop exits early once nothing changed,
+   * so the common case costs one extra walk. */
+  for (let pass = 0; pass < 3; pass++) {
+    const before = types.size;
+
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i]!;
+      if (t.kind !== "keyword" || t.value !== "local") continue;
+      const name = nextSignificantFrom(tokens, i + 1);
+      if (!name || name.tok.kind !== "ident" || types.has(name.tok.value)) continue;
+      const eq = nextSignificantFrom(tokens, name.i + 1);
+      if (!eq || eq.tok.value !== "=") continue;
+      const head = nextSignificantFrom(tokens, eq.i + 1);
+      if (!head) continue;
+
+      const chain = chainType(tokens, head.i, types);
+      // Only when the chain actually stepped through a member — a bare
+      // `local a = b` alias is not what this is for.
+      if (chain && chain.end > head.i) types.set(name.tok.value, chain.type);
+    }
+
+    bindEventParams(tokens, types);
+
+    if (types.size === before) break;
   }
 
   return types;
+}
+
+/**
+ * The type of a dotted chain starting at token `i`, e.g. `localPlayer.Character`.
+ *
+ * Walks one hop at a time through the generated member table, so every step is
+ * a fact Roblox published rather than a guess. Stops at the first hop it cannot
+ * prove, which is what keeps `folder.MyThing` — someone's own child, named
+ * whatever they liked — from resolving to anything.
+ *
+ * Returns the type and the index of the last token consumed, so a caller can
+ * tell how much of the expression was accounted for.
+ */
+function chainType(
+  tokens: Token[],
+  i: number,
+  types: Map<string, string>,
+): { type: string; end: number } | null {
+  const head = tokens[i];
+  if (!head || (head.kind !== "ident" && head.kind !== "builtin")) return null;
+
+  let current = types.get(head.value) ?? GLOBAL_TYPES[head.value];
+  if (!current) return null;
+
+  let end = i;
+  let j = i + 1;
+  for (;;) {
+    const sep = nextSignificantFrom(tokens, j);
+    if (!sep || (sep.tok.value !== "." && sep.tok.value !== ":")) break;
+    const member = nextSignificantFrom(tokens, sep.i + 1);
+    if (!member || (member.tok.kind !== "ident" && member.tok.kind !== "builtin")) break;
+
+    const next = memberType(current, member.tok.value);
+    if (!next) break;
+    current = next;
+    end = member.i;
+    j = member.i + 1;
+  }
+
+  return { type: current, end };
+}
+
+/**
+ * The type of the expression sitting immediately before the `.`/`:` at `sepIdx`.
+ *
+ * Two shapes, because those are the two that appear:
+ *
+ *     userInputService.InputBegan          -- a named local or global
+ *     game:GetService("UserInputService")  -- an inline call, used directly
+ *          .InputBegan
+ *
+ * The second is extremely common in forum snippets, where people paste a single
+ * statement rather than a script with its services hoisted. Without it the whole
+ * chain after the closing paren resolved to nothing.
+ */
+export function exprTypeBefore(
+  tokens: Token[],
+  sepIdx: number,
+  types: Map<string, string>,
+): string | undefined {
+  let j = sepIdx - 1;
+  while (j >= 0 && (tokens[j]!.kind === "whitespace" || tokens[j]!.kind === "comment")) j--;
+  const prev = tokens[j];
+  if (!prev) return undefined;
+
+  if (prev.kind === "ident" || prev.kind === "builtin") {
+    return types.get(prev.value) ?? GLOBAL_TYPES[prev.value];
+  }
+
+  // A call expression: walk back over the balanced parens to its callee.
+  if (prev.value !== ")") return undefined;
+  let depth = 0;
+  let k = j;
+  for (; k >= 0; k--) {
+    const v = tokens[k]!.value;
+    if (tokens[k]!.kind === "string") continue;
+    if (v === ")") depth++;
+    else if (v === "(") {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  if (k < 0) return undefined;
+
+  const arg = nextSignificantFrom(tokens, k + 1);
+  const fn = prevSignificant(tokens, k);
+  if (!arg || !fn || arg.tok.kind !== "string") return undefined;
+
+  const sep = prevSignificant(tokens, tokens.indexOf(fn));
+  const recv = sep ? prevSignificant(tokens, tokens.indexOf(sep)) : null;
+  const recvType = recv ? (types.get(recv.value) ?? GLOBAL_TYPES[recv.value]) : undefined;
+
+  const isService = fn.value === "GetService" && recvType === "DataModel";
+  const isNew = fn.value === "new" && recv?.value === "Instance";
+  if (isService || isNew || CLASS_TYPED_CALLS.has(fn.value)) return stringValue(arg.tok);
+  return undefined;
+}
+
+/** First significant token at or after `from`. */
+function nextSignificantFrom(tokens: Token[], from: number): { tok: Token; i: number } | null {
+  for (let j = from; j < tokens.length; j++) {
+    const t = tokens[j]!;
+    if (t.kind !== "whitespace" && t.kind !== "comment") return { tok: t, i: j };
+  }
+  return null;
+}
+
+/**
+ * Bind callback parameters from the event they are connected to.
+ *
+ * `uis.InputBegan:Connect(function(input, gameProcessedEvent)` declares, in
+ * Roblox's own data, that the first parameter is an `InputObject`. That is the
+ * difference between `input.KeyCode` linking and staying grey, and it is the
+ * single most common shape in forum code after `GetService`.
+ *
+ * Only `Connect`, `Once` and `ConnectParallel` — the three that take a handler
+ * whose parameters the event defines. `Wait` returns them instead.
+ */
+const CONNECTORS = new Set(["Connect", "Once", "ConnectParallel"]);
+
+function bindEventParams(tokens: Token[], types: Map<string, string>): void {
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (t.kind !== "ident" || !CONNECTORS.has(t.value)) continue;
+
+    // `<chain>.Event : Connect ( function ( p1, p2 )`
+    const colon = prevSignificant(tokens, i);
+    if (!colon || (colon.value !== ":" && colon.value !== ".")) continue;
+    const evt = prevSignificant(tokens, tokens.indexOf(colon));
+    if (!evt || (evt.kind !== "ident" && evt.kind !== "builtin")) continue;
+
+    // The receiver is whatever chain sits before the event name.
+    const evtPos = tokens.indexOf(evt);
+    const sep2 = prevSignificant(tokens, evtPos);
+    if (!sep2 || (sep2.value !== "." && sep2.value !== ":")) continue;
+    const owner = exprTypeBefore(tokens, tokens.indexOf(sep2), types);
+    if (!owner) continue;
+
+    const paramTypes = eventParamTypes(owner, evt.value);
+    if (!paramTypes) continue;
+
+    // `Connect ( function ( a , b )`
+    const open = nextSignificantFrom(tokens, i + 1);
+    if (!open || open.tok.value !== "(") continue;
+    const fn = nextSignificantFrom(tokens, open.i + 1);
+    if (!fn || fn.tok.value !== "function") continue;
+    const argsOpen = nextSignificantFrom(tokens, fn.i + 1);
+    if (!argsOpen || argsOpen.tok.value !== "(") continue;
+
+    let k = argsOpen.i + 1;
+    let slot = 0;
+    for (;;) {
+      const p = nextSignificantFrom(tokens, k);
+      if (!p || p.tok.value === ")") break;
+      if (p.tok.kind === "ident") {
+        const type = paramTypes[slot];
+        // Only bind names whose declared type is something that can own members.
+        if (type && !types.has(p.tok.value)) types.set(p.tok.value, type);
+        slot++;
+      }
+      const comma = nextSignificantFrom(tokens, p.i + 1);
+      if (!comma || comma.tok.value !== ",") break;
+      k = comma.i + 1;
+    }
+  }
+}
+
+/** The identifier immediately before the `.`/`:` at `sepIndex`, if any. */
+function recvValue(tokens: Token[], sepIndex: number): string | undefined {
+  for (let j = sepIndex - 1; j >= 0; j--) {
+    const t = tokens[j]!;
+    if (t.kind === "whitespace" || t.kind === "comment") continue;
+    return t.kind === "ident" || t.kind === "builtin" ? t.value : undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -133,7 +407,7 @@ export function inferLocalTypes(tokens: Token[]): Map<string, string> {
  * an identifier after `:`. The difference is what precedes the receiver:
  * `local x: T` has a declaration keyword behind it, `obj:method()` does not.
  */
-function isTypePosition(tokens: Token[], i: number, prev: Token): boolean {
+export function isTypePosition(tokens: Token[], i: number, prev: Token): boolean {
   if (prev.kind === "operator" && prev.value === "::") return true;
   if (prev.value !== ":") return false;
 

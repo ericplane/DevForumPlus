@@ -1,7 +1,14 @@
 import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { decorateCooked } from "../decorate";
-import { detect, inferLocalTypes, GLOBAL_TYPES, type Finding } from "../../luau/detect";
+import {
+  detect,
+  inferLocalTypes,
+  isTypePosition,
+  exprTypeBefore,
+  GLOBAL_TYPES,
+  type Finding,
+} from "../../luau/detect";
 import {
   DOC_CLASSES,
   DOC_DATATYPES,
@@ -60,6 +67,30 @@ const KIND_CLASS: Partial<Record<TokenKind, string>> = {
   operator: "dfp-tok-op",
 };
 
+/**
+ * Field and method names, coloured from position alone.
+ *
+ * Every name after a `.` or `:` was previously a bare `ident` and rendered the
+ * same plain white as a local variable, so `killbrick.Touched:Connect(…)` came
+ * out with `Touched` and `Connect` looking exactly like `killbrick`. Naming
+ * what you are reaching into is the single most useful colour in a language
+ * built on `a.b:c()`, and it needs no type inference at all — the separator
+ * proves it.
+ *
+ * Deliberately done here rather than in the tokenizer: `detect.ts` keys the
+ * deprecation scanner off `kind === "ident"` in four places, so introducing new
+ * kinds upstream would silently stop it finding anything.
+ *
+ * `:` is a method call and `.` is a field access, which is what Luau's own
+ * syntax means, so they get different colours rather than one shared one.
+ */
+function memberClass(prevValue: string | undefined, kind: TokenKind): string | undefined {
+  if (kind !== "ident" && kind !== "builtin") return undefined;
+  if (prevValue === ":") return "dfp-tok-method";
+  if (prevValue === ".") return "dfp-tok-prop";
+  return undefined;
+}
+
 export interface Segment {
   text: string;
   cls?: string;
@@ -111,9 +142,13 @@ function apiRefAt(
 
   // ── Member of something whose owner is known ─────────────────────────────
   if (afterDot) {
-    const recv = before(tokens.indexOf(prev!));
-    if (!recv) return undefined;
-    const owner = ownerOf(recv, localTypes);
+    /* `exprTypeBefore` first, because it also resolves a receiver that is a call
+     * rather than a name — `game:GetService("UserInputService").InputBegan`, the
+     * form people paste when they quote a single statement. `ownerOf` still
+     * handles the cases it knows: a class or namespace used directly. */
+    const sepIdx = tokens.indexOf(prev!);
+    const recv = before(sepIdx);
+    const owner = exprTypeBefore(tokens, sepIdx, localTypes) ?? (recv ? ownerOf(recv, localTypes) : undefined);
     if (!owner) return undefined;
 
     // `Enum.KeyCode.Space` — the middle segment is the enum, the last its item.
@@ -253,8 +288,15 @@ export function segment(source: string): Segment[] {
       continue;
     }
 
-    const api = apiRefAt(tokens, i, localTypes, after, before);
-    out.push({ text: t.value, cls: KIND_CLASS[t.kind], api });
+    /* `local hum: Humanoid = …` puts an identifier after a `:` without it being
+     * a method call at all. Without this the annotation was coloured as a
+     * method and linked as `Humanoid.Humanoid` — a member of itself. */
+    const prev = before(i);
+    const inTypePosition = !!prev && isTypePosition(tokens, i, prev);
+
+    const api = inTypePosition ? undefined : apiRefAt(tokens, i, localTypes, after, before);
+    const cls = (inTypePosition ? undefined : memberClass(prev?.value, t.kind)) ?? KIND_CLASS[t.kind];
+    out.push({ text: t.value, cls, api });
   }
 
   return out;
