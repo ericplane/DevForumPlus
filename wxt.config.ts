@@ -1,7 +1,7 @@
 import { defineConfig } from "wxt";
 
 /**
- * DevForum Plus — Chromium-only (Chrome / Brave / Edge).
+ * DevForum Plus — Chromium (Chrome / Brave / Edge) and Firefox.
  *
  * Two content scripts, deliberately:
  *   - main-world:  runs in the page's JS world so it can reach Discourse's
@@ -17,11 +17,20 @@ import { defineConfig } from "wxt";
 export default defineConfig({
   srcDir: "src",
   outDir: ".output",
-  browser: "chrome",
-  targetBrowsers: ["chrome"],
+  targetBrowsers: ["chrome", "firefox"],
   manifestVersion: 3,
 
-  manifest: {
+  /* The manifest is a function because two keys genuinely differ per target,
+   * and both would break the other browser if shared. See each one below.
+   *
+   * Firefox viability was settled empirically before this was written, not
+   * assumed: tools/firefox-probe/ loads a `world: "MAIN"` content script on the
+   * live forum and reports whether it reaches Discourse's AMD loader. Result on
+   * Firefox 128+: the script runs, `require()` resolves in ~589ms, and
+   * `PLUGIN_API_VERSION` is 2.1.1 — the same version the Chrome build targets.
+   * So the two-world architecture, and every JS feature built on it, ports
+   * intact rather than degrading to the CSS-only rung. */
+  manifest: ({ browser }) => ({
     name: "DevForum Plus",
     short_name: "DevForum+",
     description:
@@ -30,7 +39,17 @@ export default defineConfig({
 
     // Exactly one origin. No <all_urls>, no tabs, no cookies, no webRequest.
     host_permissions: ["https://devforum.roblox.com/*"],
-    permissions: ["storage", "declarativeNetRequest"],
+
+    /* `declarativeNetRequest` is Chromium-only here.
+     *
+     * Firefox's DNR does not implement static rulesets the way this uses them,
+     * and the single feature behind it — an optional, off-by-default ruleset
+     * that skips one decorative footer bundle — is not worth a second code path
+     * or a permission prompt that buys the user nothing. The one call site in
+     * background.ts is already inside a try/catch, so the Firefox build simply
+     * never enables a ruleset. */
+    permissions:
+      browser === "firefox" ? ["storage"] : ["storage", "declarativeNetRequest"],
 
     /* Opt-in network trimming (PLAN.md §4.4). Every ruleset ships DISABLED and
      * is turned on only from settings.
@@ -41,16 +60,36 @@ export default defineConfig({
      * Those are compliance surfaces — interfering with them is both legally
      * dubious and hostile to the user, so they are not blockable at any
      * setting rather than merely defaulted off. */
-    declarative_net_request: {
-      rule_resources: [
-        {
-          id: "lite-footer",
-          enabled: false,
-          path: "rules/lite-footer.json",
-        },
-      ],
-    },
+    ...(browser === "firefox"
+      ? {}
+      : {
+          declarative_net_request: {
+            rule_resources: [
+              {
+                id: "lite-footer",
+                enabled: false,
+                path: "rules/lite-footer.json",
+              },
+            ],
+          },
+        }),
     optional_permissions: ["notifications"],
+
+    /* Firefox requires an extension id for a temporary or signed install, and
+     * `strict_min_version` is doing real work: `world: "MAIN"` in a manifest
+     * content script landed in 128, and without it this silently falls back to
+     * an isolated world where `require()` does not exist — the one failure that
+     * would look like "the extension does nothing" with no error anywhere. */
+    ...(browser === "firefox"
+      ? {
+          browser_specific_settings: {
+            gecko: {
+              id: "devforum-plus@ericplane.dev",
+              strict_min_version: "128.0",
+            },
+          },
+        }
+      : {}),
 
     /* The Creator Docs shards. The isolated content script fetches exactly one
      * per hover, so they have to be reachable from a content script — which in
@@ -91,8 +130,8 @@ export default defineConfig({
 
     // The site sends `frame-ancestors 'self'`, so nothing here can be framed
     // by an extension page anyway. Listed for completeness of intent.
-    minimum_chrome_version: "116",
-  },
+    ...(browser === "firefox" ? {} : { minimum_chrome_version: "116" }),
+  }),
 
   vite: () => ({
     build: {

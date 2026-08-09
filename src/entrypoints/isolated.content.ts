@@ -45,22 +45,43 @@ export default defineContentScript({
     let latestDiagnostics: Diagnostics | null = null;
     new IsolatedBridge({ onDiagnostics: (d) => (latestDiagnostics = d) });
 
+    /* Each mount is isolated, so one throwing cannot take the others with it.
+     *
+     * They used to be bare calls in sequence. A single unbound
+     * `requestIdleCallback` inside the docs-card mount — legal in Chrome, a
+     * TypeError in Firefox — therefore killed the ⌘K palette, the composer
+     * helpers and the onboarding card, none of which touch idle callbacks. The
+     * symptom was "the palette does not work on Firefox", four steps from the
+     * cause, with nothing in the page console.
+     *
+     * The MAIN world has had this guarantee since the start: ModuleRegistry
+     * wraps every install so a broken feature disables itself and nothing else.
+     * This is the same rule, finally applied on this side of the bridge. */
+    const step = (name: string, fn: () => void) => {
+      try {
+        fn();
+      } catch (err) {
+        // Never rethrow into the page, and never stop the remaining mounts.
+        console.warn(`[DFP] ${name} failed to mount`, err);
+      }
+    };
+
     // 3. `?dfp-perf=1` — budgets from PLAN.md §4.1, measured live rather than
     //    asserted in a README.
-    mountPerfOverlay(() => latestDiagnostics);
+    step("perf-overlay", () => mountPerfOverlay(() => latestDiagnostics));
 
     // 4. Creator Docs hover cards. Delegated listeners only, so this costs
     //    nothing until someone actually hovers an API name that MAIN resolved.
-    mountDocsCards();
+    step("docs-cards", mountDocsCards);
 
     // 5. ⌘K. One keydown listener until it is actually opened.
-    mountCommandPalette();
+    step("command-palette", mountCommandPalette);
 
     // 6. Composer: duplicate detection, draft vault, Luau block button.
-    mountComposer();
+    step("composer", mountComposer);
 
     // 7. First-run card. One storage read, then nothing.
-    mountOnboarding();
+    step("onboarding", mountOnboarding);
 
     // 8. Reconcile with the real settings once storage resolves.
     void getSettings().then((settings) => {

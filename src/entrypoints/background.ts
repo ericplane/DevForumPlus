@@ -39,11 +39,19 @@ async function syncTrimRulesets(settings: DfpSettings): Promise<void> {
 }
 
 export default defineBackground(() => {
-  // Must be called on every worker start, not just on install: access level is
-  // per-session, and the worker is torn down and restarted constantly.
+  /* Must be called on every worker start, not just on install: access level is
+   * per-session, and the worker is torn down and restarted constantly.
+   *
+   * Optional-called because `setAccessLevel` is Chromium-only. On Firefox the
+   * property is undefined, and calling it would throw synchronously — which a
+   * trailing `.catch()` cannot see, so this would have taken the whole
+   * background script down at startup rather than degrading. Firefox has no
+   * equivalent because its content scripts cannot read `storage.session` at
+   * all; diagnostics simply report unavailable there, which they already
+   * handle. */
   chrome.storage.session
-    .setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" })
-    .catch(() => {
+    .setAccessLevel?.({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" })
+    ?.catch(() => {
       // Older Chromium, or already set. Diagnostics degrade to unavailable.
     });
 

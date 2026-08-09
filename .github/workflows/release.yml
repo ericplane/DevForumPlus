@@ -1,0 +1,109 @@
+# Build the extension and attach the store-ready zips to a GitHub release.
+name: Release
+
+on:
+  # Primary path: publish a release in the GitHub UI (or with `gh release create`)
+  # and the artifacts appear on it a couple of minutes later.
+  release:
+    types: [published]
+  # Manual runs for dry-checking a build without cutting a release. Artifacts go
+  # to the run's own artifact list rather than to a release.
+  workflow_dispatch:
+
+permissions:
+  contents: write # required to upload assets onto the release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The toolchain needs 20.11+ for `import.meta.dirname`; .nvmrc is the
+      # single source of truth, so CI cannot drift from local.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # `package-lock.json` is gitignored in this repo, so `npm ci` has nothing
+      # to work from. Deliberate rather than an oversight — see .gitignore.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      # The Creator Docs checkout is ~9.5 MB and does not change between runs of
+      # the same release. Cached on the tarball so a re-run does not re-download.
+      - name: Cache Creator Docs source
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache
+          key: creator-docs-${{ hashFiles('scripts/build-docs-index.ts') }}
+
+      # `public/docs/` and `public/rules/` are both gitignored build outputs, so
+      # a fresh checkout has neither. Without this step the extension builds
+      # successfully and ships with no hover documentation at all — a failure
+      # that is invisible until someone hovers a class name.
+      - name: Generate bundled data
+        run: |
+          npm run docs-index
+          npm run rules
+
+      # A release must be reproducible from what is committed. `docs-index`
+      # rewrites tracked generated sources from upstream Creator Docs, so if
+      # upstream moved since the last commit, the build about to be shipped is
+      # not the build that was reviewed. Fail loudly rather than ship the drift.
+      - name: Check generated sources are current
+        run: |
+          if ! git diff --quiet -- src/luau; then
+            echo "::error::Generated sources under src/luau/ drifted from the commit."
+            echo "Creator Docs upstream has changed. Run 'npm run docs-index' locally,"
+            echo "review the diff, commit it, and re-cut the release."
+            git diff --stat -- src/luau
+            exit 1
+          fi
+
+      # Typecheck, style guardrails and unit tests. A release should never be
+      # the first place these run.
+      - name: Check
+        run: npm run check
+
+      - name: Build and zip
+        run: |
+          npm run zip
+          npx wxt zip -b firefox
+
+      # The zip filenames carry the manifest version, which lives in
+      # wxt.config.ts and has no connection to the git tag. Tagging v0.2.0 with
+      # the config still on 0.1.0 produces zips a store will reject as a
+      # duplicate upload — caught here instead of three days later.
+      - name: Verify version matches the tag
+        if: github.event_name == 'release'
+        run: |
+          manifest_version="$(node -p "require('./.output/chrome-mv3/manifest.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          echo "manifest: $manifest_version   tag: $tag"
+          if [ "$manifest_version" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest version $manifest_version."
+            echo "Bump 'version' in wxt.config.ts, commit, and re-tag."
+            exit 1
+          fi
+
+      - name: List artifacts
+        run: ls -lh .output/*.zip
+
+      # Attached to the release itself, so the download links are stable and
+      # public.
+      - name: Attach to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" .output/*.zip --clobber
+
+      # Manual runs have no release to attach to; keep the output reachable.
+      - name: Upload artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-zips
+          path: .output/*.zip
+          retention-days: 14

@@ -539,10 +539,26 @@ function verifyPending(): void {
 function scheduleVerify(): void {
   if (verifyScheduled) return;
   verifyScheduled = true;
-  const idle = (window as unknown as { requestIdleCallback?: typeof setTimeout })
-    .requestIdleCallback;
-  if (idle) idle(() => verifyPending(), { timeout: 500 } as never);
-  else setTimeout(verifyPending, 50);
+
+  /* Called as a method on `window`, never detached into a local first.
+   *
+   * `const idle = window.requestIdleCallback; idle(…)` loses the receiver, and
+   * Firefox enforces the WebIDL `this` check that Chrome lets slide:
+   *
+   *   TypeError: 'requestIdleCallback' called on an object that does not
+   *   implement interface Window.
+   *
+   * It threw during mount, which took out every isolated feature that mounts
+   * after this one — the ⌘K palette, the composer helpers and the onboarding
+   * card all went with it, and none of them touch idle callbacks. */
+  const w = window as Window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+  };
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(() => verifyPending(), { timeout: 500 });
+  } else {
+    setTimeout(verifyPending, 50);
+  }
 }
 
 /**

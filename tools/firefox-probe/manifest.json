@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "DFP Firefox MAIN-world probe",
+  "version": "1.0",
+  "description": "Answers one question: can a world:MAIN content script reach Discourse's module loader on devforum.roblox.com under Firefox?",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "dfp-firefox-probe@devforumplus.invalid",
+      "strict_min_version": "128.0"
+    }
+  },
+
+  "host_permissions": ["https://devforum.roblox.com/*"],
+
+  "content_scripts": [
+    {
+      "matches": ["https://devforum.roblox.com/*"],
+      "js": ["main-world.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://devforum.roblox.com/*"],
+      "js": ["isolated.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

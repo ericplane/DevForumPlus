@@ -1,7 +1,7 @@
 # DevForum Plus
 
 A browser extension for [devforum.roblox.com](https://devforum.roblox.com) — Luau-aware code
-intelligence, faster navigation, and a full restyle. Chromium only: Chrome, Brave, Edge.
+intelligence, faster navigation, and a full restyle. Chrome, Brave, Edge and Firefox 128+.
 
 Every feature below can be turned off individually, and the redesign can be switched off while
 keeping the features.
@@ -73,10 +73,16 @@ nvm use && npm install && npm run build
 
 Then load it:
 
-1. Open `chrome://extensions` (or `brave://extensions`)
-2. Enable **Developer mode**
-3. **Load unpacked** → select `.output/chrome-mv3`
-4. Open <https://devforum.roblox.com>
+**Chromium** — open `chrome://extensions` (or `brave://extensions`), enable **Developer mode**,
+**Load unpacked**, select `.output/chrome-mv3`.
+
+**Firefox** — run `npx wxt build -b firefox`, open `about:debugging` → **This Firefox** →
+**Load Temporary Add-on…**, select `.output/firefox-mv3/manifest.json`. Firefox 128 is the floor:
+`world: "MAIN"` content scripts landed there, and without one the extension cannot reach
+Discourse's module loader at all. Firefox also treats host permissions as opt-in, so grant access
+to devforum.roblox.com when prompted or nothing runs.
+
+Then open <https://devforum.roblox.com>.
 
 The toolbar popup reports which boot rung engaged — the first thing to check if something looks off.
 
