@@ -35,7 +35,7 @@ export default defineConfig({
     short_name: "DevForum+",
     description:
       "A faster, cleaner, more capable devforum.roblox.com. Modern design, instant navigation, and Luau-aware code intelligence.",
-    version: "0.1.0",
+    version: "1.1.0",
 
     // Exactly one origin. No <all_urls>, no tabs, no cookies, no webRequest.
     host_permissions: ["https://devforum.roblox.com/*"],
@@ -49,7 +49,9 @@ export default defineConfig({
      * background.ts is already inside a try/catch, so the Firefox build simply
      * never enables a ruleset. */
     permissions:
-      browser === "firefox" ? ["storage"] : ["storage", "declarativeNetRequest"],
+      browser === "firefox"
+        ? ["storage"]
+        : ["storage", "declarativeNetRequest"],
 
     /* Opt-in network trimming (PLAN.md §4.4). Every ruleset ships DISABLED and
      * is turned on only from settings.
