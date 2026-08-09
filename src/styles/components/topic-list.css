@@ -1,0 +1,450 @@
+/* Topic list.
+ *
+ * The list is the forum's front page and its worst-designed surface: title,
+ * category, poster avatars, three numeric columns and a date all compete at
+ * roughly equal visual weight, so nothing is scannable.
+ *
+ * The fix is hierarchy, not decoration — promote the title, demote the meta,
+ * and give each row a card so the eye has something to track. Everything here
+ * is `transform`/`opacity`/`background` so hover never triggers layout.
+ *
+ * The markup is a real <table>, which constrains the approach: card rows need
+ * `border-collapse: separate` plus per-cell borders, because a <tr> cannot
+ * carry a border or a border-radius of its own.
+ */
+
+html[data-dfp] table.topic-list {
+  border-collapse: separate;
+  border-spacing: 0 var(--dfp-row-gap);
+}
+
+/* "See N new or updated topics".
+ *
+ * Discourse positions this `absolute; top: 0` over the head of the list and
+ * relies on it being short enough not to matter. Giving it real alert styling
+ * made it 56px tall, so it sat on top of the first row. Putting it back in
+ * normal flow means it can never overlap, whatever height it ends up. */
+html[data-dfp] .show-more.has-topics {
+  position: static;
+  margin-block-end: var(--dfp-s-3);
+}
+
+html[data-dfp] .show-more .alert {
+  display: block;
+  padding: var(--dfp-s-2) var(--dfp-s-4);
+  border-radius: var(--dfp-r-md);
+  background: var(--dfp-accent-soft);
+  border: 1px solid color-mix(in oklab, var(--dfp-accent) 30%, transparent);
+  color: var(--dfp-accent);
+  font-weight: var(--dfp-fw-medium);
+  font-size: var(--dfp-fs-sm);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .show-more .alert:hover {
+  background: color-mix(in oklab, var(--dfp-accent) 22%, transparent);
+}
+
+/* The sortable columns wrap their label in an <a>/<button>, so the transform
+ * has to reach the child or "TOPIC" ends up uppercase next to a sentence-case
+ * "Replies". */
+html[data-dfp] .topic-list-header th,
+html[data-dfp] .topic-list-header th > a,
+html[data-dfp] .topic-list-header th > button,
+html[data-dfp] .topic-list-header th .d-button-label {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+html[data-dfp] .topic-list-header th {
+  border: 0;
+  padding-block: var(--dfp-s-2);
+}
+
+/* ── Row as card ────────────────────────────────────────────────────────── */
+
+/* The <tr> carries its own border-bottom (coloured via --primary-low, which
+ * base.css retargets — so it inherits our border colour and becomes a real
+ * visible line). With the card borders on the cells, that is a second rule
+ * drawn just below the first. */
+html[data-dfp] .topic-list-item {
+  border-bottom: 0;
+}
+
+html[data-dfp] .topic-list-item > td {
+  background: var(--dfp-surface-1);
+  border-block: 1px solid var(--dfp-border);
+  padding-block: var(--dfp-row-pad-y);
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* Note: the first row's padding-top is forced in overrides/hard.css — Discourse
+ * zeroes it with !important, so no amount of specificity reaches it. */
+
+html[data-dfp] .topic-list-item > td:first-child {
+  border-inline-start: 1px solid var(--dfp-border);
+  border-start-start-radius: var(--dfp-r-md);
+  border-end-start-radius: var(--dfp-r-md);
+  padding-inline-start: var(--dfp-row-pad-x);
+  position: relative;
+}
+
+html[data-dfp] .topic-list-item > td:last-child {
+  border-inline-end: 1px solid var(--dfp-border);
+  border-start-end-radius: var(--dfp-r-md);
+  border-end-end-radius: var(--dfp-r-md);
+  padding-inline-end: var(--dfp-row-pad-x);
+}
+
+/* There was a coloured status rail on the left edge of every row here. It is
+ * gone: rails read as clutter down a long list, and the row card plus the
+ * category chip already carry the structure the rail was reinforcing. Signals
+ * are expressed as tint and weight instead — see the DFP signal classes at the
+ * bottom of this file. */
+
+html[data-dfp] .topic-list-item:hover > td {
+  background: var(--dfp-surface-2);
+  border-color: var(--dfp-border-strong);
+}
+
+/* ── Title ──────────────────────────────────────────────────────────────── */
+
+/* Deliberately NOT a flex container.
+ *
+ * Flex made the title one atomic item, so on any row whose title wrapped to two
+ * lines the unread dot and post badges were pushed onto a third line of their
+ * own — costing ~20px on exactly the rows that were already the tallest.
+ *
+ * Normal inline flow lets the badges sit after the last word of the title,
+ * which is both shorter and where a reader expects them. */
+html[data-dfp] .topic-list-item .link-top-line {
+  display: block;
+}
+
+html[data-dfp] .topic-list-item .topic-statuses {
+  display: inline;
+  margin-inline-end: var(--dfp-s-1);
+}
+
+html[data-dfp] .topic-list-item .topic-post-badges {
+  display: inline;
+  margin-inline-start: var(--dfp-s-2);
+  white-space: nowrap;
+}
+
+/* The extra `.link-top-line` is deliberate, not redundant. Discourse styles the
+ * title through a more specific selector than `.topic-list-item a.title`, and
+ * the CDN serves those stylesheets without CORS headers so the rule cannot be
+ * read back from the page — this was found by bisecting specificity against the
+ * live site. One extra class wins it without reaching for !important. */
+html[data-dfp] .topic-list-item .link-top-line a.title {
+  font-size: var(--dfp-fs-lg);
+  font-weight: var(--dfp-fw-semibold);
+  line-height: var(--dfp-lh-snug);
+  letter-spacing: var(--dfp-track-title);
+  color: var(--dfp-text);
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+  /* Discourse ships `padding: 15px 0` on the title link to fake row height.
+   * With the row already padded by the card, that is 30px of dead space per
+   * row — measured as the single largest contributor to a 152px row that
+   * should be about 76px. */
+  padding: 0;
+}
+
+html[data-dfp] .topic-list-item:hover .link-top-line a.title {
+  color: var(--dfp-accent);
+}
+
+/* Read topics recede rather than disappear — still legible, clearly secondary. */
+html[data-dfp] .topic-list-item.visited .link-top-line a.title,
+html[data-dfp] .topic-list-item .link-top-line a.title.visited {
+  color: var(--dfp-text-2);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp] .topic-list-item .link-bottom-line {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  margin-top: var(--dfp-s-1);
+}
+
+html[data-dfp] .topic-list-item .topic-excerpt {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  margin-top: var(--dfp-s-2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ── Category chips and tags ─────────────────────────────────────────────
+ *
+ * Discourse exposes the category colour as --category-badge-color inline on
+ * the wrapper, so these are tinted from real data rather than a hardcoded map
+ * that would rot the moment a category is recoloured.
+ *
+ * The redesign is about restraint. The chip previously carried FOUR colour
+ * signals for one fact: a coloured square, a coloured border, a tinted
+ * background and coloured text. Four ways of saying "Scripting Support" is
+ * three too many, and with two chips side by side (parent and child) the title
+ * underneath was losing the contest.
+ *
+ * Now one signal carries it — a coloured dot — over a whisper of tint, with
+ * the label in ordinary text colour so it stays legible at 12px. Categories
+ * are filled, tags are outlined, which is what makes the hierarchy between
+ * them readable at a glance instead of requiring a colour lookup. */
+
+html[data-dfp] .badge-category__wrapper .badge-category {
+  border-radius: var(--dfp-r-full);
+  padding: 3px var(--dfp-s-2) 3px 7px;
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  line-height: 1.4;
+  background: color-mix(in oklab, var(--category-badge-color, var(--dfp-accent)) 13%, transparent);
+  color: var(--dfp-text);
+  border: 1px solid transparent;
+  gap: 6px;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* Discourse draws the category marker as a 10px square (`--style-square`).
+ * A dot reads as an indicator; a square reads as an unfinished swatch. */
+html[data-dfp] .badge-category::before {
+  border-radius: var(--dfp-r-full);
+  inline-size: 8px;
+  block-size: 8px;
+  flex: 0 0 auto;
+}
+
+html[data-dfp] .badge-category__wrapper:hover .badge-category,
+html[data-dfp] .topic-list-item:hover .badge-category {
+  background: color-mix(in oklab, var(--category-badge-color, var(--dfp-accent)) 22%, transparent);
+  border-color: color-mix(in oklab, var(--category-badge-color, var(--dfp-accent)) 35%, transparent);
+}
+
+/* ── Meta columns ───────────────────────────────────────────────────────── */
+
+html[data-dfp] .topic-list-item .num,
+html[data-dfp] .topic-list-item .age,
+html[data-dfp] .topic-list-item .activity {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-dfp] .topic-list-item .posts-map .badge-posts {
+  color: var(--dfp-text-2);
+  font-weight: var(--dfp-fw-medium);
+}
+
+/* Discourse's activity "heatmap" tints busy columns orange — measured
+ * rgb(254,122,21) for high, rgb(207,119,33) for medium. Against this palette
+ * it reads as an error state, and it is the loudest thing on the page.
+ *
+ * The signal is worth keeping, so express it as brightness instead of hue:
+ * busier is brighter. Same information, no clash, and it still works for
+ * anyone who cannot separate orange from red. */
+html[data-dfp] .topic-list-item td[class*="heatmap-high"] a,
+html[data-dfp] .topic-list-item td[class*="heatmap-high"] button,
+html[data-dfp] .topic-list-item td[class*="heatmap-high"] span {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+html[data-dfp] .topic-list-item td[class*="heatmap-med"] a,
+html[data-dfp] .topic-list-item td[class*="heatmap-med"] button,
+html[data-dfp] .topic-list-item td[class*="heatmap-med"] span {
+  color: var(--dfp-text-2);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp] .topic-list-item td[class*="heatmap-low"] a,
+html[data-dfp] .topic-list-item td[class*="heatmap-low"] button,
+html[data-dfp] .topic-list-item td[class*="heatmap-low"] span {
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .topic-list .discourse-tags .discourse-tag {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+}
+
+/* Tags are pills now, so Discourse's literal comma between them reads as a
+ * typo. The list already has role="list" for assistive tech, so the visual
+ * separator carries no information. */
+html[data-dfp] .discourse-tags__tag-separator {
+  display: none;
+}
+
+html[data-dfp] .discourse-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--dfp-s-1);
+  align-items: center;
+}
+
+html[data-dfp] .topic-list-item .topic-avatar img.avatar,
+html[data-dfp] .topic-list-item .posters img.avatar {
+  border-radius: var(--dfp-r-full);
+  border: 1px solid var(--dfp-border);
+}
+
+/* ── DFP signal classes ──────────────────────────────────────────────────
+ * Added by the topic-list-signals module. Each one is derived from data the
+ * list payload already carried — see discourse/modules/topic-list-signals.ts. */
+
+/* Solved reads as a tint rather than a rail — present when you look for it,
+ * invisible when you are scanning titles. */
+html[data-dfp] .topic-list-item.dfp-solved > td {
+  background: color-mix(in oklab, var(--dfp-solved) 5%, var(--dfp-surface-1));
+}
+
+html[data-dfp] .topic-list-item.dfp-solved:hover > td {
+  background: color-mix(in oklab, var(--dfp-solved) 9%, var(--dfp-surface-2));
+}
+
+/* Stale threads are the forum's quiet hazard: a 2018 answer ranks in Google
+ * and reads as current. Muting them is a nudge, not a warning — the real
+ * warning lands on the post itself once code intelligence ships. */
+html[data-dfp] .topic-list-item.dfp-stale > td {
+  background: color-mix(in oklab, var(--dfp-surface-1) 70%, var(--dfp-bg));
+}
+
+html[data-dfp] .topic-list-item.dfp-stale a.title {
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .topic-list-item.dfp-stale .age::after {
+  content: "";
+  display: inline-block;
+  inline-size: 5px;
+  block-size: 5px;
+  margin-inline-start: var(--dfp-s-1);
+  border-radius: var(--dfp-r-full);
+  background: var(--dfp-warning);
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
+html[data-dfp] .topic-list-item.dfp-busy .posts-map .badge-posts {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+html[data-dfp] .topic-list-item.dfp-closed a.title {
+  color: var(--dfp-text-3);
+}
+
+/* Pinned rows earn a tint, not a different layout. */
+html[data-dfp] .topic-list-item.pinned > td {
+  background: color-mix(in oklab, var(--dfp-accent) 5%, var(--dfp-surface-1));
+}
+
+/* ── Staff replied (PLAN.md §7.6 #43) ────────────────────────────────────────
+ *
+ * If you file a bug report, the only thing you care about is whether Roblox
+ * answered. Nothing in any list says so today.
+ *
+ * The data is in the DOM, not the payload. `topic-list-signals.ts` deliberately
+ * left this feature out because `/latest.json` carries no group information —
+ * verified again here: `posters[].primary_group_id` is null on every poster in
+ * Scripting Support. But Discourse renders the poster anchor with the group on
+ * it: `<a href="/u/bluff_006" class="group-Roblox_Staff">`, which is exactly the
+ * hook §7.6 #43 named.
+ *
+ * `:not(:first-child)` is the whole feature. The first anchor in `.posters` is
+ * always the Original Poster (checked against 8 consecutive rows), so matching
+ * the group alone answers "did staff *write* this", not "did staff *reply*". On
+ * /c/updates/announcements — where staff write everything — the naive selector
+ * hits 29 of 30 rows. With `:not(:first-child)` it hits 1, and that one is a
+ * Roblox engineer replying in a thread someone else started. A signal that
+ * fires on most rows is noise, which is the same lesson that deleted
+ * `dfp-fresh`.
+ *
+ * Positive-only, deliberately: `posters` is a *sample* (original, most recent,
+ * most frequent), so a staff reply buried mid-thread may not appear. The badge
+ * therefore means "staff replied", and its absence claims nothing. */
+
+html[data-dfp] .topic-list-item:has(.posters a.group-Roblox_Staff:not(:first-child))
+  .link-top-line::after {
+  content: "Staff replied";
+  display: inline-block;
+  margin-inline-start: var(--dfp-s-2);
+  padding: 0 var(--dfp-s-2);
+  background: color-mix(in oklab, var(--dfp-staff) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--dfp-staff) 38%, transparent);
+  border-radius: var(--dfp-r-pill, 999px);
+  color: var(--dfp-staff);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Category action cluster ─────────────────────────────────────────────
+ * "Report Bug", "New Topic", the split-button chevron and the notification
+ * bell sit in one row and came from three different places: Report Bug is a
+ * Roblox-injected MUI button, New Topic is Discourse's `.btn`, and the last two
+ * are `.btn.no-text`. Measured on /c/updates/announcements they rendered at
+ * three heights (23/23/26px), two font sizes (15.0/13.1px) and two different
+ * `vertical-align` values — so they sat on different baselines.
+ *
+ * Normalising the row rather than each button: they are one control group, and
+ * a group is only as tidy as its worst-aligned member. */
+
+/* `.navigation-controls` is a flex row with `align-items: stretch`, which is
+ * the actual cause: it pulls its children to the tallest one (41px measured),
+ * and "New Topic" sits inside a `.fk-d-button-tooltip` wrapper that stretches
+ * while the button centres inside it — so that one button sat 4px lower than
+ * the rest. Centring the row is what fixes the alignment; the sizing rules
+ * below only make the members match once they stop being stretched. */
+html[data-dfp] .navigation-container,
+html[data-dfp] .navigation-container .navigation-controls {
+  align-items: center;
+}
+
+html[data-dfp] .navigation-container .navigation-controls > * {
+  align-self: center;
+}
+
+html[data-dfp] .navigation-container button,
+html[data-dfp] .navigation-container a.btn {
+  /* One height for every member, set from the type scale so density settings
+   * still move it together. */
+  min-block-size: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  font-size: var(--dfp-fs-sm);
+  line-height: 1;
+  border-radius: var(--dfp-r-sm);
+}
+
+/* The MUI button brings its own padding scale; match it to Discourse's so the
+ * two do not read as different sizes sitting next to each other. */
+html[data-dfp] .navigation-container button.MuiButton-root {
+  padding-inline: var(--dfp-s-3);
+  font-family: inherit;
+  font-weight: var(--dfp-fw-medium);
+  text-transform: none;
+}
+
+/* Icon-only members are square, so they read as a pair rather than as two
+ * differently-proportioned buttons. */
+html[data-dfp] .navigation-container button.no-text,
+html[data-dfp] .navigation-container button.btn-icon {
+  inline-size: 2rem;
+  padding-inline: 0;
+}

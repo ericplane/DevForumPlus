@@ -1,0 +1,468 @@
+/* Header, sidebar, and the surrounding page chrome. */
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+/* The header sits at the same value as the page, not above it.
+ *
+ * It was surface-1, which is lighter than the page background — so the bar
+ * read as a pale stripe across the top and drew the eye to chrome instead of
+ * content. A header is a boundary, not a surface: matching the page and
+ * letting a single hairline define the edge is quieter and looks intentional.
+ * The blur still does its job when content scrolls underneath. */
+html[data-dfp] .d-header {
+  background: color-mix(in oklab, var(--dfp-bg) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid var(--dfp-border);
+  box-shadow: none;
+  transition: border-color var(--dfp-dur-2) var(--dfp-ease);
+  /* Discourse ships `10px 20px 0` — the missing bottom padding pushed the
+   * contents against the border instead of centring them in the bar. */
+  padding-block: 0;
+  align-items: center;
+}
+
+/* The header's inner .wrap must stay transparent. It is the same `.wrap` class
+ * used for the page container, so any background applied to `.wrap` globally
+ * shows up as an opaque rectangle floating inside the translucent header. */
+html[data-dfp] .d-header .wrap {
+  background: transparent;
+}
+
+html[data-dfp] .d-header .contents {
+  display: flex;
+  align-items: center;
+}
+
+html[data-dfp] .d-header .icon,
+html[data-dfp] .d-header .btn {
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-2);
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .d-header .icon:hover,
+html[data-dfp] .d-header .btn:hover {
+  background: var(--dfp-surface-3);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .d-header .header-dropdown-toggle .badge-notification {
+  background: var(--dfp-accent);
+  color: var(--dfp-accent-fg);
+  border-radius: var(--dfp-r-full);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+html[data-dfp] .d-header img.avatar {
+  border-radius: var(--dfp-r-full);
+}
+
+/* ── Navigation menu ──────────────────────────────────────────────────────
+ * VERIFIED, and the finding is worth recording: this forum sets
+ * `navigation_menu: "header dropdown"`, so it has NO sidebar. `.sidebar-wrapper`
+ * is a vestigial 1px element that never receives content — which is why it
+ * needs the `:has(*)` guard below rather than styling.
+ *
+ * The `.sidebar-section-*` classes are still live, though: Discourse reuses
+ * them for the rows inside the hamburger dropdown (23 of them here). So these
+ * rules do real work, just not where the names suggest. */
+
+/* `:has(*)` is load-bearing.
+ *
+ * When the sidebar is collapsed Discourse leaves `.sidebar-wrapper` in the DOM
+ * at 1px wide with no element children. An unconditional border-inline-end
+ * then paints a full-height vertical line down the left of the page with
+ * nothing attached to it. Only draw the edge when there is actually a sidebar
+ * to edge. (`:empty` does not work here — the element contains whitespace text
+ * nodes, so it never matches.) */
+html[data-dfp] .sidebar-wrapper:has(*) {
+  background: var(--dfp-bg);
+  border-inline-end: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .sidebar-section-header,
+html[data-dfp] .sidebar-section-header-text {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+html[data-dfp] .sidebar-section-link {
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-2);
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .sidebar-section-link:hover {
+  background: var(--dfp-surface-2);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .sidebar-section-link.active,
+html[data-dfp] .sidebar-section-link--active {
+  background: var(--dfp-accent-soft);
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+}
+
+/* Category markers in the dropdown are squares, while every other category
+ * marker in the product is now a dot. Same fact, same shape. */
+html[data-dfp] .sidebar-section-link-prefix .prefix-square {
+  border-radius: var(--dfp-r-full);
+  inline-size: 9px;
+  block-size: 9px;
+}
+
+/* 30px rows in a 23-row menu is tight; a couple of px each buys real
+ * legibility without pushing the panel past the fold. */
+html[data-dfp] .sidebar-section-link.sidebar-row {
+  min-block-size: 32px;
+}
+
+html[data-dfp] .sidebar-section-link-suffix.unread {
+  color: var(--dfp-accent);
+}
+
+/* ── Navigation pills ───────────────────────────────────────────────────── */
+
+/* No background pills in this row.
+ *
+ * Discourse marks the active tab with a straight accent underline. Adding a
+ * rounded filled pill put two differently-shaped indicators on the same word,
+ * which is what looked wrong. Hover is a colour change only, so the underline
+ * stays the single shape that means "selected". */
+html[data-dfp] .nav-pills > li > a {
+  background: transparent;
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-3);
+  padding-inline: var(--dfp-s-3);
+  font-weight: var(--dfp-fw-medium);
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .nav-pills > li > a:hover {
+  background: transparent;
+  color: var(--dfp-text);
+}
+
+/* Discourse already marks the active tab with an accent underline (an ::after
+ * bar). Adding a filled pill on top of it gave the same tab two competing
+ * indicators, which is what made "Latest" look wrong. Keep the underline —
+ * it is the one Discourse maintains — and let the pill background carry hover
+ * only. */
+html[data-dfp] .nav-pills > li > a.active {
+  background: transparent;
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+/* ── Category / tag filter drops ──────────────────────────────────────────
+ * These sit inline with the nav pills, so they should read as part of that
+ * row rather than as form fields. The generic select-kit treatment in
+ * controls.css (bordered, filled — correct for the composer) is overridden
+ * here with one extra class so it wins regardless of import order. */
+html[data-dfp] .select-kit.category-drop .select-kit-header,
+html[data-dfp] .select-kit.tag-drop .select-kit-header {
+  background: transparent;
+  border: 0;
+  border-radius: var(--dfp-r-full);
+  color: var(--dfp-text-3);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp] .select-kit.category-drop .select-kit-header:hover,
+html[data-dfp] .select-kit.tag-drop .select-kit-header:hover {
+  background: transparent;
+  color: var(--dfp-text);
+}
+
+/* Do NOT rotate this caret.
+ *
+ * Discourse already swaps the glyph on open — `#caret-right` becomes
+ * `#caret-down`. An added rotate(90deg) was therefore a second transform on an
+ * already-correct icon, turning the open state's caret to point *left*. That
+ * was the "triangle doesn't line up" symptom.
+ *
+ * The two glyphs also have different intrinsic bounding boxes, so a shared box
+ * with centred content is what actually keeps them from shifting vertically
+ * between states. */
+html[data-dfp] .select-kit.category-drop .caret-icon,
+html[data-dfp] .select-kit.tag-drop .caret-icon {
+  color: var(--dfp-text-3);
+  inline-size: 14px;
+  block-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  transform: none;
+}
+
+/* ── Category list ────────────────────────────────────────────────────────
+ * /categories renders `table.category-list.with-topics`, not the box layout
+ * some Discourse instances use — verified against the live site. Rows carry
+ * no stable class of their own (just `has-description` / `no-logo`), so the
+ * anchor is the table plus the `td.category` cell, which conveniently exposes
+ * --category-badge-color inline. */
+
+html[data-dfp] table.category-list {
+  border-collapse: separate;
+  border-spacing: 0 var(--dfp-row-gap);
+}
+
+html[data-dfp] table.category-list > tbody > tr > td {
+  background: var(--dfp-surface-1);
+  border-block: 1px solid var(--dfp-border);
+  padding-block: var(--dfp-row-pad-y);
+  transition:
+    background-color var(--dfp-dur-2) var(--dfp-ease),
+    border-color var(--dfp-dur-2) var(--dfp-ease);
+}
+
+html[data-dfp] table.category-list > tbody > tr > td:first-child {
+  border-inline-start: 4px solid var(--category-badge-color, var(--dfp-border));
+  border-start-start-radius: var(--dfp-r-md);
+  border-end-start-radius: var(--dfp-r-md);
+  padding-inline-start: var(--dfp-row-pad-x);
+}
+
+html[data-dfp] table.category-list > tbody > tr > td:last-child {
+  border-inline-end: 1px solid var(--dfp-border);
+  border-start-end-radius: var(--dfp-r-md);
+  border-end-end-radius: var(--dfp-r-md);
+}
+
+html[data-dfp] table.category-list > tbody > tr:hover > td {
+  background: var(--dfp-surface-2);
+  border-block-color: var(--dfp-border-strong);
+}
+
+html[data-dfp] .category-title-link .category-name {
+  font-size: var(--dfp-fs-lg);
+  font-weight: var(--dfp-fw-semibold);
+  color: var(--dfp-text);
+  letter-spacing: var(--dfp-track-title);
+}
+
+html[data-dfp] .category-description {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  margin-top: var(--dfp-s-1);
+}
+
+html[data-dfp] .category-list .subcategories a {
+  color: var(--dfp-text-2);
+}
+
+/* ── The "Topics" column ──────────────────────────────────────────────────
+ * Two unrelated numbers stacked with no structure: an activity rate
+ * ("228 / week", which wrapped onto two lines on the busier categories) and
+ * a set of unread/new badges. Right-align the stack, stop the rate wrapping,
+ * and let the number carry the weight with the unit muted behind it. */
+
+/* Discourse ships `padding: 12px 0 12px 10px` on the latest cell — zero on the
+ * right. Flat against the page that is invisible; inside a card it leaves the
+ * timestamps hugging the border with nothing between them and the edge. */
+html[data-dfp] table.category-list td.latest {
+  padding-inline-end: var(--dfp-row-pad-x);
+}
+
+html[data-dfp] table.category-list td.topics {
+  text-align: end;
+  white-space: nowrap;
+  padding-inline-end: var(--dfp-s-4);
+}
+
+/* 80px is not enough room for two stats, which is most of why they read as a
+ * pile rather than a column. Widening it lets the activity rate and the
+ * unread/new counts each sit on one line. */
+html[data-dfp] table.category-list th.topics,
+html[data-dfp] table.category-list td.topics {
+  inline-size: 148px;
+}
+
+html[data-dfp] table.category-list td.topics > div {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1.3;
+}
+
+/* The rate is the headline: number carries the weight, unit recedes behind it
+ * so "228 / week" scans as one figure rather than three tokens. */
+html[data-dfp] table.category-list td.topics .value {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--dfp-fs-lg);
+  letter-spacing: -0.01em;
+}
+
+html[data-dfp] table.category-list td.topics .unit {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+}
+
+/* Unread and new were stacked one per line, which made a personal-state
+ * detail as tall as the headline stat. They belong together on one line —
+ * they are the same kind of fact — separated by a dot rather than a newline. */
+html[data-dfp] table.category-list .category__badges {
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 0 6px;
+  margin-top: 3px;
+}
+
+html[data-dfp] table.category-list .category__badges .badge-notification {
+  background: transparent;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Only the count is worth accenting; the word after it is a label. */
+html[data-dfp] table.category-list .category__badges .badge-notification.new-posts,
+html[data-dfp] table.category-list .category__badges .badge-notification.unread-posts {
+  color: var(--dfp-accent);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp]
+  table.category-list
+  .category__badges
+  .badge-notification
+  + .badge-notification::before {
+  content: "·";
+  color: var(--dfp-text-3);
+  margin-inline-end: 6px;
+  font-weight: var(--dfp-fw-normal);
+}
+
+/* ── The "Latest" column ──────────────────────────────────────────────────
+ * This was the crowded part, and the cause was structural rather than
+ * decorative: `.featured-topic` is a plain block, so the title and its
+ * timestamp simply flowed inline. Every date therefore landed at whatever x
+ * the title happened to end on, giving six ragged right edges stacked on top
+ * of each other — which reads as clutter even though the content is fine.
+ *
+ * One flex row per topic fixes it: the title takes the space and truncates,
+ * the date pins to the right in tabular figures so the column has a real
+ * edge to scan down. */
+
+html[data-dfp] table.category-list td.latest .featured-topic {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dfp-s-2);
+  padding-block: 3px;
+  line-height: 1.45;
+}
+
+html[data-dfp] table.category-list td.latest .featured-topic .title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] table.category-list td.latest .featured-topic:hover .title {
+  color: var(--dfp-text);
+}
+
+html[data-dfp] table.category-list td.latest .featured-topic .last-posted-at {
+  flex: 0 0 auto;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status icons (pinned, locked) sit before the title and were adding a full
+ * line of height on the rows that had them. */
+html[data-dfp] table.category-list td.latest .topic-statuses {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+html[data-dfp] table.category-list td.latest .topic-statuses:empty {
+  display: none;
+}
+
+/* ── Row rhythm ──────────────────────────────────────────────────────────
+ * A 4px saturated bar per row is a lot of colour when twenty categories are
+ * stacked; 3px reads as an accent rather than a wall. */
+html[data-dfp] table.category-list > tbody > tr > td:first-child {
+  border-inline-start-width: 3px;
+}
+
+html[data-dfp] table.category-list .category-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Subcategory chips: proximity has to do the grouping.
+ *
+ * Each `.subcategory` span already contains its own chip *and* its unread
+ * count, so the markup is correct — but with equal spacing on both sides, "111
+ * unread" sat exactly as close to the next chip as to its own. The eye groups
+ * by distance, so it read as belonging to whichever chip you looked at first.
+ *
+ * Tight inside the pair, wide between pairs. Nothing else changes. */
+html[data-dfp] table.category-list .subcategories {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 20px;
+  margin-top: var(--dfp-s-2);
+}
+
+html[data-dfp] table.category-list .subcategories .subcategory {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* The "N unread" trailing a chip is supporting detail, not a peer of it. */
+html[data-dfp] table.category-list .subcategories .badge-notification {
+  background: transparent;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+  padding: 0;
+  margin: 0;
+}
+
+/* Column headers were 12px grey against a busy table; make them read as
+ * labels for the columns they actually sit above. */
+html[data-dfp] table.category-list > thead th {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-block-end: var(--dfp-s-2);
+  border: 0;
+}
+
+html[data-dfp] table.category-list > thead th.topics {
+  text-align: end;
+}

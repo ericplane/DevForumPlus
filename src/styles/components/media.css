@@ -1,0 +1,360 @@
+/* Media inside posts: screenshots, videos, link previews, link counts.
+ *
+ * DevForum threads are mostly evidence — screenshots of Studio, capture videos,
+ * gyazo links. This is the content people actually came to look at, and it was
+ * the least considered part of the page.
+ *
+ * One root cause runs through several of these. Discourse composes media chrome
+ * out of `--primary` and `--secondary`, relying on them being text-colour and
+ * background-colour respectively. base.css retargets both, which is correct —
+ * but any rule using `--primary` as a *background* then paints in near-white.
+ * That is why the screenshot caption bar rendered as a white slab. Each one is
+ * restated explicitly below rather than left to inherit.
+ */
+
+/* ── Screenshots (lightbox) ──────────────────────────────────────────────── */
+
+/* `fit-content` is the point.
+ *
+ * This was `display: block`, which stretched the frame to the full post width
+ * regardless of how wide the image actually was — so a 300px screenshot got a
+ * 900px border with empty space either side. Block keeps the vertical margins
+ * behaving; fit-content makes the border hug the image. */
+html[data-dfp] .lightbox-wrapper {
+  display: block;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  position: relative;
+  border-radius: var(--dfp-r-md);
+  overflow: hidden;
+  border: 1px solid var(--dfp-border);
+  margin-block: var(--dfp-s-4);
+}
+
+html[data-dfp] .lightbox-wrapper a.lightbox {
+  display: block;
+  line-height: 0;
+}
+
+html[data-dfp] .lightbox-wrapper img {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  border-radius: 0;
+  transition: transform var(--dfp-dur-3) var(--dfp-ease);
+}
+
+html[data-dfp] .lightbox-wrapper:hover img {
+  transform: scale(1.012);
+}
+
+/* The caption bar. Measured rendering as background #eff4fc on #0c0e14 text —
+ * a white slab across the bottom of every screenshot. It should read as a
+ * caption over the image, so: dark scrim, light text, and only on hover. */
+html[data-dfp] .lightbox-wrapper .meta {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  background: linear-gradient(to top, rgb(0 0 0 / 0.78), rgb(0 0 0 / 0));
+  color: #fff;
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity var(--dfp-dur-2) var(--dfp-ease);
+  pointer-events: none;
+}
+
+html[data-dfp] .lightbox-wrapper:hover .meta,
+html[data-dfp] .lightbox-wrapper a.lightbox:focus-visible .meta {
+  opacity: 1;
+}
+
+html[data-dfp] .lightbox-wrapper .meta .filename {
+  font-weight: var(--dfp-fw-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dimensions and file size are supporting detail next to the filename. */
+html[data-dfp] .lightbox-wrapper .meta .informations {
+  color: rgb(255 255 255 / 0.72);
+  white-space: nowrap;
+}
+
+html[data-dfp] .lightbox-wrapper .meta .d-icon {
+  color: rgb(255 255 255 / 0.8);
+  flex: 0 0 auto;
+}
+
+/* Push the expand affordance to the trailing edge. */
+html[data-dfp] .lightbox-wrapper .meta .d-icon-discourse-expand,
+html[data-dfp] .lightbox-wrapper .meta .expand-btn {
+  margin-inline-start: auto;
+}
+
+/* ── Videos ──────────────────────────────────────────────────────────────
+ * The discourse-lazy-videos plugin renders a thumbnail with a play button over
+ * it. Unstyled, the button is a bare glyph on the frame and the container has
+ * square corners against a rounded post card. */
+
+html[data-dfp] .lazy-video-container,
+html[data-dfp] .video-container {
+  position: relative;
+  border-radius: var(--dfp-r-md);
+  overflow: hidden;
+  border: 1px solid var(--dfp-border);
+  margin-block: var(--dfp-s-4);
+  background: var(--dfp-surface-3);
+}
+
+html[data-dfp] .lazy-video-container img,
+html[data-dfp] .lazy-video-container iframe,
+html[data-dfp] .video-container video {
+  display: block;
+  max-inline-size: 100%;
+  border-radius: 0;
+}
+
+html[data-dfp] .lazy-video-container .lazy-video-thumbnail {
+  transition: transform var(--dfp-dur-3) var(--dfp-ease);
+}
+
+html[data-dfp] .lazy-video-container:hover .lazy-video-thumbnail {
+  transform: scale(1.015);
+}
+
+/* A real target with a real hit area, centred over the frame. */
+html[data-dfp] .lazy-video-container .lazy-video-play-button,
+html[data-dfp] .lazy-video-container button.tile {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: var(--dfp-r-full);
+  background: rgb(0 0 0 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    scale var(--dfp-dur-2) var(--dfp-spring);
+}
+
+html[data-dfp] .lazy-video-container:hover .lazy-video-play-button,
+html[data-dfp] .lazy-video-container .lazy-video-play-button:focus-visible {
+  background: var(--dfp-accent);
+  border-color: transparent;
+  color: var(--dfp-accent-fg);
+  scale: 1.06;
+}
+
+html[data-dfp] .lazy-video-container .lazy-video-title {
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  background: var(--dfp-surface-2);
+  border-top: 1px solid var(--dfp-border);
+}
+
+/* ── Link previews (onebox) ──────────────────────────────────────────────── */
+
+html[data-dfp] .cooked aside.onebox {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-inline-start: 3px solid var(--dfp-border-strong);
+  border-radius: var(--dfp-r-sm);
+  padding: var(--dfp-s-3) var(--dfp-s-4);
+  margin-block: var(--dfp-s-3);
+  transition: border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .cooked aside.onebox:hover {
+  border-color: var(--dfp-border-strong);
+  border-inline-start-color: var(--dfp-accent);
+}
+
+/* Discourse gives `header.source` a fixed 60px height to hold a single 18px
+ * line, then adds a 15px margin under it — 57px of empty space above every
+ * link preview. The rule lives in a CDN stylesheet this page cannot read, so
+ * it was found by measuring: padding 0, min-height 0, one 18px child, box
+ * still 60px. Releasing the height and halving the gap takes a plain Roblox
+ * onebox from 176px to 123px without moving a single glyph. */
+html[data-dfp] .cooked aside.onebox header.source {
+  block-size: auto;
+  min-block-size: 0;
+  margin-block-end: var(--dfp-s-2);
+}
+
+html[data-dfp] .cooked aside.onebox .onebox-body h3,
+html[data-dfp] .cooked aside.onebox header a {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+html[data-dfp] .cooked aside.onebox .onebox-body h3 {
+  margin-block-end: var(--dfp-s-1);
+}
+
+/* Only the small floated avatar. Other onebox kinds use `.thumbnail` for a
+ * large preview image, and those must keep their size. */
+html[data-dfp] .cooked aside.onebox img.thumbnail.onebox-avatar {
+  inline-size: 48px;
+  block-size: 48px;
+  margin-inline-end: var(--dfp-s-3);
+}
+
+html[data-dfp] .cooked aside.onebox .onebox-body p,
+html[data-dfp] .cooked aside.onebox .onebox-body .description {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] .cooked aside.onebox img.thumbnail,
+html[data-dfp] .cooked aside.onebox .aspect-image img {
+  border-radius: var(--dfp-r-xs);
+}
+
+/* ── Link click counts ───────────────────────────────────────────────────
+ * The small number Discourse appends to a link showing how many people clicked
+ * it. It was inheriting the generic notification-badge treatment, so a piece of
+ * incidental analytics rendered as loud as an unread count sitting right beside
+ * the URL it belonged to. */
+
+html[data-dfp] .cooked .badge-notification.clicks,
+html[data-dfp] .badge-notification.clicks {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  color: var(--dfp-text-3);
+  font-size: 0.68rem;
+  font-weight: var(--dfp-fw-normal);
+  font-variant-numeric: tabular-nums;
+  padding: 0 5px;
+  border-radius: var(--dfp-r-full);
+  margin-inline-start: 5px;
+  vertical-align: 1px;
+  line-height: 1.5;
+}
+
+/* ── Bare media ──────────────────────────────────────────────────────────
+ * Images posted without a lightbox wrapper, plus any raw video element. */
+
+/* ── Native <video> ──────────────────────────────────────────────────────
+ *
+ * Honest scope note: the play/scrub/volume bar Chrome draws on a `<video
+ * controls>` element lives in a closed UA shadow root. It cannot be restyled
+ * from here — replacing it means rendering a custom player in JS, which is a
+ * feature, not a stylesheet change. What CSS *can* own is the frame around it
+ * and the idle state before playback, which is what most of a post's video
+ * actually looks like most of the time.
+ *
+ * `background: #000` matters more than it sounds: without it a video whose
+ * aspect ratio does not match its box letterboxes against the post surface,
+ * so the frame edges look ragged. Black reads as intentional. */
+
+html[data-dfp] .cooked video {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  margin-block: var(--dfp-s-4);
+  border-radius: var(--dfp-r-md);
+  border: 1px solid var(--dfp-border);
+  background: #000;
+  box-shadow: var(--dfp-e-1);
+  transition:
+    box-shadow var(--dfp-dur-2) var(--dfp-ease),
+    border-color var(--dfp-dur-2) var(--dfp-ease);
+}
+
+/* Idle — before the first click — is the state people see most, so it gets the
+ * hover affordance: the frame lifts to say "this is playable". Once playing,
+ * `:hover` still applies but the moving image dominates anyway. */
+html[data-dfp] .cooked video:hover {
+  border-color: var(--dfp-border-strong);
+  box-shadow: var(--dfp-e-2);
+}
+
+html[data-dfp] .cooked video:focus-visible {
+  outline: var(--dfp-focus-ring) solid var(--dfp-accent);
+  outline-offset: 2px;
+}
+
+html[data-dfp] .cooked iframe {
+  max-inline-size: 100%;
+  border-radius: var(--dfp-r-md);
+  border: 1px solid var(--dfp-border);
+  display: block;
+  margin-block: var(--dfp-s-4);
+  background: #000;
+}
+
+/* Emoji must never pick up any of the above. */
+html[data-dfp] .cooked img.emoji {
+  border: 0;
+  border-radius: 0;
+  display: inline;
+  margin: 0;
+}
+
+/* ── Uploaded audio ──────────────────────────────────────────────────────
+ * Discourse cooks an uploaded sound to a bare native player — verified in a
+ * real post's `cooked`:
+ *
+ *   <p><audio preload="metadata" controls>
+ *        <source src="…wav"><a href="…">fallback</a>
+ *      </audio></p>
+ *
+ * No wrapper class, and the control panel lives in a *closed* shadow root
+ * (`element.shadowRoot` is null), so there is no way to rebuild it and no way
+ * to reach inside it except through Chrome's `::-webkit-media-controls-*`
+ * pseudo-elements.
+ *
+ * The default is a 300px-wide light-grey pill that sits in the middle of a dark
+ * post looking like it was pasted in from another site. Two things fix most of
+ * that without touching the shadow DOM at all: give it the full measure, and
+ * put it on the same surface as every other media block here.
+ *
+ * The `::-webkit-` rules are non-standard and Chrome could drop them. That is
+ * an acceptable bet because the failure mode is graceful — the panel reverts to
+ * its own dark background inside our bordered, full-width, correctly-rounded
+ * box, which is still better than the default. Nothing here is load-bearing. */
+
+html[data-dfp] .cooked audio {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  block-size: 40px;
+  margin-block: var(--dfp-s-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  background: var(--dfp-surface-2);
+  /* Keeps Chrome's own icons light. Already inherited on the dark themes; set
+   * explicitly so the light theme gets dark icons rather than inheriting ours. */
+  color-scheme: light dark;
+  /* Colours the scrubber and volume slider on browsers that honour it. */
+  accent-color: var(--dfp-accent);
+}
+
+/* The enclosure paints over the element's own corners, so it has to be rounded
+ * too or the background squares off inside our border. */
+html[data-dfp] .cooked audio::-webkit-media-controls-enclosure {
+  border-radius: var(--dfp-r-md);
+  background: transparent;
+}
+
+html[data-dfp] .cooked audio::-webkit-media-controls-panel {
+  background: var(--dfp-surface-2);
+}
+
+/* The fallback anchor only renders when the browser cannot play the file; it
+ * should read as a download link, not as bare blue text on a panel. */
+html[data-dfp] .cooked audio a {
+  color: var(--dfp-accent);
+}

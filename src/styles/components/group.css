@@ -1,0 +1,139 @@
+/* ── Group pages ───────────────────────────────────────────────────────────
+ *
+ * `/g/{name}` — reached from the group chips this extension puts on profiles,
+ * user cards and post bylines, which is why it stopped being acceptable for it
+ * to look stock. Three new doors were built into a room nobody had decorated.
+ *
+ * The member list is Discourse's `.directory-table`, shared with `/u` and with
+ * the follows lists on a profile, so most of what is here is written against
+ * that component rather than against group pages specifically — style it once,
+ * get the users directory for free.
+ *
+ * NOTE: `.directory-table__row` and `__header` are `display: grid` with
+ * `grid-template-columns: subgrid`. Nothing below may set `display` on them, or
+ * the columns stop tracking the header and every row misaligns.
+ */
+
+/* ── Header card ────────────────────────────────────────────────────────── */
+
+html[data-dfp] .group-details-container {
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-lg);
+  padding: var(--dfp-s-4);
+}
+
+html[data-dfp] .group-info {
+  align-items: center;
+  gap: var(--dfp-s-3);
+}
+
+html[data-dfp] .group-info-name {
+  font-size: var(--dfp-fs-xl);
+  font-weight: var(--dfp-fw-semibold);
+  letter-spacing: var(--dfp-track-title);
+  line-height: var(--dfp-lh-tight);
+}
+
+/* The flair is the group's one piece of identity, and at 25px on a page all
+ * about that group it was smaller than the avatars in the list below it. */
+html[data-dfp] .group-details-container .group-avatar-flair .avatar-flair {
+  inline-size: 38px;
+  block-size: 38px;
+}
+
+html[data-dfp] .group-bio {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-body);
+  /* Group descriptions are one or two sentences; without a measure they run
+   * the full 1080px of the card. */
+  max-inline-size: var(--dfp-measure);
+}
+
+html[data-dfp] .group-bio p:last-child {
+  margin-block-end: 0;
+}
+
+/* ── Member list ────────────────────────────────────────────────────────── */
+
+/* Column headers were 15px in --dfp-text-3 — the same size as the data beneath
+ * them, so nothing said "this is a header". Matched to the labels used on the
+ * profile stats strip so tabular headings read the same way product-wide. */
+html[data-dfp] .directory-table__column-header {
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .directory-table__header {
+  border-block-end: 1px solid var(--dfp-border);
+}
+
+/* A 50-row list with no separators and no hover is a wall of names. The
+ * hairline is on the row rather than the cell so it spans the full width
+ * including the gaps between columns. */
+html[data-dfp] .directory-table__row {
+  border-block-end: 1px solid var(--dfp-border);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .directory-table__row:last-child {
+  border-block-end: 0;
+}
+
+/* Mixed from the text colour, not a surface token: --dfp-surface-1 through -3
+ * all resolve to #ffffff in the light theme, so a surface-based row hover is
+ * invisible there. */
+html[data-dfp] .directory-table__row:hover {
+  background: color-mix(in oklab, var(--dfp-text) 5%, transparent);
+}
+
+/* The numbers were rendering at full --dfp-text and 15px, identical to the
+ * member's name — so every row had four things competing to be read first. */
+html[data-dfp] .directory-table__cell:not(.directory-table__cell--username) {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  /* Dates stacked down a column shuffle sideways without this. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* The inline "Added" / "Posted" labels Discourse shows beside each value when
+ * the table collapses. They repeat the column header, so they stay quiet. */
+html[data-dfp] .directory-table__label {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+}
+
+/* ── Identity cell ──────────────────────────────────────────────────────── */
+
+html[data-dfp] .directory-table__cell--username .user-info {
+  align-items: center;
+  gap: var(--dfp-s-3);
+}
+
+html[data-dfp] .directory-table__cell--username .name-line .name {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+}
+
+/* Display name and username are frequently identical on this forum — half the
+ * rows on the Programmers list read "0_0 / 0_0". They cannot be deduplicated
+ * from CSS, but they can stop being the same weight twice. */
+html[data-dfp] .directory-table__cell--username .name-line .username {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] .directory-table__cell--username .title {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+}
+
+/* ── Filter ─────────────────────────────────────────────────────────────── */
+
+html[data-dfp] .group-username-filter {
+  inline-size: min(20rem, 100%);
+}

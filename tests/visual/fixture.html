@@ -1,0 +1,278 @@
+<!-- Representative DevForum markup, transcribed from the live DOM
+     (devforum.roblox.com, Discourse 3.5.0.beta3-dev, captured 2026-08-07).
+
+     Keep this in sync with reality: if Discourse changes its markup, the
+     component CSS breaks and this fixture is what tells us. Class names,
+     nesting depth, and the inline --category-badge-color custom property are
+     all reproduced exactly, because they are what the stylesheet targets. -->
+
+<!-- Stand-in sprite. Discourse serves its icons the same way — `<use href="#id">`
+     against a document-level symbol set — so referencing them like this is what
+     exercises the `.d-icon` sizing rules. The shapes are placeholders; only
+     their box matters here. -->
+<svg style="display: none" aria-hidden="true">
+  <symbol id="hx-pencil" viewBox="0 0 16 16"><path d="M2 12l8-8 2 2-8 8H2z" fill="currentColor"/></symbol>
+  <symbol id="hx-arrow" viewBox="0 0 16 16"><path d="M6 3L1 8l5 5V9h9V7H6z" fill="currentColor"/></symbol>
+  <symbol id="hx-dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></symbol>
+  <symbol id="hx-chevron" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5z" fill="currentColor"/></symbol>
+  <symbol id="hx-heart" viewBox="0 0 16 16"><path d="M8 14S1 9.5 1 5.5A3.5 3.5 0 018 4a3.5 3.5 0 017 1.5C15 9.5 8 14 8 14z" fill="currentColor"/></symbol>
+  <symbol id="hx-dots" viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="13" cy="8" r="1.5" fill="currentColor"/></symbol>
+  <symbol id="hx-link" viewBox="0 0 16 16"><path d="M6 10a3 3 0 010-4l2-2a3 3 0 014 4l-1 1" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M10 6a3 3 0 010 4l-2 2a3 3 0 01-4-4l1-1" stroke="currentColor" stroke-width="1.6" fill="none"/></symbol>
+</svg>
+
+<section class="harness-block">
+  <h2 class="harness-label">Topic list</h2>
+
+  <table class="topic-list --glimmer">
+    <thead class="topic-list-header">
+      <tr>
+        <th class="default topic-list-data">Topic</th>
+        <th class="posters topic-list-data"></th>
+        <th class="posts topic-list-data">Replies</th>
+        <th class="views topic-list-data">Views</th>
+        <th class="activity topic-list-data">Activity</th>
+      </tr>
+    </thead>
+    <tbody class="topic-list-body">
+      <!-- Pinned + fresh -->
+      <tr data-topic-id="1" class="topic-list-item category-updates-announcements pinned dfp-fresh">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"><span title="Pinned" class="topic-status pinned">📌</span></span>
+            <a href="#" class="title raw-link raw-topic-link">Weekly Recap: Predictive Streaming &amp; New Music Library</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#E2231A;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="36" class="badge-category --has-parent --style-square"><span class="badge-category__name">Announcements</span></span>
+            </a>
+          </div>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%234a5568'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">12</button></td>
+        <td class="num views topic-list-data">8.4k</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">3h</span></td>
+      </tr>
+
+      <!-- Solved -->
+      <tr data-topic-id="2" class="topic-list-item category-help-and-feedback-scripting-support dfp-solved">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"></span>
+            <a href="#" class="title raw-link raw-topic-link">DataStore :GetAsync() throttling on high player counts — what is the correct retry pattern?</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#0074BD;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="55" class="badge-category --has-parent --style-square"><span class="badge-category__name">Scripting Support</span></span>
+            </a>
+            <div class="discourse-tags"><a class="discourse-tag" href="#">datastore</a><a class="discourse-tag" href="#">luau</a></div>
+          </div>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%232f855a'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">7</button></td>
+        <td class="num views topic-list-data">1.9k</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">2d</span></td>
+      </tr>
+
+      <!-- Busy thread -->
+      <tr data-topic-id="3" class="topic-list-item category-feature-requests dfp-busy">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"></span>
+            <a href="#" class="title raw-link raw-topic-link">Allow custom fonts in TextLabel without uploading as an asset</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#9EB83B;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="170" class="badge-category --style-square"><span class="badge-category__name">Feature Requests</span></span>
+            </a>
+          </div>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23805ad5'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">148</button></td>
+        <td class="num views topic-list-data">42.1k</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">6d</span></td>
+      </tr>
+
+      <!-- Visited (read) -->
+      <tr data-topic-id="4" class="topic-list-item category-help-and-feedback-building-support visited">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"></span>
+            <a href="#" class="title raw-link raw-topic-link visited">How do I make a part follow the player smoothly?</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#F1592A;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="58" class="badge-category --has-parent --style-square"><span class="badge-category__name">Building Support</span></span>
+            </a>
+          </div>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23718096'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">3</button></td>
+        <td class="num views topic-list-data">412</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">11d</span></td>
+      </tr>
+
+      <!-- Stale: the 2018-answer problem this forum is full of -->
+      <tr data-topic-id="5" class="topic-list-item category-help-and-feedback-scripting-support dfp-stale">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"></span>
+            <a href="#" class="title raw-link raw-topic-link">[SOLVED] Using BodyVelocity to move a character</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#0074BD;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="55" class="badge-category --has-parent --style-square"><span class="badge-category__name">Scripting Support</span></span>
+            </a>
+          </div>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%234a5568'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">9</button></td>
+        <td class="num views topic-list-data">63.7k</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">Mar 2018</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="harness-block">
+  <h2 class="harness-label">Post stream</h2>
+
+  <div id="topic-title">
+    <h1><a href="#" class="fancy-title">DataStore :GetAsync() throttling on high player counts</a></h1>
+  </div>
+
+  <!-- Staff post -->
+  <div class="topic-post clearfix topic-owner group-Roblox_Staff regular">
+    <article id="post_1" class="boxed onscreen-post" data-post-id="1">
+      <div class="row">
+        <div class="topic-avatar">
+          <div class="post-avatar">
+            <a class="trigger-user-card main-avatar" href="#"><img class="avatar" width="48" height="48" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%23e2231a'/%3E%3C/svg%3E"></a>
+          </div>
+        </div>
+        <div class="topic-body clearfix">
+          <div class="topic-meta-data">
+            <div class="names trigger-user-card">
+              <span class="first full-name staff admin moderator group--Roblox_Staff"><a href="#">Bluff_006</a></span>
+              <span class="user-title user-title--developer-relations">Developer Relations</span>
+            </div>
+            <!-- Byline meta, transcribed from the live DOM: the edits button is
+                 `widget-button btn-flat` with NO bare `.btn` class, which is the
+                 detail that decides whether the post-chrome rules match. -->
+            <div class="post-infos">
+              <div class="post-info edits">
+                <button class="widget-button btn-flat btn-icon-text" title="post last edited on Jul 31, 2026 1:10 pm">
+                  <svg class="fa d-icon d-icon-pencil svg-icon svg-node" aria-hidden="true"><use href="#hx-pencil"></use></svg>
+                  <span class="d-button-label">24</span>
+                </button>
+              </div>
+              <a class="reply-to-tab" href="#" title="Load parent post">
+                <svg class="fa d-icon d-icon-share svg-icon svg-node" aria-hidden="true"><use href="#hx-arrow"></use></svg>
+                <img class="avatar" title="ArawDev" width="16" height="16" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234c8bf5'/%3E%3C/svg%3E">
+                <span>ArawDev</span>
+              </a>
+              <div class="post-info post-date"><a class="widget-link post-date" href="#" title="Post date"><span class="relative-date">Jan 14</span></a></div>
+              <div class="read-state read" title="Post is unread"><svg class="fa d-icon d-icon-circle svg-icon" aria-hidden="true"><use href="#hx-dot"></use></svg></div>
+            </div>
+          </div>
+          <div class="regular contents">
+            <div class="cooked">
+              <p>Request budgets are per-server, not per-key. If you are seeing <code>DataStoreService</code> throttling at high player counts, the usual cause is <strong>one call per player per heartbeat</strong> rather than a batched write.</p>
+              <p>The pattern we recommend:</p>
+              <pre><code class="lang-lua">local function safeGetAsync(store, key)
+	local attempts = 0
+	while attempts &lt; 3 do
+		local ok, result = pcall(store.GetAsync, store, key)
+		if ok then
+			return result
+		end
+		attempts += 1
+		task.wait(2 ^ attempts)  -- exponential backoff
+	end
+	error("GetAsync failed after 3 attempts")
+end</code></pre>
+              <blockquote>Note that <code>UpdateAsync</code> counts against both the read and write budget.</blockquote>
+            </div>
+          </div>
+          <!-- Action bar, transcribed from the live DOM. `aria-expanded` on
+               .show-replies is real: opening flips it to "true" and swaps the
+               chevron glyph, both verified in the browser. -->
+          <section class="post-menu-area clearfix">
+            <nav class="post-controls glimmer-post-menu collapsed">
+              <button class="btn btn-text show-replies btn-icon-text btn-flat" aria-expanded="false" title="This post has 3 replies">
+                <span class="d-button-label">3 Replies</span>
+                <svg class="fa d-icon d-icon-chevron-down svg-icon svg-string" aria-hidden="true"><use href="#hx-chevron"></use></svg>
+              </button>
+              <div class="actions">
+                <div class="double-button">
+                  <button class="btn no-text post-action-menu__like-count like-count button-count highlight-action regular-likes btn-flat">82</button>
+                  <button class="btn no-text btn-icon post-action-menu__like toggle-like like btn-flat" title="like this post"><svg class="fa d-icon d-icon-d-unliked svg-icon" aria-hidden="true"><use href="#hx-heart"></use></svg></button>
+                </div>
+                <button class="btn btn-icon-text post-action-menu__reply reply create fade-out btn-flat" title="begin composing a reply to this post">
+                  <svg class="fa d-icon d-icon-reply svg-icon" aria-hidden="true"><use href="#hx-arrow"></use></svg>
+                  <span class="d-button-label">Reply</span>
+                </button>
+                <button class="btn no-text btn-icon post-action-menu__show-more show-more-actions btn-flat" title="show more"><svg class="fa d-icon d-icon-ellipsis svg-icon" aria-hidden="true"><use href="#hx-dots"></use></svg></button>
+                <button class="btn no-text btn-icon post-action-menu__share share btn-flat" title="share a link to this post"><svg class="fa d-icon d-icon-link svg-icon" aria-hidden="true"><use href="#hx-link"></use></svg></button>
+              </div>
+            </nav>
+          </section>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <!-- Accepted answer -->
+  <div class="topic-post clearfix accepted-answer regular">
+    <article id="post_2" class="boxed onscreen-post" data-post-id="2">
+      <div class="row">
+        <div class="topic-avatar">
+          <div class="post-avatar">
+            <a class="trigger-user-card main-avatar" href="#"><img class="avatar" width="48" height="48" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%232f855a'/%3E%3C/svg%3E"></a>
+          </div>
+        </div>
+        <div class="topic-body clearfix">
+          <div class="topic-meta-data">
+            <div class="names trigger-user-card"><span class="first full-name"><a href="#">ashenix_dev</a></span><span class="user-title">Regular</span></div>
+            <div class="post-infos"><div class="post-info post-date"><a class="widget-link post-date" href="#"><span class="relative-date">6d</span></a></div></div>
+          </div>
+          <div class="regular contents">
+            <div class="cooked">
+              <p>Batching solved it for us. We queue writes and flush every 30 seconds plus on <code>BindToClose</code>. Went from ~400 requests/min to under 20.</p>
+              <table><thead><tr><th>Approach</th><th>Requests/min</th><th>p99 latency</th></tr></thead>
+              <tbody><tr><td>Per-heartbeat</td><td>412</td><td>2400 ms</td></tr><tr><td>Batched (30s)</td><td>18</td><td>140 ms</td></tr></tbody></table>
+            </div>
+          </div>
+          <section class="post-menu-area clearfix">
+            <nav class="post-controls">
+              <button class="btn btn-flat like toggle-like has-like"><span class="d-icon">♥</span></button>
+              <button class="btn btn-flat reply">Reply</button>
+            </nav>
+          </section>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="harness-block">
+  <h2 class="harness-label">Controls</h2>
+  <div class="harness-row">
+    <button class="btn btn-primary">Reply</button>
+    <button class="btn btn-default">Cancel</button>
+    <button class="btn btn-danger">Delete</button>
+    <button class="btn btn-flat">Flag</button>
+    <button class="btn btn-default" disabled>Disabled</button>
+  </div>
+  <div class="harness-row">
+    <input type="text" placeholder="Search topics…">
+    <select><option>Latest</option><option>Top</option></select>
+  </div>
+  <div class="harness-row">
+    <a class="discourse-tag" href="#">datastore</a>
+    <a class="discourse-tag" href="#">optimization</a>
+    <span class="badge-notification">12</span>
+  </div>
+  <div class="harness-row">
+    <div class="alert alert-info">Feature Requests requires membership in <strong>AllowFeatureRequests</strong>.</div>
+  </div>
+</section>

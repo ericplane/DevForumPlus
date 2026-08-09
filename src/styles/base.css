@@ -1,0 +1,295 @@
+/* Base layer: retarget Discourse's own variables at DFP tokens.
+ *
+ * This file does more visual work than every component file combined, and it
+ * is worth understanding why.
+ *
+ * Discourse's stylesheets — 26 plugin sheets plus six theme components on this
+ * instance — are written against a small set of custom properties. Reassigning
+ * those properties restyles hundreds of rules we never had to write a selector
+ * for, and it keeps working when Discourse refactors its markup. Writing our
+ * own selector for each of those rules would be both larger and more brittle.
+ *
+ * Cascade note: DFP styles are deliberately UNLAYERED. Discourse's CSS is
+ * unlayered too, and an @layer always loses to unlayered rules regardless of
+ * specificity. Putting a design system in a cascade layer here would be the
+ * one change guaranteed to make none of it apply.
+ */
+
+html[data-dfp] {
+  /* Discourse dark schemes use --primary for TEXT and --secondary for
+   * BACKGROUND, which reads backwards until you have been bitten by it once. */
+  --primary: var(--dfp-text);
+  --secondary: var(--dfp-bg);
+  --tertiary: var(--dfp-accent);
+  --quaternary: var(--dfp-accent);
+  --highlight: var(--dfp-accent-soft);
+  --danger: var(--dfp-danger);
+  --success: var(--dfp-success);
+  --love: var(--dfp-danger);
+
+  /* Derived neutral scale. Discourse composes almost every border, muted
+   * label and subtle fill out of these. */
+  --primary-very-low: var(--dfp-surface-1);
+  --primary-low: var(--dfp-border);
+  --primary-low-mid: var(--dfp-border-strong);
+  --primary-medium: var(--dfp-text-3);
+  --primary-high: var(--dfp-text-2);
+  --primary-very-high: var(--dfp-text);
+
+  --secondary-low: var(--dfp-text-3);
+  --secondary-medium: var(--dfp-surface-3);
+  --secondary-high: var(--dfp-surface-2);
+  --secondary-very-high: var(--dfp-surface-1);
+
+  /* Discourse's `dark-light-choose` blends. These are computed by the *server*
+   * from the forum's own colour scheme, so retargeting the two halves above
+   * does not touch them — they stay frozen at the forum's values while DFP
+   * repaints everything underneath.
+   *
+   * Measured: `.top-date-string` on /top renders rgb(77,81,104) on our
+   * background at 2.47:1, and the badge grant list uses `-med` at rgb(120,126,155).
+   * Both fail even the 3:1 non-text floor.
+   *
+   * Safe to map to text colours: across the 34 stylesheets the forum actually
+   * serves, `-high` has 48 uses and every one is a `color`; `-med` has 168, of
+   * which the only non-`color` is a select-kit scrollbar thumb, and a mid grey
+   * is a better thumb than a stale purple anyway. */
+  --primary-med-or-secondary-high: var(--dfp-text-2);
+  --primary-med-or-secondary-med: var(--dfp-text-3);
+
+  --tertiary-low: var(--dfp-accent-soft);
+  --tertiary-medium: var(--dfp-accent);
+  --tertiary-high: var(--dfp-accent);
+  --tertiary-hover: var(--dfp-accent);
+
+  --danger-low: var(--dfp-danger-soft);
+  --danger-medium: var(--dfp-danger);
+  --danger-hover: var(--dfp-danger);
+  --success-low: var(--dfp-success-soft);
+  --success-medium: var(--dfp-success);
+  --highlight-low: var(--dfp-accent-soft);
+  --highlight-medium: var(--dfp-accent-soft);
+  --highlight-high: var(--dfp-accent);
+
+  /* Numeric ramp. Discourse generates --primary-100 … --primary-900 from the
+   * colour scheme; in a dark scheme they run from near-background to
+   * near-text, so the mapping is monotonic in the same direction. */
+  --primary-50: var(--dfp-surface-1);
+  --primary-100: var(--dfp-surface-2);
+  --primary-200: var(--dfp-surface-3);
+  --primary-300: var(--dfp-border);
+  --primary-400: var(--dfp-border-strong);
+  --primary-500: var(--dfp-text-3);
+  --primary-600: var(--dfp-text-3);
+  --primary-700: var(--dfp-text-2);
+  --primary-800: var(--dfp-text-2);
+  --primary-900: var(--dfp-text);
+
+  --header_background: var(--dfp-surface-1);
+  --header_primary: var(--dfp-text);
+  --hover: var(--dfp-surface-2);
+  --d-hover: var(--dfp-surface-2);
+  --d-selected: var(--dfp-surface-3);
+  --d-content-background: var(--dfp-bg);
+  --d-sidebar-background: var(--dfp-bg);
+
+  --d-border-radius: var(--dfp-r-sm);
+  --d-border-radius-large: var(--dfp-r-md);
+  --d-input-border-radius: var(--dfp-r-sm);
+  --d-button-border-radius: var(--dfp-r-sm);
+
+  --d-max-width: var(--dfp-content-max);
+
+  --scheme-type: dark;
+}
+
+html[data-dfp][data-dfp-theme="light"] {
+  --scheme-type: light;
+}
+
+/* ── Page frame ─────────────────────────────────────────────────────────── */
+
+html[data-dfp] body {
+  background: var(--dfp-bg);
+  color: var(--dfp-text);
+  line-height: var(--dfp-lh-body);
+  font-size: var(--dfp-fs-md);
+  letter-spacing: var(--dfp-track-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html[data-dfp] #main-outlet {
+  max-width: var(--dfp-content-max);
+}
+
+/* ── Icons ────────────────────────────────────────────────────────────────
+ * Discourse paints its SVG sprite icons with a hardcoded `fill` (measured on
+ * the live site as rgb(123,123,123) in the header, rgb(152,152,152) in
+ * controls) rather than `currentColor`. The result is that every icon ignores
+ * the theme and sits at roughly 3:1 against our background — which is why the
+ * header read as empty at a glance.
+ *
+ * Routing fill through currentColor is the single highest-impact rule in this
+ * file: icons inherit whatever colour their button already has, so hover
+ * states, disabled states and semantic colours all start working for free. */
+html[data-dfp] svg.d-icon,
+html[data-dfp] .d-icon {
+  /* `color: inherit` is the load-bearing half. Discourse sets a hardcoded
+   * `color` on the icon element itself (measured rgb(123,123,123) in the
+   * header), so `fill: currentColor` alone resolves right back to that grey.
+   * Inheriting from the button first is what makes the icon follow the theme,
+   * and it makes hover and disabled states work for free. */
+  color: inherit;
+  fill: currentColor;
+}
+
+/* ── Focus ────────────────────────────────────────────────────────────────
+ * DevForum's focus treatment is inconsistent — some controls show a ring,
+ * some show nothing. One rule, applied to everything focusable, is both more
+ * accessible and less code than the status quo. */
+html[data-dfp] :focus-visible {
+  outline: var(--dfp-focus-ring) solid var(--dfp-accent);
+  outline-offset: 2px;
+  border-radius: var(--dfp-r-xs);
+}
+
+html[data-dfp] :focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Selection ──────────────────────────────────────────────────────────── */
+html[data-dfp] ::selection {
+  background: var(--dfp-accent-soft);
+  color: var(--dfp-text);
+}
+
+/* ── Highlighted text ───────────────────────────────────────────────────────
+ * `<mark>`, which is what `==this==` compiles to in a post.
+ *
+ * Discourse sets `background: var(--highlight)` on it and sets no `color`, so
+ * the foreground falls through to the browser's UA default `marktext` — BLACK.
+ * DFP retargets `--highlight` to `--dfp-accent-soft`, a near-black navy built to
+ * sit *behind* light text. The pair rendered black on dark navy: invisible. DFP
+ * had no `mark` rule at all, which is why nothing caught it.
+ *
+ * Same shape as the `--secondary`-as-a-foreground bug: a variable retargeted for
+ * one role, consumed in the other. Setting both halves here means neither
+ * Discourse nor the UA gets to supply the missing one.
+ *
+ * Amber rather than the accent, deliberately — `::selection` above is already
+ * the accent blue, and an author's highlight that looks identical to the
+ * reader's own selection is unreadable in a different way. */
+html[data-dfp] mark {
+  background: var(--dfp-mark-bg);
+  color: var(--dfp-mark-fg);
+  padding: 0.06em 0.28em;
+  border-radius: var(--dfp-r-xs);
+  /* Marks inherit the muted colour of a quote or an excerpt otherwise. */
+  font-weight: inherit;
+}
+
+/* A selection *over* a mark has to stay legible too: without this the
+ * selection's own foreground lands on the amber. */
+html[data-dfp] mark::selection {
+  background: var(--dfp-accent);
+  color: var(--dfp-on-accent);
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────── */
+html[data-dfp] * {
+  scrollbar-color: var(--dfp-border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+/* ── Links ──────────────────────────────────────────────────────────────── */
+html[data-dfp] a {
+  color: var(--dfp-accent);
+  text-underline-offset: 0.18em;
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* ── Typography inside posts ───────────────────────────────────────────── */
+html[data-dfp] .cooked {
+  font-size: var(--dfp-fs-md);
+  line-height: var(--dfp-lh-body);
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .cooked > * {
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .cooked strong,
+html[data-dfp] .cooked b {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+html[data-dfp] .cooked h1,
+html[data-dfp] .cooked h2,
+html[data-dfp] .cooked h3,
+html[data-dfp] .cooked h4 {
+  color: var(--dfp-text);
+  line-height: var(--dfp-lh-tight);
+  letter-spacing: var(--dfp-track-title);
+  font-weight: var(--dfp-fw-semibold);
+  margin-block: var(--dfp-s-5) var(--dfp-s-3);
+}
+
+html[data-dfp] .cooked p {
+  margin-block: 0 var(--dfp-s-4);
+}
+
+html[data-dfp] .cooked blockquote {
+  border-inline-start: 3px solid var(--dfp-border-strong);
+  background: var(--dfp-surface-1);
+  border-radius: 0 var(--dfp-r-sm) var(--dfp-r-sm) 0;
+  padding: var(--dfp-s-3) var(--dfp-s-4);
+  margin-block: var(--dfp-s-4);
+  color: var(--dfp-text-3);
+}
+
+/* Tables inside posts currently overflow the column on narrow viewports. */
+html[data-dfp] .cooked table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+html[data-dfp] .cooked table th,
+html[data-dfp] .cooked table td {
+  border: 1px solid var(--dfp-border);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+}
+
+html[data-dfp] .cooked table th {
+  background: var(--dfp-surface-2);
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+html[data-dfp] .cooked img:not(.emoji):not(.avatar) {
+  border-radius: var(--dfp-r-sm);
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Theme "off" ─────────────────────────────────────────────────────────
+ * Tokens stay defined so JS features that read them keep working, but every
+ * visual change stands down. This is the setting for someone who wants the
+ * features and none of the redesign. */
+html[data-dfp][data-dfp-theme="off"] {
+  --primary: initial;
+  --secondary: initial;
+  --tertiary: initial;
+  --quaternary: initial;
+  --highlight: initial;
+  --danger: initial;
+  --success: initial;
+  --love: initial;
+  --d-border-radius: initial;
+  --header_background: initial;
+  --header_primary: initial;
+}

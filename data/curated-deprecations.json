@@ -1,0 +1,206 @@
+{
+  "_comment": [
+    "Idioms the API dump cannot express.",
+    "",
+    "The dump marks deprecated *classes and members* with a Tags entry, which is",
+    "authoritative and machine-readable. What it does not encode is the thing that",
+    "actually hurts people on this forum: global functions that still work but are",
+    "the wrong answer (wait, spawn, delay), and replacements \u2014 the dump has no",
+    "PreferredDescriptorName anywhere, verified against the live file.",
+    "",
+    "So the dump supplies WHAT is deprecated and this file supplies WHY IT MATTERS",
+    "and WHAT TO USE INSTEAD. Entries here also override the dump's severity.",
+    "",
+    "severity: 'error'   \u2014 actively harmful or removed",
+    "          'warn'    \u2014 deprecated, has a direct replacement",
+    "          'info'    \u2014 legacy style, still functional",
+    "",
+    "access: 'method'   \u2014 only flag after ':' (a call like event:wait())",
+    "        'property' \u2014 only flag after '.'",
+    "        omitted    \u2014 either. Dump-derived entries default to this.",
+    "",
+    "This distinction is load-bearing. Without it `task.wait(1)` \u2014 the *correct*",
+    "modern API \u2014 was flagged as the legacy `event:wait()` alias, which would have",
+    "told people the right answer was wrong. Caught by tests/unit/detect.test.ts."
+  ],
+  "globals": {
+    "wait": {
+      "replacement": "task.wait()",
+      "severity": "warn",
+      "why": "Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it."
+    },
+    "spawn": {
+      "replacement": "task.spawn()",
+      "severity": "warn",
+      "why": "Defers by an unpredictable amount under load. `task.spawn()` runs immediately on a new thread."
+    },
+    "delay": {
+      "replacement": "task.delay()",
+      "severity": "warn",
+      "why": "Same scheduler as `wait()`; drifts under load. `task.delay()` is precise."
+    },
+    "Spawn": {
+      "replacement": "task.spawn()",
+      "severity": "warn",
+      "why": "Legacy uppercase alias of `spawn`."
+    },
+    "Delay": {
+      "replacement": "task.delay()",
+      "severity": "warn",
+      "why": "Legacy uppercase alias of `delay`."
+    },
+    "Wait": {
+      "replacement": "task.wait()",
+      "severity": "warn",
+      "why": "Legacy uppercase alias of `wait`."
+    },
+    "LoadLibrary": {
+      "replacement": null,
+      "severity": "error",
+      "why": "Removed from the engine. Calling it errors."
+    },
+    "printidentity": {
+      "replacement": null,
+      "severity": "info",
+      "why": "Debug-only global; not meaningful in shipped code."
+    },
+    "ypcall": {
+      "replacement": "pcall",
+      "severity": "warn",
+      "why": "`pcall` has been yield-safe since Lua 5.1 in Roblox; `ypcall` is a legacy alias."
+    }
+  },
+  "members": {
+    "remove": {
+      "replacement": ":Destroy()",
+      "severity": "warn",
+      "why": "`:remove()` only reparents to nil, leaving the instance alive and its connections intact. `:Destroy()` releases it.",
+      "access": "method"
+    },
+    "connect": {
+      "replacement": ":Connect()",
+      "severity": "info",
+      "why": "Legacy lowercase alias. Modern code uses `:Connect()`.",
+      "access": "method"
+    },
+    "disconnect": {
+      "replacement": ":Disconnect()",
+      "severity": "info",
+      "why": "Legacy lowercase alias.",
+      "access": "method"
+    },
+    "wait": {
+      "replacement": ":Wait()",
+      "severity": "info",
+      "why": "Legacy lowercase alias on events.",
+      "access": "method"
+    },
+    "clone": {
+      "replacement": ":Clone()",
+      "severity": "info",
+      "why": "Legacy lowercase alias.",
+      "access": "method"
+    },
+    "destroy": {
+      "replacement": ":Destroy()",
+      "severity": "info",
+      "why": "Legacy lowercase alias.",
+      "access": "method"
+    },
+    "findFirstChild": {
+      "replacement": ":FindFirstChild()",
+      "severity": "info",
+      "why": "Legacy lowercase alias.",
+      "access": "method"
+    },
+    "getChildren": {
+      "replacement": ":GetChildren()",
+      "severity": "info",
+      "why": "Legacy lowercase alias.",
+      "access": "method"
+    },
+    "isA": {
+      "replacement": ":IsA()",
+      "severity": "info",
+      "why": "Legacy lowercase alias.",
+      "access": "method"
+    },
+    "className": {
+      "replacement": ".ClassName",
+      "severity": "info",
+      "why": "Legacy lowercase alias.",
+      "access": "property"
+    },
+    "LoadAnimation": {
+      "replacement": "Animator:LoadAnimation()",
+      "severity": "warn",
+      "why": "Loading on Humanoid or AnimationController is deprecated. Get the Animator and load on that so animations replicate correctly.",
+      "onlyAfter": [
+        "Humanoid",
+        "humanoid",
+        "AnimationController"
+      ],
+      "access": "method"
+    },
+    "GetMouse": {
+      "replacement": "UserInputService",
+      "severity": "info",
+      "why": "Mouse is a legacy object. UserInputService covers mouse, touch and gamepad in one API.",
+      "access": "method"
+    }
+  },
+  "classes": {
+    "BodyVelocity": {
+      "replacement": "LinearVelocity",
+      "severity": "warn",
+      "why": "Superseded by the constraint-based mover. LinearVelocity works with the current physics solver."
+    },
+    "BodyPosition": {
+      "replacement": "AlignPosition",
+      "severity": "warn",
+      "why": "Superseded by AlignPosition."
+    },
+    "BodyGyro": {
+      "replacement": "AlignOrientation",
+      "severity": "warn",
+      "why": "Superseded by AlignOrientation."
+    },
+    "BodyAngularVelocity": {
+      "replacement": "AngularVelocity",
+      "severity": "warn",
+      "why": "Superseded by the AngularVelocity constraint."
+    },
+    "BodyForce": {
+      "replacement": "VectorForce",
+      "severity": "warn",
+      "why": "Superseded by VectorForce."
+    },
+    "BodyThrust": {
+      "replacement": "VectorForce",
+      "severity": "warn",
+      "why": "Superseded by VectorForce."
+    },
+    "RocketPropulsion": {
+      "replacement": "LinearVelocity or AlignPosition",
+      "severity": "warn",
+      "why": "Legacy body mover."
+    },
+    "Hint": {
+      "replacement": "a ScreenGui with a TextLabel",
+      "severity": "warn",
+      "why": "Legacy top-bar UI, not styleable and not mobile-friendly."
+    },
+    "Message": {
+      "replacement": "a ScreenGui with a TextLabel",
+      "severity": "warn",
+      "why": "Legacy full-screen text, not styleable."
+    }
+  },
+  "patterns": {
+    "instanceNewParent": {
+      "severity": "warn",
+      "replacement": "set .Parent last",
+      "why": "The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead."
+    }
+  }
+}

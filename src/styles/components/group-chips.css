@@ -1,0 +1,189 @@
+/* ── Group flair chips ────────────────────────────────────────────────────
+ *
+ * One appearance, three surfaces: profile strips (profile-groups.ts), user
+ * cards (card-groups.ts) and post bylines (post-groups.ts).
+ *
+ * The chip stays neutral and only the icon badge carries the group's colour.
+ * Eight fully-coloured chips in a metadata strip would out-shout the profile
+ * they describe; a small colour block reads as identity without becoming the
+ * loudest thing on the card.
+ */
+
+html[data-dfp] .dfp-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dfp-s-1) var(--dfp-s-2);
+  align-items: center;
+}
+
+html[data-dfp] .dfp-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px 1px 3px;
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-pill, 999px);
+  background: var(--dfp-surface-2);
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* Groups without flair have no badge, so the chip needs its padding back. */
+html[data-dfp] .dfp-group-chip:not(:has(.dfp-group-chip__icon)) {
+  padding-inline-start: 8px;
+}
+
+html[data-dfp] .dfp-group-chip:hover {
+  border-color: var(--dfp-border-strong);
+}
+
+/* ── Why colour lives on the label, not on the chip ───────────────────────
+ *
+ * The chip is an `<a>`, and both surfaces that host one already claim every
+ * anchor inside them:
+ *
+ *   post.css:133      .topic-meta-data .names a          (0,3,2)
+ *   profile.css:1221  … > .secondary dd a                (0,5,3)
+ *
+ * and on post bylines Discourse adds a further colour rule of its own that
+ * outranks even (0,4,1) — measured, a literal `color` on the chip anchor at
+ * that specificity does not land, while the same declaration on this span
+ * does. Rather than escalate (and end up in the !important quarantine),
+ * colour goes on the label, which is a plain `<span>` no other rule targets.
+ *
+ * Font size and weight are NOT moved here: the pill's padding, gap and 16px
+ * badge are sized against the anchor's font, so the byline block below
+ * corrects the anchor instead. */
+html[data-dfp] .dfp-group-chip__name {
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .dfp-group-chip:hover .dfp-group-chip__name {
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .dfp-group-chip__icon {
+  display: grid;
+  place-items: center;
+  inline-size: 16px;
+  block-size: 16px;
+  border-radius: var(--dfp-r-pill, 999px);
+  background: var(--chip-bg, var(--dfp-surface-3));
+  color: var(--chip-fg, var(--dfp-text));
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+html[data-dfp] .dfp-group-chip__svg {
+  inline-size: 9px;
+  block-size: 9px;
+  fill: currentColor;
+}
+
+html[data-dfp] .dfp-group-chip__icon img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* Discourse comma-separates the group list in the profile's stats cell using a
+ * generated `::after` on the spans inside it. The icon badge is a span, so it
+ * inherited a comma — invisible, because the badge is a 16px circle with
+ * `overflow: hidden`, but not harmless: the badge is a grid, and the comma
+ * became a second row. Measured `grid-template-rows: 9px 16.8px`, which pinned
+ * every glyph to the top of its badge instead of centring it (0px above, 7px
+ * below). Removing the comma restores a single 16px row and 3.5px either side.
+ *
+ * Scoped to the cell because that is where Discourse's rule lives, and scoped
+ * tightly enough to win on specificity rather than with `!important`. */
+html[data-dfp] .user-main .about > .details > .secondary dd .dfp-group-chip__icon::after,
+html[data-dfp] .user-main .about > .details > .secondary dd .dfp-group-chip__icon::before,
+html[data-dfp] .user-main .about > .details > .secondary dd .dfp-group-chip__name::after,
+html[data-dfp] .user-main .about > .details > .secondary dd .dfp-group-chip__name::before {
+  content: none;
+}
+
+/* ── Overflow ─────────────────────────────────────────────────────────────
+ * Chips past the surface's limit are rendered and hidden rather than withheld,
+ * so expanding is instant and no request is involved. */
+
+html[data-dfp] .dfp-group-chips[data-expanded="0"] .dfp-group-chip--extra {
+  display: none;
+}
+
+html[data-dfp] .dfp-group-chip--more {
+  /* It is a <button>, so the UA's font and background have to be undone
+   * before the shared chip rule above can show through. */
+  font: inherit;
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  padding-inline-start: 8px;
+  cursor: pointer;
+  color: var(--dfp-text-3);
+  border-style: dashed;
+}
+
+html[data-dfp] .dfp-group-chip--more:hover {
+  color: var(--dfp-text);
+  border-style: solid;
+}
+
+html[data-dfp] .dfp-group-chip--more:focus-visible {
+  outline: 2px solid var(--dfp-accent);
+  outline-offset: 2px;
+}
+
+/* ── User card ───────────────────────────────────────────────────────────
+ * A row of its own, matched to the card's other rows. */
+
+html[data-dfp] .card-content .dfp-card-groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--dfp-s-1) var(--dfp-s-2);
+}
+
+/* Matched to the card's own POSTED / JOINED / READ labels, measured off the
+ * live card: 12px, uppercase, 0.6px tracking, --dfp-text-3. Discourse's `.desc`
+ * class is scoped to `.metadata` and inherits nothing out here.
+ *
+ * Aligned to the first row of chips rather than centred against a strip that
+ * has wrapped to three. */
+html[data-dfp] .card-content .dfp-card-groups__label {
+  align-self: flex-start;
+  margin-block-start: 3px;
+  font-size: var(--dfp-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--dfp-text-3);
+}
+
+/* ── Post byline ─────────────────────────────────────────────────────────
+ * Sits after the username and title on the byline's own baseline. A post shows
+ * one chip, so it never wraps and never needs the overflow toggle. */
+
+html[data-dfp] .topic-meta-data .names .dfp-group-chip--byline {
+  margin-inline-start: var(--dfp-s-2);
+  vertical-align: middle;
+  /* The byline is a flex row of spans; without this the chip stretches. */
+  align-self: center;
+
+  /* Font is restated because post.css:133 `.topic-meta-data .names a` (0,3,2)
+   * claims every anchor in the byline for the display name's treatment, and the
+   * shared chip rule is only (0,2,1). Measured before this existed: the chip
+   * rendered at 15px/600 — larger and heavier than the username beside it —
+   * inside a pill padded for 12px text, with its badge still at 16px. This
+   * selector is (0,4,1) and wins for font. Colour is handled on the label; see
+   * the note above it for why it cannot be won here. */
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+}
+
+/* Nothing hides `.user-title` any more — see the note in post-groups.ts about
+ * why the chip is additive rather than a replacement. */

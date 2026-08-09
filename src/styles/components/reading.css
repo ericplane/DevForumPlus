@@ -1,0 +1,304 @@
+/* Reading-experience surfaces (PLAN.md §7.3): the pinned accepted answer and
+ * the stale-reply caution.
+ *
+ * Both sit inside other people's posts, so both are deliberately quiet. The
+ * accepted answer is an aid, not a takeover; the stale notice is advice, not an
+ * accusation that the author was wrong. */
+
+/* ── Accepted answer, hoisted above the question ───────────────────────────
+ *
+ * PLAN.md §7.3 #14 specified building this: "`discourse-solved` exposes
+ * `accepted_answer`. Pin it directly under the OP with a jump-to-context link."
+ * The forum already ships exactly that. Verified on a live solved topic, post 1
+ * contains TWO sibling `.cooked` containers:
+ *
+ *   div.regular.contents
+ *     ├─ div.cooked                     the question body
+ *     ├─ div.cooked                     discourse-solved's panel
+ *     │    └─ aside.quote.accepted-answer
+ *     │         ├─ div.title            "Solved by X in post #2" + jump link
+ *     │         └─ blockquote           excerpt, collapsible
+ *     └─ section.post-menu-area
+ *
+ * A first draft of this feature was a JS module rendering a second, near-
+ * identical card, which duplicated content it would have had to keep in sync.
+ * Deleted. What is actually wrong is only the ORDER: on a question with three
+ * screens of setup and screenshots you scroll past the entire problem to reach
+ * the answer — the complaint the plan opened with.
+ *
+ * So it is fixed with `order`, and no JavaScript at all. Nothing is moved, so
+ * there is nothing for Ember to undo on re-render, nothing to re-apply on a
+ * route change, and removing these two rules restores the forum exactly.
+ * `:has()` is safe here — the manifest already requires Chrome 116. */
+
+html[data-dfp] .topic-post .contents:has(> .cooked > aside.accepted-answer) {
+  display: flex;
+  flex-direction: column;
+}
+
+html[data-dfp] .topic-post .contents > .cooked:has(> aside.accepted-answer) {
+  order: -1;
+  margin-block-end: var(--dfp-s-4);
+}
+
+/* Now that it leads the post rather than trailing it, it earns a little more
+ * presence: a solved-green rail so the eye lands here before the question. */
+html[data-dfp] aside.accepted-answer {
+  background: color-mix(in oklab, var(--dfp-solved) 8%, var(--dfp-surface-1));
+  border: 1px solid color-mix(in oklab, var(--dfp-solved) 28%, transparent);
+  border-inline-start: 3px solid var(--dfp-solved);
+  border-radius: var(--dfp-r-md);
+}
+
+html[data-dfp] aside.accepted-answer .title {
+  color: var(--dfp-solved);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+/* Discourse's own check icon in the title row must follow the rail colour
+ * rather than the ambient one — see the badge-tick note in profile.css. */
+html[data-dfp] aside.accepted-answer .title .d-icon {
+  color: var(--dfp-solved);
+}
+
+html[data-dfp] aside.accepted-answer blockquote {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* ── Stale-reply caution ───────────────────────────────────────────────── */
+
+html[data-dfp] .dfp-stale-post {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dfp-s-3);
+  margin-block-end: var(--dfp-s-3);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  background: color-mix(in oklab, var(--dfp-deprecated) 10%, transparent);
+  border-inline-start: 3px solid color-mix(in oklab, var(--dfp-deprecated) 60%, transparent);
+  border-radius: var(--dfp-r-sm);
+}
+
+html[data-dfp] .dfp-stale-post__text {
+  margin: 0;
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.5;
+}
+
+html[data-dfp] .dfp-stale-post__dismiss {
+  flex: 0 0 auto;
+  padding: 0 var(--dfp-s-1);
+  background: none;
+  border: 0;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  cursor: pointer;
+}
+
+html[data-dfp] .dfp-stale-post__dismiss:hover {
+  color: var(--dfp-text);
+  text-decoration: underline;
+}
+
+/* ── "Can I post here?" gate (PLAN.md §7.2 #10) ──────────────────────────── */
+
+html[data-dfp] .dfp-gate {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dfp-s-3);
+  flex-wrap: wrap;
+  margin-block: var(--dfp-s-3);
+  padding: var(--dfp-s-3) var(--dfp-s-4);
+  background: color-mix(in oklab, var(--dfp-warning) 9%, transparent);
+  border: 1px solid color-mix(in oklab, var(--dfp-warning) 26%, transparent);
+  border-inline-start: 3px solid color-mix(in oklab, var(--dfp-warning) 70%, transparent);
+  border-radius: var(--dfp-r-md);
+}
+
+html[data-dfp] .dfp-gate__text {
+  margin: 0;
+  flex: 1 1 20rem;
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  line-height: 1.5;
+}
+
+html[data-dfp] .dfp-gate__link {
+  flex: 0 0 auto;
+  color: var(--dfp-warning);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+html[data-dfp] .dfp-gate__link:hover {
+  color: var(--dfp-text);
+}
+
+/* ── Composer: duplicate detection + draft vault (PLAN.md §7.5) ──────────── */
+
+html[data-dfp] .dfp-dupes {
+  display: block;
+  margin-block: var(--dfp-s-2);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  background: color-mix(in oklab, var(--dfp-accent) 7%, transparent);
+  border: 1px solid color-mix(in oklab, var(--dfp-accent) 24%, transparent);
+  border-radius: var(--dfp-r-md);
+}
+
+html[data-dfp] .dfp-dupes__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dfp-s-3);
+  margin-block-end: var(--dfp-s-1);
+}
+
+html[data-dfp] .dfp-dupes__label {
+  color: var(--dfp-accent);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+html[data-dfp] .dfp-dupes__dismiss,
+html[data-dfp] .dfp-draft__discard {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  cursor: pointer;
+}
+
+html[data-dfp] .dfp-dupes__dismiss:hover,
+html[data-dfp] .dfp-draft__discard:hover {
+  color: var(--dfp-text);
+  text-decoration: underline;
+}
+
+html[data-dfp] .dfp-dupes__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dfp-s-3);
+  padding: var(--dfp-s-1) 0;
+  color: var(--dfp-text-2);
+  text-decoration: none;
+}
+
+html[data-dfp] .dfp-dupes__row:hover .dfp-dupes__title {
+  color: var(--dfp-accent);
+  text-decoration: underline;
+}
+
+html[data-dfp] .dfp-dupes__title {
+  flex: 1 1 auto;
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-dfp] .dfp-dupes__meta {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--dfp-s-2);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  white-space: nowrap;
+}
+
+html[data-dfp] .dfp-dupes__solved {
+  color: var(--dfp-solved);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp] .dfp-draft {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dfp-s-3);
+  flex-wrap: wrap;
+  margin-block: var(--dfp-s-2);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  background: color-mix(in oklab, var(--dfp-warning) 9%, transparent);
+  border: 1px solid color-mix(in oklab, var(--dfp-warning) 24%, transparent);
+  border-radius: var(--dfp-r-md);
+}
+
+html[data-dfp] .dfp-draft__text {
+  flex: 1 1 18rem;
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-xs);
+}
+
+html[data-dfp] .dfp-draft__restore {
+  padding: var(--dfp-s-1) var(--dfp-s-3);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--dfp-warning) 45%, transparent);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-warning);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  cursor: pointer;
+}
+
+html[data-dfp] .dfp-draft__restore:hover {
+  background: color-mix(in oklab, var(--dfp-warning) 16%, transparent);
+}
+
+html[data-dfp] .d-editor-button-bar .dfp-luau-btn {
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .d-editor-button-bar .dfp-luau-btn:hover {
+  color: var(--dfp-accent);
+}
+
+/* ── Thread view (PLAN.md §7.3 #13) ──────────────────────────────────────────
+ * Depth, not reordering. See thread-view.ts for why a literal tree loses to
+ * Ember's virtualised post stream.
+ *
+ * Only active while the root carries `data-dfp-threaded`, so the toggle is a
+ * single attribute and turning it off leaves no residue — the inline
+ * `--dfp-depth` values stay harmless because nothing reads them. */
+
+html[data-dfp][data-dfp-threaded] .topic-post {
+  /* Each level steps in by a fixed amount rather than a percentage, so depth 4
+   * on a narrow window still leaves a readable measure. */
+  margin-inline-start: calc(var(--dfp-depth, 0) * clamp(10px, 2.2vw, 26px));
+  transition: margin-inline-start var(--dfp-dur-2) var(--dfp-ease);
+}
+
+/* A rail on the indented posts, so the eye can follow a chain rather than
+ * guessing from the offset alone. */
+html[data-dfp][data-dfp-threaded] .topic-post[style*="--dfp-depth"] > article {
+  border-inline-start: 2px solid
+    color-mix(in oklab, var(--dfp-accent) calc(var(--dfp-depth, 1) * 14%), var(--dfp-border));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-dfp][data-dfp-threaded] .topic-post {
+    transition: none;
+  }
+}
+
+/* Below this the indent costs more measure than the structure is worth. */
+@media (max-width: 720px) {
+  html[data-dfp][data-dfp-threaded] .topic-post {
+    margin-inline-start: calc(min(var(--dfp-depth, 0), 2) * 8px);
+  }
+}
+
+html[data-dfp] .dfp-thread-toggle[aria-pressed="true"] {
+  background: var(--dfp-accent-soft);
+  border-color: color-mix(in oklab, var(--dfp-accent) 40%, transparent);
+  color: var(--dfp-accent);
+}

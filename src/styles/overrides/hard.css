@@ -1,0 +1,95 @@
+/* !important quarantine.
+ *
+ * HARD CAP: 20 declarations. CI fails the build on the 21st.
+ *
+ * DevForum stacks six theme components on top of 26 plugin stylesheets, and a
+ * few of them set colours with enough specificity that a normal rule cannot
+ * reach them. Rather than let `!important` metastasize through the codebase,
+ * every one lives here with a comment naming what it is fighting.
+ *
+ * Before adding one: check whether retargeting a Discourse custom property in
+ * base.css solves it instead. It usually does, and it survives their refactors.
+ *
+ * Current count: 12 (enforced by `npm run check:styles`)
+ *
+ * TODO: re-audit. Rules 2–5 were added before base.css was fixed to win its
+ * specificity fight against `:root`, so some may no longer be needed at all —
+ * rule 1 already shrank from `body, .wrap` to `body` for exactly that reason.
+ */
+
+/* 1. Theme component 17 hardcodes the body background.
+ *
+ * This used to cover `.wrap` too, which was a mistake with a visible symptom:
+ * the header's inner `.wrap` then painted an opaque page-coloured rectangle
+ * inside the translucent header bar. Once base.css started winning the
+ * specificity fight against `:root`, `.wrap` needed no override at all —
+ * verified on the live site, where removing it leaves both wraps transparent
+ * and the page background intact. */
+html[data-dfp] body {
+  background-color: var(--dfp-bg) !important;
+}
+
+/* 3. The colour-scheme stylesheet sets a fixed radius on topic list rows with
+ * an id-level selector; every other radius token is respected. */
+html[data-dfp] .topic-list-item > td:first-child {
+  border-start-start-radius: var(--dfp-r-md) !important;
+}
+
+/* 4. Same rule, opposite corner. */
+html[data-dfp] .topic-list-item > td:last-child {
+  border-start-end-radius: var(--dfp-r-md) !important;
+}
+
+/* 5. Discourse sets an inline `color` on the category badge from the category's
+ * own colour, which defeats the chip treatment in topic-list.css. The badge
+ * background still carries the category colour, so no information is lost. */
+html[data-dfp] .badge-category__wrapper .badge-category .badge-category__name {
+  color: inherit !important;
+}
+
+/* 5. The header sets an opaque background via a theme variable that is not
+ * one of the documented ones, blocking the blur treatment. */
+html[data-dfp] .d-header {
+  background-color: color-mix(in oklab, var(--dfp-bg) 86%, transparent) !important;
+}
+
+/* 6. Discourse zeroes padding-top on the first row of a topic list with
+ * !important, so specificity cannot reach it — verified by bisecting up to
+ * `table.topic-list tbody tr:first-child > td`, which still lost. Sensible for
+ * a flat list sitting flush under the header; with cards it leaves the first
+ * one looking cropped while every card below it is padded. */
+html[data-dfp] .topic-list-item:first-child > td {
+  padding-block: var(--dfp-row-pad-y) !important;
+}
+
+/* 7. The user card's square corners. Verified by bisecting: `div.user-card`,
+ * `.user-card.show` and even an ID-weight `:not(#\9)` all lost, so Discourse
+ * sets this with !important. Every other popover in the product is rounded;
+ * this is the one that could not be reached normally. */
+html[data-dfp] .user-card,
+html[data-dfp] .group-card {
+  border-radius: var(--dfp-r-lg) !important;
+  /* Paired with the radius on purpose. The card stacks several layers
+   * (.card-content, a profile-background layer, the badge row) and each keeps
+   * its own square corners. Clipping the container is what rounds all of them
+   * at once — without it the outer border curves while an inner layer still
+   * shows a square edge through it. */
+  overflow: hidden !important;
+}
+
+/* 9. The profile avatar's dimensions. Bisected against the live page:
+ * `.user-main .user-profile-avatar img.avatar` loses on both `inline-size` and
+ * `width`, so Discourse or a theme sets this !important. Without it the hero
+ * avatar stays 45px in an 88px slot. */
+html[data-dfp] .user-main .user-profile-avatar img.avatar {
+  inline-size: 88px !important;
+  block-size: 88px !important;
+}
+
+/* 8. "+N More" in the badge row, same story — it kept the solid square button
+ * treatment among a row of pills no matter the selector. */
+html[data-dfp] .user-card .badge-section .btn,
+html[data-dfp] .user-card .badge-section button {
+  border-radius: var(--dfp-r-full) !important;
+  background: transparent !important;
+}

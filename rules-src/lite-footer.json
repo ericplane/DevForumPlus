@@ -1,0 +1,24 @@
+[
+  {
+    "_comment": [
+      "Blocks Roblox's decorative footer bundle. Verified live: it is served from",
+      "d348twzf7a8p5.cloudfront.net, NOT devforum.roblox.com — an earlier version of",
+      "this rule filtered on the forum host and would never have matched anything.",
+      "",
+      "initiatorDomains scopes it to requests originating from devforum pages, so",
+      "enabling this cannot affect any other Roblox site that loads the same bundle.",
+      "",
+      "Only footer_rbx is listed. creator_hub_navigation_rbx is real navigation, and",
+      "roblox_age_verification_banner_rbx is a compliance surface — neither is",
+      "blockable here at any setting."
+    ],
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "footer_rbx.bundle.js",
+      "resourceTypes": ["script"],
+      "initiatorDomains": ["devforum.roblox.com"]
+    }
+  }
+]

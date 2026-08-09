@@ -1,0 +1,1306 @@
+/* User profiles — /u/:username/summary, /activity, /badges, /preferences, …
+ *
+ * The profile is the least-designed surface on the forum. Everything floats on
+ * the page background with no surfaces at all, the summary columns are laid out
+ * with `pull-left` / `pull-right` floats, and the stats row is a single line of
+ * fourteen numbers and labels running together.
+ *
+ * Three changes carry most of the redesign:
+ *   1. The hero becomes a card, and stops squeezing the name into 73px.
+ *   2. Stats become a grid of tiles instead of a sentence.
+ *   3. The float columns become a real grid, so sections align.
+ */
+
+/* ── Hero ────────────────────────────────────────────────────────────────
+ * `.controls` is a flex child with no basis, so it grew to a measured 944px
+ * and squashed `.primary-textual` — the name and username — down to 73px.
+ * That is the whole reason the header looked cramped. */
+
+/* Scoped to `.about`, which is the hero container in BOTH states.
+ *
+ * This was `.collapsed-info` — a class Discourse only applies while the header
+ * is collapsed. Hitting "Expand" therefore dropped the card entirely: measured
+ * `.about.no-background` with a transparent background and `padding: 0`, so the
+ * name, username and the whole stats strip sat flush against the container edge
+ * and clipped.
+ *
+ * `.about` is the right hook and is still safe. `.user-main .details` matches
+ * **19** elements on a summary page — every row of the user lists — which is
+ * what gave each of those rows its own card and produced the overlapping boxes
+ * reported on "most replied to" and "most liked by". `.about` matches exactly
+ * one, and is not inside `.user-detail`. Verified live on both states. */
+/* The card lives on `.collapsed-info`, not `.details`.
+ *
+ * `.details` carries its own translucent rgba(17,18,23,.8) — a colour from no
+ * palette — so styling it would have stacked two surfaces the way the user-card
+ * popover did. Putting the card on the parent and clearing the child leaves
+ * exactly one painted surface.
+ *
+ * The gradient and the corner wash are doing real work: a flat rectangle with a
+ * name in it is the definition of a plain header, and this is the first thing
+ * anyone sees on a profile. The accent glow sits behind the actions, so the
+ * eye lands on the person first and the buttons second. */
+html[data-dfp] .user-main .about {
+  position: relative;
+  background:
+    radial-gradient(
+      120% 150% at 88% -35%,
+      color-mix(in oklab, var(--dfp-accent) 14%, transparent),
+      transparent 62%
+    ),
+    linear-gradient(158deg, var(--dfp-surface-2), var(--dfp-surface-1) 60%);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-lg);
+  padding: var(--dfp-s-5) var(--dfp-s-6);
+  margin-block-end: var(--dfp-s-4);
+  overflow: hidden;
+}
+
+/* A hairline of accent along the top edge, so the card reads as *this user's*
+ * header rather than a generic panel. */
+html[data-dfp] .user-main .about::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--dfp-accent),
+    color-mix(in oklab, var(--dfp-accent) 30%, transparent) 45%,
+    transparent 80%
+  );
+  pointer-events: none;
+}
+
+html[data-dfp] .user-main .about > .details {
+  background: transparent;
+  padding: 0;
+  border: 0;
+}
+
+html[data-dfp] .user-main .about > .details .primary {
+  display: flex;
+  /* `flex-start`, not `center`. Centred, the actions floated to the vertical
+   * middle of the card — which reads fine while collapsed and looks stranded
+   * beside a long bio once expanded, sitting level with the middle of a
+   * paragraph instead of with the person they act on. */
+  align-items: flex-start;
+  gap: var(--dfp-s-4);
+  flex-wrap: wrap;
+}
+
+html[data-dfp] .user-main .user-profile-avatar {
+  inline-size: 88px;
+  block-size: 88px;
+  flex: 0 0 auto;
+  position: relative;
+}
+
+/* The ring lifts the avatar off the gradient instead of letting it sit flat
+ * on it. Size itself is forced in overrides/hard.css — see rule 9. */
+html[data-dfp] .user-main .user-profile-avatar img.avatar {
+  border-radius: var(--dfp-r-lg);
+  object-fit: cover;
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--dfp-bg) 65%, transparent),
+    0 0 0 4px var(--dfp-border);
+}
+
+/* The group flair sits over the avatar's corner, same treatment as the card. */
+html[data-dfp] .user-main .user-profile-avatar .avatar-flair {
+  position: absolute;
+  inset-block-end: -3px;
+  inset-inline-end: -3px;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: var(--dfp-r-full);
+  border: 2px solid var(--dfp-surface-2);
+  background-size: 15px 15px;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: grid;
+  place-items: center;
+}
+
+html[data-dfp] .user-main .primary-textual {
+  flex: 1 1 240px;
+  min-inline-size: 0;
+}
+
+html[data-dfp] .user-main .user-profile-names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+html[data-dfp] .user-main .user-profile-names .username,
+html[data-dfp] .user-main .user-profile-names h1 {
+  font-size: calc(var(--dfp-fs-title) * 1.08);
+  font-weight: var(--dfp-fw-bold);
+  letter-spacing: var(--dfp-track-title);
+  line-height: var(--dfp-lh-tight);
+  color: var(--dfp-text);
+  margin: 0;
+}
+
+html[data-dfp] .user-main .user-profile-names .name,
+html[data-dfp] .user-main .user-profile-names h2 {
+  font-size: var(--dfp-fs-md);
+  font-weight: var(--dfp-fw-normal);
+  color: var(--dfp-text-3);
+  margin: 0;
+}
+
+html[data-dfp] .user-main .user-profile-names .user-profile-names__secondary {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-md);
+}
+
+html[data-dfp] .user-main .bio {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  margin-block-start: var(--dfp-s-2);
+}
+
+/* Actions sit at the trailing edge and size to their content. */
+html[data-dfp] .user-main .about > .details .controls {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  inline-size: auto;
+  /* The card's padding is asymmetric — 24px block, 32px inline — so actions
+   * tucked into the corner sat 25px from the top and 33px from the right, and
+   * read as not-quite-aligned. Pulling them out by the difference makes both
+   * gaps equal without changing the padding for everything else in the card. */
+  margin-inline-end: calc(var(--dfp-s-5) - var(--dfp-s-6));
+  /* And the box must not be wider than the buttons in it. Measured: the list
+   * was 203px around 117px buttons, which left them 111px from the card edge
+   * while the *container* sat at 25px — so the corner looked wrong even though
+   * the container was placed correctly.
+   *
+   * `inline-size: fit-content` did NOT shrink it, and `justify-content` on the
+   * inner `<ul>` still left the buttons 16px short. Owning the layout — a
+   * right-aligned column — is what actually lands them on the corner, and it
+   * also stops depending on how Discourse nests `ul > li` around them. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+html[data-dfp] .user-main .about > .details .controls ul {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--dfp-s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  inline-size: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+html[data-dfp] .user-main .about > .details .controls .btn {
+  min-block-size: 36px;
+  border-radius: var(--dfp-r-sm);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp] .user-main .about > .details .controls .btn-primary {
+  background: var(--dfp-accent-strong);
+  color: var(--dfp-on-accent);
+}
+
+/* ── DFP additions: trust level and member-since ─────────────────────────
+ * Injected by discourse/modules/profile-info.ts. Discourse shows the trust
+ * level nowhere on a profile, and on this forum it is the single most asked-
+ * about number a user has. */
+
+html[data-dfp] .dfp-profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  margin-block-start: var(--dfp-s-2);
+}
+
+html[data-dfp] .dfp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px var(--dfp-s-2);
+  border-radius: var(--dfp-r-full);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  color: var(--dfp-text-2);
+  line-height: 1.5;
+}
+
+html[data-dfp] .dfp-chip--tl {
+  background: var(--dfp-accent-soft);
+  border-color: color-mix(in oklab, var(--dfp-accent) 30%, transparent);
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] .dfp-chip--staff {
+  background: color-mix(in oklab, var(--dfp-staff) 16%, transparent);
+  border-color: color-mix(in oklab, var(--dfp-staff) 34%, transparent);
+  color: var(--dfp-staff);
+}
+
+html[data-dfp] .dfp-chip__dot {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--dfp-r-full);
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+/* ── Profile navigation ──────────────────────────────────────────────────
+ * Same rule as the rest of the product: the underline is the active marker,
+ * hover is a colour change, no competing pill. */
+
+html[data-dfp] .user-navigation .nav-pills {
+  gap: var(--dfp-s-1);
+  border-bottom: 1px solid var(--dfp-border);
+  padding-block-end: 0;
+  flex-wrap: wrap;
+}
+
+html[data-dfp] .user-navigation .nav-pills > li > a {
+  background: transparent;
+  border-radius: var(--dfp-r-sm) var(--dfp-r-sm) 0 0;
+  color: var(--dfp-text-3);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  font-weight: var(--dfp-fw-medium);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] .user-navigation .nav-pills > li > a:hover {
+  background: transparent;
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .user-navigation .nav-pills > li > a.active {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+/* ── Stats ───────────────────────────────────────────────────────────────
+ * Fourteen figures in one running line, each `number` immediately followed by
+ * its `label`, was the least readable element on the page. Tiles give every
+ * stat the same shape so the row can be scanned rather than read. */
+
+/* One panel, not eleven boxes.
+ *
+ * Eleven identically-sized rounded rectangles in two ragged rows is monotonous
+ * — the shapes repeat, so nothing stands out and the eye has nowhere to land.
+ * A single card divided by hairlines reads as one coherent block: same
+ * information, one object instead of eleven, and the ragged second row becomes
+ * a continuation rather than a stranded group. */
+
+html[data-dfp] .user-content .stats-section > ul,
+html[data-dfp] .top-section.stats-section > ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  overflow: hidden;
+}
+
+html[data-dfp] .user-content .stats-section > ul > li {
+  list-style: none;
+  margin: 0;
+  /* Hover lives on the cell, not the stat inside it. The stat does not fill
+   * its li, so highlighting the stat left an inset patch that stopped short of
+   * the dividers. */
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+  /* Hairlines on two sides only; the card's own border closes the outer edges,
+   * and the overflow clip hides the ones that fall off the end. */
+  border-inline-end: 1px solid var(--dfp-border);
+  border-block-end: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .user-content .user-stat {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: var(--dfp-s-3) var(--dfp-s-4);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  block-size: 100%;
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-content .stats-section > ul > li:hover {
+  background: var(--dfp-surface-2);
+}
+
+html[data-dfp] .user-content .user-stat .value,
+html[data-dfp] .user-content .user-stat .number {
+  display: block;
+  font-size: var(--dfp-fs-xl);
+  font-weight: var(--dfp-fw-semibold);
+  color: var(--dfp-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+html[data-dfp] .user-content .user-stat .label {
+  display: block;
+  font-size: var(--dfp-fs-xs);
+  color: var(--dfp-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
+
+/* The heart glyph inside "likes given / received" should not be uppercase-
+ * spaced like the words around it. */
+html[data-dfp] .user-content .user-stat .label .d-icon {
+  color: var(--dfp-danger);
+  margin-inline-end: 2px;
+}
+
+html[data-dfp] .user-content .stats-title,
+html[data-dfp] .user-content .top-section > h3 {
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dfp-text-3);
+  margin: 0 0 var(--dfp-s-3);
+}
+
+/* ── Summary sections ────────────────────────────────────────────────────
+ * Discourse lays these out with `pull-left` / `pull-right` floats, so the two
+ * columns never align and a tall section drags the next one out of position.
+ * A grid fixes the alignment and makes the whole page respond properly. */
+
+html[data-dfp] .user-content div:has(> .top-sub-section) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--dfp-s-4);
+  align-items: start;
+}
+
+/* Kill the clearfix pseudo-elements before they become grid items.
+ *
+ * These containers were built for floats, so they carry a clearfix. In a float
+ * layout `::before { content: "" }` is invisible; in a grid it is a *child*,
+ * and it took the first column — measured as three tracks with the two real
+ * sections sitting in columns 2 and 3, indenting the whole block by a column.
+ * Converting a float layout to grid means clearing its clearfix. */
+html[data-dfp] .user-content div:has(> .top-sub-section)::before,
+html[data-dfp] .user-content div:has(> .top-sub-section)::after {
+  display: none;
+}
+
+html[data-dfp] .user-content .top-sub-section {
+  float: none;
+  inline-size: auto;
+  margin: 0;
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-4);
+}
+
+/* `> h3` only — a bare `.title` here also matches `.user-detail > .title`, the
+ * per-user title inside the summary user lists. */
+html[data-dfp] .user-content .top-sub-section > h3 {
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dfp-text-3);
+  margin: 0 0 var(--dfp-s-3);
+  padding-block-end: var(--dfp-s-2);
+  border-bottom: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .user-content .top-sub-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dfp-s-1);
+}
+
+html[data-dfp] .user-content .top-sub-section li {
+  list-style: none;
+  margin: 0;
+  padding: var(--dfp-s-2);
+  border-radius: var(--dfp-r-sm);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-content .top-sub-section li:hover {
+  background: var(--dfp-surface-2);
+}
+
+/* Date and like-count are meta; the topic title is the content. */
+html[data-dfp] .user-content .top-sub-section .time,
+html[data-dfp] .user-content .top-sub-section .date,
+html[data-dfp] .user-content .top-sub-section .likes {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-dfp] .user-content .top-sub-section .likes .d-icon {
+  color: var(--dfp-danger);
+}
+
+html[data-dfp] .user-content .replies-section a.title,
+html[data-dfp] .user-content .topics-section a.title,
+html[data-dfp] .user-content .links-section a.title,
+html[data-dfp] .user-content .top-sub-section .topic-title {
+  display: block;
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  margin-block-start: 2px;
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-content .top-sub-section li:hover a.title,
+html[data-dfp] .user-content .top-sub-section li:hover .topic-title,
+html[data-dfp] .user-content .top-sub-section li:hover .name-line a {
+  color: var(--dfp-text);
+}
+
+/* Link rows: the URL is provenance, the title is the thing. */
+html[data-dfp] .user-content .links-section .domain,
+html[data-dfp] .user-content .links-section .badge-notification {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  background: transparent;
+  padding: 0;
+}
+
+html[data-dfp] .user-content .links-section .badge-notification.clicks {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-full);
+  padding: 0 5px;
+  margin-inline-start: 5px;
+}
+
+/* ── User lists: "most replied to", "most liked by", "most liked" ────────
+ *
+ * Real markup, read rather than assumed:
+ *   li > .user-info.small > .user-image > .user-image-inner > a > img
+ *                         > .user-detail > .name-line > a
+ *                                        > .title
+ *                                        > .details > svg + span.replies
+ *
+ * Everything here is laid out horizontally on one line: avatar, name, count.
+ * The nested blocks were stretching to 129px tall because nothing constrained
+ * them once the parent became flex. */
+
+html[data-dfp] .user-content .summary-user-list li {
+  display: block;
+  padding: 0;
+}
+
+html[data-dfp] .user-content .summary-user-list .user-info.small {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  inline-size: 100%;
+  block-size: auto;
+  padding: var(--dfp-s-2);
+  border-radius: var(--dfp-r-sm);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-content .summary-user-list .user-info.small:hover {
+  background: var(--dfp-surface-2);
+}
+
+html[data-dfp] .user-content .summary-user-list .user-image {
+  flex: 0 0 auto;
+  inline-size: 32px;
+  block-size: 32px;
+  margin: 0;
+}
+
+html[data-dfp] .user-content .summary-user-list .user-image-inner {
+  inline-size: 32px;
+  block-size: 32px;
+  display: block;
+}
+
+html[data-dfp] .user-content .summary-user-list img.avatar {
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: var(--dfp-r-full);
+  border: 1px solid var(--dfp-border);
+  display: block;
+}
+
+html[data-dfp] .user-content .summary-user-list .user-detail {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  block-size: auto;
+}
+
+html[data-dfp] .user-content .summary-user-list .name-line {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  block-size: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-dfp] .user-content .summary-user-list .name-line a {
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-medium);
+  display: inline;
+}
+
+/* Markup is `<a><span class="name">Frost</span><span class="username">Da_Fr0st
+ * </span></a>` — display name then handle, separated by nothing, so rows read
+ * "Frost Da_Fr0st" as if it were one name. Same problem as the post byline and
+ * the same fix: differentiate them rather than hide one, since which account a
+ * display name belongs to is genuinely useful here. */
+html[data-dfp] .user-content .summary-user-list .name-line .name {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+  margin-inline-end: 5px;
+}
+
+html[data-dfp] .user-content .summary-user-list .name-line .username {
+  color: var(--dfp-text-3);
+  font-weight: var(--dfp-fw-normal);
+  font-size: var(--dfp-fs-xs);
+}
+
+/* When a user has set no display name Discourse still renders the span, often
+ * with placeholder glyphs. An empty one should not reserve space. */
+html[data-dfp] .user-content .summary-user-list .name-line .name:empty {
+  display: none;
+}
+
+/* The per-user title — not a section heading. It had been picking up the
+ * heading treatment (uppercase, border-bottom, block margins). */
+html[data-dfp] .user-content .summary-user-list .user-detail > .title {
+  display: none;
+}
+
+/* The count sits at the trailing edge with its icon. */
+html[data-dfp] .user-content .summary-user-list .user-detail > .details {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  block-size: auto;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-dfp] .user-content .summary-user-list .user-detail > .details .d-icon {
+  inline-size: 12px;
+  block-size: 12px;
+}
+
+html[data-dfp] .user-content .summary-user-list .liked .d-icon,
+html[data-dfp] .user-content .liked-section .d-icon,
+html[data-dfp] .user-content .liked-by-section .d-icon {
+  color: var(--dfp-danger);
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+
+/* Badge cards lay their contents out horizontally — `.badge-contents` is a flex
+ * row of `.badge-icon` beside `.badge-info`. At a 200px column that left the
+ * text 99px wide, so every title wrapped to two lines and the longer ones
+ * truncated mid-word.
+ *
+ * Stacking the contents fixes it at any column width, and reads better: icon,
+ * then name, then description, like a card rather than a table row. */
+
+html[data-dfp] .badge-group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--dfp-s-3);
+}
+
+html[data-dfp] .badge-group-list .badge-card,
+html[data-dfp] .user-content .user-badge {
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-4);
+  position: relative;
+  block-size: 100%;
+  transition:
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .badge-group-list .badge-card:hover,
+html[data-dfp] .user-content .user-badge:hover {
+  border-color: var(--dfp-border-strong);
+  background: var(--dfp-surface-2);
+}
+
+html[data-dfp] .badge-card .badge-contents {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--dfp-s-2);
+  inline-size: 100%;
+  block-size: auto;
+}
+
+html[data-dfp] .badge-card .badge-icon {
+  inline-size: 34px;
+  block-size: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+html[data-dfp] .badge-card .badge-icon svg {
+  inline-size: 28px;
+  block-size: 28px;
+}
+
+html[data-dfp] .badge-card .badge-info {
+  inline-size: 100%;
+  block-size: auto;
+  min-inline-size: 0;
+}
+
+html[data-dfp] .badge-card .badge-info .badge-display-name,
+html[data-dfp] .badge-card .badge-info h3 {
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-md);
+  font-weight: var(--dfp-fw-semibold);
+  line-height: var(--dfp-lh-snug);
+  margin: 0 0 2px;
+}
+
+html[data-dfp] .badge-card .badge-info .badge-info-item {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  block-size: auto;
+}
+
+html[data-dfp] .badge-card .badge-info .grant-count,
+html[data-dfp] .badge-card .badge-info .awarded {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  display: block;
+  margin-block-start: var(--dfp-s-2);
+}
+
+/* The favourite toggle is absolutely positioned; pin it to the top-right so it
+ * stops colliding with the description at the bottom of the card. */
+html[data-dfp] .badge-card .favorite-btn {
+  position: absolute;
+  inset-block-start: var(--dfp-s-2);
+  inset-inline-end: var(--dfp-s-2);
+  inset-block-end: auto;
+  min-block-size: 0;
+  inline-size: 28px;
+  block-size: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .badge-card .favorite-btn:hover {
+  background: var(--dfp-surface-3);
+  color: var(--dfp-warning);
+}
+
+/* Keep the title clear of the star. */
+html[data-dfp] .badge-card .badge-info .badge-display-name {
+  padding-inline-end: var(--dfp-s-5);
+}
+
+/* Badge tier is the only colour these carry, so let it show. */
+html[data-dfp] .user-content .badge-type-gold .badge-icon,
+html[data-dfp] .badge-card.gold .badge-icon {
+  color: var(--dfp-warning);
+}
+
+html[data-dfp] .user-content .badge-type-silver .badge-icon,
+html[data-dfp] .badge-card.silver .badge-icon {
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .user-content .badge-type-bronze .badge-icon,
+html[data-dfp] .badge-card.bronze .badge-icon {
+  color: var(--dfp-deprecated);
+}
+
+/* ── Activity stream ─────────────────────────────────────────────────────── */
+
+html[data-dfp] .user-stream .user-stream-item,
+html[data-dfp] .user-stream-item {
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-3) var(--dfp-s-4);
+  margin-block-end: var(--dfp-s-2);
+  transition: border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-stream .user-stream-item:hover {
+  border-color: var(--dfp-border-strong);
+}
+
+html[data-dfp] .user-stream .user-stream-item .title,
+html[data-dfp] .user-stream-item .title {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+  font-size: var(--dfp-fs-md);
+}
+
+/* `.post-excerpt` is the bookmarks list's own class for the same thing. That
+ * page is otherwise fully covered — it renders as `tr.topic-list-item`, so it
+ * inherits the whole topic-list treatment — and this was the one element it
+ * brings that nothing else on the forum uses. */
+html[data-dfp] .user-stream .user-stream-item .excerpt,
+html[data-dfp] .user-stream-item .excerpt,
+html[data-dfp] .bookmark-list-item .post-excerpt,
+html[data-dfp] .topic-list-item .post-excerpt {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  margin-block-start: var(--dfp-s-1);
+}
+
+html[data-dfp] .user-stream .user-stream-item .time,
+html[data-dfp] .user-stream-item .relative-date {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+}
+
+html[data-dfp] .user-stream img.avatar {
+  border-radius: var(--dfp-r-full);
+  border: 1px solid var(--dfp-border);
+}
+
+/* Discourse's newer stream markup: `.post-list-item` with a header row
+ * (avatar + title + metadata) and an excerpt beneath. Verified on /activity. */
+
+html[data-dfp] .post-list-item__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dfp-s-3);
+}
+
+html[data-dfp] .post-list-item .avatar-link {
+  flex: 0 0 auto;
+  inline-size: 36px;
+  block-size: 36px;
+}
+
+html[data-dfp] .post-list-item .avatar-wrapper,
+html[data-dfp] .post-list-item img.avatar {
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--dfp-r-full);
+}
+
+html[data-dfp] .post-list-item__details {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+html[data-dfp] .post-list-item .stream-topic-title,
+html[data-dfp] .post-list-item .stream-topic-title a {
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-md);
+  font-weight: var(--dfp-fw-medium);
+  line-height: var(--dfp-lh-snug);
+}
+
+html[data-dfp] .post-list-item:hover .stream-topic-title a {
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] .post-list-item__metadata {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--dfp-s-2);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  margin-block-start: 2px;
+}
+
+html[data-dfp] .post-list-item .excerpt,
+html[data-dfp] .post-list-item .excerpt .cooked {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  margin-block-start: var(--dfp-s-2);
+  /* Excerpts vary wildly in length; two lines keeps the stream scannable. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ── Follows / Messages ──────────────────────────────────────────────────
+ * Both render as topic lists or user grids that already inherit the list
+ * treatment; these only fix the containers around them. */
+
+html[data-dfp] .user-content .user-messages,
+html[data-dfp] .user-content .follow-container,
+html[data-dfp] .user-content .directory-table {
+  inline-size: 100%;
+}
+
+html[data-dfp] .user-content .follow-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--dfp-s-3);
+}
+
+html[data-dfp] .user-content .follow-container .user-info {
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  transition: border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-content .follow-container .user-info:hover {
+  border-color: var(--dfp-border-strong);
+  background: var(--dfp-surface-2);
+}
+
+/* ── Preferences ─────────────────────────────────────────────────────────
+ * Long forms with no grouping. Giving each control group a surface is the
+ * difference between a settings page and a wall of inputs. */
+
+/* Discourse fixes the preferences form to 500px, but ships controls marked
+ * `input-xxlarge` that measure 530px — so the widest fields overflowed their own
+ * form by 47px, and boxing the groups made the overflow visible. Giving the
+ * form room and capping every control at 100% fixes both.
+ *
+ * 760px rather than the full 1080px: these are single-column forms, and a text
+ * field a thousand pixels wide is harder to use, not easier. */
+html[data-dfp] .user-preferences form.form-vertical,
+html[data-dfp] .user-preferences > form {
+  inline-size: 100%;
+  max-inline-size: 760px;
+}
+
+html[data-dfp] .user-preferences .control-group,
+html[data-dfp] .user-preferences fieldset.control-group {
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-4);
+  margin-block-end: var(--dfp-s-3);
+  inline-size: 100%;
+  box-sizing: border-box;
+}
+
+/* Nothing inside a group may be wider than the group. */
+html[data-dfp] .user-preferences .control-group > *,
+html[data-dfp] .user-preferences .controls,
+html[data-dfp] .user-preferences .input-xxlarge,
+html[data-dfp] .user-preferences .input-xlarge,
+html[data-dfp] .user-preferences .input-large {
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
+html[data-dfp] .user-preferences .control-group input[type="text"],
+html[data-dfp] .user-preferences .control-group input[type="email"],
+html[data-dfp] .user-preferences .control-group textarea,
+html[data-dfp] .user-preferences .control-group select,
+html[data-dfp] .user-preferences .control-group .select-kit {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
+/* The bio editor is a composer inside a form; it needs room and a frame of its
+ * own rather than spilling past the card. */
+html[data-dfp] .user-preferences .bio-composer,
+html[data-dfp] .user-preferences .d-editor {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
+html[data-dfp] .user-preferences .d-editor-textarea-wrapper,
+html[data-dfp] .user-preferences .d-editor-preview-wrapper {
+  inline-size: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  background: var(--dfp-surface-2);
+}
+
+html[data-dfp] .user-preferences .d-editor-button-bar {
+  border-bottom: 1px solid var(--dfp-border);
+  padding: var(--dfp-s-1);
+}
+
+/* ── Recently used devices (Security) ────────────────────────────────────
+ * These render as rows inside a control group. Left to the generic input and
+ * button styling they picked up borders and became boxes-within-a-box, and a
+ * row with no detail to show rendered as an empty bordered strip. Rows with
+ * hairline separators read as the list they are. */
+
+html[data-dfp] .user-preferences .auth-tokens {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+}
+
+html[data-dfp] .user-preferences .auth-token {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-3);
+  padding: var(--dfp-s-3) 0;
+  border: 0;
+  border-block-start: 1px solid var(--dfp-border);
+  border-radius: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+html[data-dfp] .user-preferences .auth-token:first-child {
+  border-block-start: 0;
+}
+
+/* A row with nothing to show should not reserve a bordered strip. */
+html[data-dfp] .user-preferences .auth-token:not(:has(a, span, div)) {
+  display: none;
+}
+
+html[data-dfp] .user-preferences .auth-token .d-icon {
+  color: var(--dfp-text-3);
+  flex: 0 0 auto;
+}
+
+html[data-dfp] .user-preferences .auth-token__device {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp] .user-preferences .auth-token__client,
+html[data-dfp] .user-preferences .auth-token__latest {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] .user-preferences .pref-auth-tokens .pull-right {
+  float: none;
+  margin-inline-start: auto;
+}
+
+html[data-dfp] .user-preferences .pref-auth-tokens > a:last-of-type,
+html[data-dfp] .user-preferences .pref-auth-tokens .text-danger {
+  color: var(--dfp-danger);
+}
+
+/* ── Secondary nav (Account / Security / Profile / …) ────────────────────
+ * A second full row of tabs directly under the first. Making it visibly the
+ * lesser of the two stops the page opening with two competing navigations. */
+
+html[data-dfp] .user-navigation-secondary .nav-pills {
+  border-bottom: 1px solid var(--dfp-border);
+  gap: 0;
+}
+
+html[data-dfp] .user-navigation-secondary .nav-pills > li > a {
+  font-size: var(--dfp-fs-sm);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .user-navigation-secondary .nav-pills > li > a.active {
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .user-preferences .control-group > legend,
+html[data-dfp] .user-preferences .control-label {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] .user-preferences .instructions {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  line-height: var(--dfp-lh-snug);
+}
+
+html[data-dfp] .user-preferences .save-button {
+  position: sticky;
+  inset-block-end: 0;
+  background: color-mix(in oklab, var(--dfp-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--dfp-border);
+  padding-block: var(--dfp-s-3);
+  margin-block-start: var(--dfp-s-4);
+}
+
+/* ── Empty states ────────────────────────────────────────────────────────── */
+
+html[data-dfp] .user-content .empty-state,
+html[data-dfp] .user-main .empty-state {
+  background: var(--dfp-surface-1);
+  border: 1px dashed var(--dfp-border-strong);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-6);
+  text-align: center;
+  color: var(--dfp-text-3);
+}
+
+/* ── Badge grant checkmarks ──────────────────────────────────────────────────
+ * The pill on /badges: `.check-display.status-checked` takes
+ * `background-color: var(--success)` and Discourse paints the tick inside it
+ * with `color: var(--secondary)` — deliberately, so it reads against a
+ * saturated fill.
+ *
+ * That rule is specificity (0,2,0). DFP's global icon rule in base.css,
+ * `html[data-dfp] svg.d-icon { color: inherit }`, is (0,2,2) and outranks it,
+ * so the tick stops using Discourse's chosen colour and inherits the ambient
+ * one instead — which comes from `.badge-groups`, giving rgb(120,126,155) on
+ * our green at a measured 1.83:1 across all 13 badges on the page.
+ *
+ * This is the `.d-icon` bug inverted. There, Discourse hardcoded a colour that
+ * was wrong and `color: inherit` fixed it; here it hardcoded one that was
+ * right and `color: inherit` destroyed it. The blanket rule earns its keep, so
+ * the fix is to name the two places it overreaches rather than weaken it. */
+html[data-dfp] .check-display.status-checked .d-icon {
+  color: var(--dfp-success-fg);
+}
+
+html[data-dfp] .check-display.status-unchecked .d-icon {
+  color: var(--dfp-danger-fg);
+}
+
+/* ── Expanded hero ───────────────────────────────────────────────────────
+ * Hitting "Expand" swaps `.collapsed-info` off `.about` and reveals two
+ * children the collapsed state never shows: `.primary` (bio, profile fields,
+ * badges) and `.secondary` (the Joined / Last Post / Seen / Views / Trust Level
+ * / Groups strip).
+ *
+ * Neither had ever been styled, because every hero rule was scoped to the
+ * collapsed class. The strip in particular is a `<dl>` of `inline-flex` pairs
+ * that measured out to x=1098 inside a 1080px container — it simply ran past
+ * the edge and clipped. */
+
+/* NOT `flex-direction: column`.
+ *
+ * A first attempt stacked `.primary`, which read fine until you noticed the
+ * Message and Collapse buttons had dropped inline under the badges and the
+ * right half of the card was empty. `.primary` is already a wrapping row above,
+ * and `.controls` is already pushed right with `margin-inline-start: auto` —
+ * the expanded state needs neither changed, only the text column allowed to
+ * take the space it now has content for. */
+html[data-dfp] .user-main .about > .details > .primary > .primary-textual {
+  flex: 1 1 24rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dfp-s-2);
+  min-inline-size: 0;
+}
+
+html[data-dfp] .user-main .about > .details > .secondary {
+  display: block;
+  margin-block-start: var(--dfp-s-4);
+  padding-block-start: var(--dfp-s-3);
+  /* A hairline rather than a panel: this is a footnote to the hero, not a
+   * second card inside it. */
+  border-block-start: 1px solid color-mix(in oklab, var(--dfp-border) 70%, transparent);
+}
+
+html[data-dfp] .user-main .about > .details > .secondary dl {
+  display: flex;
+  /* The overflow fix. Six pairs do not fit on one line at every width, and a
+   * strip that wraps beats one that clips. */
+  flex-wrap: wrap;
+  gap: var(--dfp-s-2) var(--dfp-s-5);
+  margin: 0;
+}
+
+/* Each pair stacks — label above value — rather than running inline.
+ *
+ * Inline, the six pairs read as one long sentence ("JOINED Dec 18, 2017 LAST
+ * POST 1 day SEEN just now …") where the labels and values blur together and
+ * nothing is scannable. Stacked and ruled, it reads as a spec strip: you can
+ * find "Trust Level" without reading the five things before it. */
+html[data-dfp] .user-main .about > .details > .secondary dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding-inline: var(--dfp-s-4);
+  /* A hairline between cells. `:first-child` loses its rule so the strip does
+   * not open with a stray divider. */
+  border-inline-start: 1px solid color-mix(in oklab, var(--dfp-border) 65%, transparent);
+}
+
+html[data-dfp] .user-main .about > .details > .secondary dl > div:first-child {
+  border-inline-start: 0;
+  padding-inline-start: 0;
+}
+
+/* Groups take their own row.
+ *
+ * Eight chips are far wider than a metric, so inline they force a wrap and then
+ * sit indented behind a divider intended for a same-line neighbour. Given a
+ * full row they read as their own thing, and the metrics above stay evenly
+ * spaced instead of being squeezed by one outsized cell. */
+html[data-dfp] .user-main .about > .details > .secondary dl > div:has(.dfp-group-chips) {
+  flex-basis: 100%;
+  border-inline-start: 0;
+  padding-inline-start: 0;
+  margin-block-start: var(--dfp-s-2);
+  gap: var(--dfp-s-1);
+}
+
+/* Label recedes, value reads. Without this both sit at the same weight and the
+ * strip is a wall of undifferentiated text. */
+html[data-dfp] .user-main .about > .details > .secondary dt {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+html[data-dfp] .user-main .about > .details > .secondary dd {
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-semibold);
+  /* Dates and counts sit in a row of other dates and counts; lining figures
+   * stop them jittering against their neighbours. */
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  white-space: nowrap;
+}
+
+html[data-dfp] .user-main .about > .details > .secondary dd a {
+  color: var(--dfp-accent);
+}
+
+/* The bio sits in the middle of the hero and inherits nothing useful. */
+html[data-dfp] .user-main .about .bio {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  line-height: 1.6;
+  max-inline-size: 68ch;
+}
+
+html[data-dfp] .user-main .about .bio p {
+  margin-block: 0 var(--dfp-s-2);
+}
+
+/* ── Avatar flair ────────────────────────────────────────────────────────
+ * Discourse absolutely-positions the group badge with all four insets set
+ * (measured `54px 16px 8px 46px`), which over-constrains it: the width wins and
+ * the badge lands mid-avatar rather than in a corner, looking dropped rather
+ * than attached.
+ *
+ * Pinned to the bottom-right and allowed to overhang slightly, with a ring in
+ * the card colour so it separates from the portrait behind it — the same
+ * treatment a presence dot gets, because that is what it reads as. */
+html[data-dfp] .user-main .about .user-profile-avatar {
+  position: relative;
+}
+
+/* Longhands, and one class deeper than the rule above.
+ *
+ * An `inset` shorthand here lost the cascade outright — computed stayed at
+ * Discourse's `52px 16px 8px 44px` while the size and border from the very same
+ * rule applied. Discourse sets the four longhands from a more specific
+ * selector, so the shorthand never had a chance. Matching it with longhands off
+ * `.user-profile-avatar` is what actually moves the badge. */
+html[data-dfp] .user-main .about .user-profile-avatar .avatar-flair {
+  top: auto;
+  right: -4px;
+  bottom: -4px;
+  left: auto;
+}
+
+html[data-dfp] .user-main .about .avatar-flair {
+  inline-size: 28px;
+  block-size: 28px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--dfp-surface-1);
+  border-radius: var(--dfp-r-pill, 999px);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+}
+
+/* Flair is either a Font Awesome glyph or an uploaded image; both need to sit
+ * inside the ring rather than overflow it. */
+html[data-dfp] .user-main .about .avatar-flair .d-icon,
+html[data-dfp] .user-main .about .avatar-flair svg {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+html[data-dfp] .user-main .about .avatar-flair img {
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+/* The stats strip sat 12px below its own hairline and 25px above the card
+ * edge, which reads as bottom-heavy however correct the padding is elsewhere.
+ * Only cards that actually have a strip lose the extra; the collapsed hero has
+ * no `.secondary` and keeps its symmetric padding. */
+html[data-dfp] .user-main .about:has(> .details > .secondary) {
+  padding-block-end: var(--dfp-s-3);
+}
+
+html[data-dfp] .user-main .about > .details .controls li {
+  inline-size: auto;
+  list-style: none;
+}

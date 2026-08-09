@@ -1,0 +1,1174 @@
+/* Interactive states.
+ *
+ * One place for the things a reader touches: disclosure widgets, the topic
+ * timeline, the topic footer, and the shared rules that keep every control
+ * behaving the same way.
+ *
+ * The governing rule for hover in a dark UI: hover must move *toward* the
+ * viewer. Every hover here raises the surface a step (surface-1 → surface-2 →
+ * surface-3) and lifts the border. Nothing hovers by getting darker, because
+ * on a dark background darker reads as "disabled" or "receding" — which is
+ * exactly how a control disappears under the cursor.
+ */
+
+/* ── Disclosure (<details>) ──────────────────────────────────────────────
+ * These sit inside a post card, and the card is surface-2. Rendering them at
+ * surface-1 made them *darker* than their container, so they read as a hole
+ * rather than a control — and with no hover rule at all, pointing at one did
+ * nothing. They now sit one step above the card and lift again on hover. */
+
+html[data-dfp] .cooked details,
+html[data-dfp] .d-editor-preview details {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  margin-block: var(--dfp-s-2);
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .cooked details:hover {
+  border-color: var(--dfp-border-strong);
+  background: color-mix(in oklab, var(--dfp-surface-3) 80%, var(--dfp-text));
+}
+
+html[data-dfp] .cooked details > summary {
+  cursor: pointer;
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  border-radius: var(--dfp-r-xs);
+}
+
+html[data-dfp] .cooked details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A caret we control, so it can animate with the open state. */
+html[data-dfp] .cooked details > summary::before {
+  content: "";
+  inline-size: 0;
+  block-size: 0;
+  border-inline-start: 5px solid currentColor;
+  border-block: 4px solid transparent;
+  color: var(--dfp-text-3);
+  transition: transform var(--dfp-dur-2) var(--dfp-ease);
+  flex: 0 0 auto;
+}
+
+html[data-dfp] .cooked details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+html[data-dfp] .cooked details[open] {
+  background: var(--dfp-surface-2);
+}
+
+html[data-dfp] .cooked details[open] > summary {
+  margin-block-end: var(--dfp-s-2);
+  padding-block-end: var(--dfp-s-2);
+  border-bottom: 1px solid var(--dfp-border);
+}
+
+/* ── Topic timeline ──────────────────────────────────────────────────────
+ * The scrubber on the right of a topic. It is genuinely useful on a 39-reply
+ * thread and it looked unfinished: a 5px hardcoded blue slab (rgb(0,141,224),
+ * not a theme colour) against an invisible track.
+ *
+ * Treated as a real scrubber: a visible track, a rounded accent handle, and
+ * a position readout that is legible rather than incidental. */
+
+/* No radius on the track: with only an inline-start border, a pill radius on a
+ * tall thin box bows the line into a visible curve at top and bottom. The
+ * handle is the part that should look rounded. */
+html[data-dfp] .topic-timeline .timeline-scrollarea {
+  border-inline-start: 2px solid var(--dfp-border);
+  border-radius: 0;
+}
+
+html[data-dfp] .topic-timeline .timeline-handle {
+  background: var(--dfp-accent);
+  border-radius: var(--dfp-r-full);
+  inline-size: 4px;
+  margin-inline-start: -1px;
+  transition: inline-size var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .topic-timeline .timeline-scrollarea:hover .timeline-handle {
+  inline-size: 6px;
+}
+
+html[data-dfp] .topic-timeline .timeline-scroller {
+  cursor: grab;
+}
+
+html[data-dfp] .topic-timeline .timeline-scroller:active {
+  cursor: grabbing;
+}
+
+/* `nowrap` is the fix for the clipped timeline.
+ *
+ * The rail is ~90px wide. Once the counter reaches three digits either side,
+ * "339 / 380" wraps to two lines, which pushes the date below it out of the
+ * scroller's fixed height and clips it in half — the "sidebar is cut off"
+ * symptom. Keeping the counter on one line keeps the block inside its box. */
+html[data-dfp] .topic-timeline .timeline-replies {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--dfp-fs-sm);
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+html[data-dfp] .topic-timeline .timeline-ago,
+html[data-dfp] .topic-timeline .timeline-date-wrapper {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+/* Nothing in the rail should clip its own text. */
+html[data-dfp] .topic-timeline .timeline-scroller,
+html[data-dfp] .topic-timeline .timeline-scroller-content,
+html[data-dfp] .topic-timeline .timeline-date-wrapper {
+  overflow: visible;
+}
+
+html[data-dfp] .topic-timeline .timeline-footer-controls {
+  gap: var(--dfp-s-2);
+}
+
+html[data-dfp] .topic-timeline .btn {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .topic-timeline .btn:hover {
+  background: var(--dfp-surface-3);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}
+
+/* ── Topic map ───────────────────────────────────────────────────────────
+ *
+ * The summary bar under the first post. Three things were wrong with it:
+ *
+ *  1. Each stat stacked its number above its label, making the bar 57px tall
+ *     to convey eight short words. Set on one baseline, "1.6k views" reads as
+ *     a phrase instead of a two-storey block, and the bar halves in height.
+ *  2. All four numbers were accent blue. Four bright blue figures in a row is
+ *     four things shouting for attention in a bar that is meant to be glanceable
+ *     background detail. Weight separates them from their labels perfectly well.
+ *  3. `.topic-map__users-list` is `flex: 1 2 0px`, so five 24px avatars were
+ *     spread across a measured 677px. That vast gap is what made the read time
+ *     look exiled at the far right rather than deliberately placed.
+ */
+
+html[data-dfp] .topic-map {
+  align-items: center;
+  gap: var(--dfp-s-4);
+  padding: var(--dfp-s-2) var(--dfp-s-4);
+  border-radius: var(--dfp-r-md);
+}
+
+html[data-dfp] .topic-map__contents {
+  inline-size: 100%;
+}
+
+html[data-dfp] .topic-map__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-4);
+  flex-wrap: wrap;
+}
+
+html[data-dfp] .topic-map__stats > .btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: var(--dfp-s-1) var(--dfp-s-2);
+  margin-inline: calc(var(--dfp-s-2) * -1);
+  background: transparent;
+  border: 0;
+  border-radius: var(--dfp-r-sm);
+  inline-size: auto;
+}
+
+html[data-dfp] .topic-map__stats > .btn:hover {
+  background: var(--dfp-surface-3);
+}
+
+html[data-dfp] .topic-map .number {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+  font-size: var(--dfp-fs-md);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+html[data-dfp] .topic-map__stat-label {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+}
+
+/* Avatars belong beside the "users" stat they illustrate, not stretched across
+ * the bar. Sizing to content is what lets the read time sit where it belongs.
+ *
+ * `flex: 0 0 auto` and `nowrap` are both load-bearing. Discourse sets
+ * `flex-wrap: wrap` on this list, so any flex-shrink above 0 lets the avatars
+ * compress and then wrap — which stacks them into a vertical column instead of
+ * a row. An earlier `flex: 0 1 auto` here did exactly that. */
+html[data-dfp] .topic-map__users-list {
+  /* `max-content`, not `auto`. Discourse pairs `flex: 1 2 0px` with
+   * `overflow: hidden`, so a basis of `auto` resolves against a zero-width box
+   * and the list clips to a single 30px avatar while the other four render
+   * outside it. Sizing the basis to the content is what actually lays the row
+   * out; `overflow: visible` stops the clip. */
+  flex: 0 0 max-content;
+  flex-wrap: nowrap;
+  overflow: visible;
+  gap: 3px;
+}
+
+html[data-dfp] .topic-map__users-list > * {
+  flex: 0 0 auto;
+}
+
+html[data-dfp] .topic-map__users-list img.avatar {
+  inline-size: 24px;
+  block-size: 24px;
+  border-radius: var(--dfp-r-full);
+  border: 1px solid var(--dfp-border);
+}
+
+/* ── Presence ("… is replying") ──────────────────────────────────────────
+ * Renders into the same outlet that is collapsed when empty, so it only shows
+ * when someone really is typing. Unstyled it was a bare avatar with body-sized
+ * text sitting between the topic map and the button row, reading as content
+ * rather than as a transient status. */
+html[data-dfp] .topic-above-footer-buttons-outlet.presence {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  padding-block: var(--dfp-s-2);
+}
+
+html[data-dfp] .presence-users {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+}
+
+html[data-dfp] .presence-users .presence-avatars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+html[data-dfp] .presence-users img.avatar {
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: var(--dfp-r-full);
+  border: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .presence-users .presence-text {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* The animated ellipsis should not shift the text beside it. */
+html[data-dfp] .presence-users .wave {
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-dfp] .topic-map .estimated-read-time {
+  margin-inline-start: auto;
+  text-align: end;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+html[data-dfp] .topic-map .estimated-read-time .number {
+  font-size: var(--dfp-fs-sm);
+}
+
+/* The close-timer notice is context, not an announcement. */
+html[data-dfp] .topic-timer-info {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  padding-block: var(--dfp-s-2);
+}
+
+/* The notification row: a control plus a sentence explaining it. The sentence
+ * is help text and should read as such rather than competing with the row of
+ * buttons above it. */
+html[data-dfp] .topic-notifications-button,
+html[data-dfp] #topic-footer-buttons .topic-notifications-row {
+  align-items: center;
+  gap: var(--dfp-s-2);
+}
+
+html[data-dfp] #topic-footer-buttons .text {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* ── Topic footer buttons ────────────────────────────────────────────────
+ * Share / Bookmark / Flag / Reply. Discourse floats Reply into its own group,
+ * which left it stranded from the others with an uneven gap. One flex row with
+ * one gap keeps them related, and Reply stays visually primary because it is
+ * the only filled button. */
+
+html[data-dfp] .topic-footer-main-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  flex-wrap: wrap;
+}
+
+/* Share/Bookmark/Flag live in a nested `__actions` wrapper, so the gap on the
+ * parent never reached them — they were spaced by whatever Discourse left. */
+html[data-dfp] .topic-footer-main-buttons__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  flex-wrap: wrap;
+}
+
+html[data-dfp] .topic-footer-main-buttons > *,
+html[data-dfp] .topic-footer-main-buttons__actions > * {
+  margin: 0;
+  float: none;
+}
+
+html[data-dfp] #topic-footer-buttons .topic-footer-button,
+html[data-dfp] .topic-footer-main-buttons .btn {
+  min-block-size: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: var(--dfp-r-sm);
+  padding-inline: var(--dfp-s-4);
+  font-weight: var(--dfp-fw-medium);
+  /* Body size, not small. These were 13px next to 15px post controls directly
+   * above them, which is what made the footer read as a different, lesser row
+   * rather than the main actions on the page. */
+  font-size: var(--dfp-fs-md);
+}
+
+html[data-dfp] #topic-footer-buttons .topic-footer-button .d-button-label,
+html[data-dfp] .topic-footer-main-buttons .btn .d-button-label {
+  font-size: inherit;
+}
+
+/* Reply is the one action people came for; give it a little more presence than
+ * the neutral three without changing its size. */
+html[data-dfp] .topic-footer-main-buttons .btn.create,
+html[data-dfp] #topic-footer-buttons .btn.create {
+  background: var(--dfp-accent-strong);
+  color: var(--dfp-on-accent);
+  padding-inline: var(--dfp-s-5);
+  box-shadow: var(--dfp-e-1);
+}
+
+html[data-dfp] .topic-footer-main-buttons .btn.create:hover,
+html[data-dfp] #topic-footer-buttons .btn.create:hover {
+  background: color-mix(in oklab, var(--dfp-accent-strong) 86%, var(--dfp-text));
+  color: var(--dfp-on-accent);
+  box-shadow: var(--dfp-e-2);
+}
+
+/* Discourse's own reply button carries `.create`; make sure it reads primary
+ * without depending on the theme having tagged it btn-primary. */
+html[data-dfp] #topic-footer-buttons .btn.create,
+html[data-dfp] .topic-footer-main-buttons .btn.create {
+  background: var(--dfp-accent);
+  color: var(--dfp-accent-fg);
+  border-color: transparent;
+}
+
+html[data-dfp] #topic-footer-buttons .btn.create:hover,
+html[data-dfp] .topic-footer-main-buttons .btn.create:hover {
+  background: color-mix(in oklab, var(--dfp-accent) 88%, var(--dfp-text));
+}
+
+/* The notification-level dropdown sits under the button row. */
+html[data-dfp] .topic-notifications-options .select-kit-header {
+  border-radius: var(--dfp-r-sm);
+}
+
+/* ── Notification-level menu (Watching / Tracking / Normal / Muted) ───────
+ *
+ * The selected row was rendering at rgb(28,31,37) — byte-identical to the menu's
+ * own background — so the option you are currently on was invisible. In a menu
+ * whose entire job is telling you which of four states you are in, that is the
+ * one thing it has to get right.
+ *
+ * Selected now reads as a tinted row with an accent title; hover raises a
+ * surface step like every other row in the product. */
+
+html[data-dfp] .notifications-tracking-content .dropdown-menu__item {
+  list-style: none;
+}
+
+html[data-dfp] .notifications-tracking-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  inline-size: 100%;
+  padding: var(--dfp-s-3) var(--dfp-s-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: start;
+}
+
+html[data-dfp] .notifications-tracking-btn:hover {
+  background: var(--dfp-surface-3);
+}
+
+html[data-dfp] .notifications-tracking-btn__label {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] .notifications-tracking-btn__description {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.45;
+  font-weight: var(--dfp-fw-normal);
+}
+
+html[data-dfp] .notifications-tracking-btn.-selected {
+  background: var(--dfp-accent-soft);
+}
+
+html[data-dfp] .notifications-tracking-btn.-selected:hover {
+  background: color-mix(in oklab, var(--dfp-accent) 22%, transparent);
+}
+
+html[data-dfp] .notifications-tracking-btn.-selected .notifications-tracking-btn__label {
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] .notifications-tracking-btn.-selected .d-icon {
+  color: var(--dfp-accent);
+}
+
+/* The trigger should say which state it is in without being read as an action. */
+html[data-dfp] .notifications-tracking-trigger,
+html[data-dfp] .btn.notifications-tracking-trigger {
+  gap: 6px;
+  font-weight: var(--dfp-fw-medium);
+}
+
+/* Discourse renders plugin outlets whether or not a plugin filled them. The
+ * one above the footer buttons was contributing 38px plus margins of pure
+ * nothing between the last post and the reply row — measured 77px of gap where
+ * ~16px was intended. Collapse it when every descendant is empty. */
+html[data-dfp] .topic-above-footer-buttons-outlet:not(:has(*:not(:empty))) {
+  display: none;
+}
+
+html[data-dfp] .topic-above-footer-buttons-outlet {
+  margin-block-end: 0;
+}
+
+/* Roblox's own footer is injected below the Discourse app and arrives with a
+ * partial-width divider. Give it a full-width hairline so the page ends on a
+ * deliberate edge rather than a stray line. */
+/* `:has(*)` guard, same reason as the collapsed sidebar. This element is
+ * present on every page but renders empty unless Roblox's footer bundle fills
+ * it — measured childCount 0, textLen 0. An unconditional border-top therefore
+ * drew a bare horizontal rule near the bottom of every single page. */
+html[data-dfp] .custom-footer-content:has(*) {
+  border-top: 1px solid var(--dfp-border);
+  margin-top: var(--dfp-s-6);
+  padding-top: var(--dfp-s-5);
+}
+
+/* ── Shared control behaviour ────────────────────────────────────────────
+ * Applied late so it governs every control the component files defined. */
+
+html[data-dfp] .btn,
+html[data-dfp] .select-kit-header,
+html[data-dfp] .sidebar-section-link,
+html[data-dfp] .menu-panel .widget-link {
+  /* Hover should feel immediate; anything slower reads as lag on a pointer. */
+  transition-duration: var(--dfp-dur-1);
+  transition-timing-function: var(--dfp-ease);
+}
+
+/* ── Hover foreground, and why this rule has to exist ────────────────────
+ *
+ * base.css retargets Discourse's `--secondary` to the page background, which
+ * is correct: in their dark scheme `--secondary` IS the background. But
+ * Discourse also uses `--secondary` as a *foreground* in places — notably
+ * `.btn:hover { color: var(--secondary) }`, which assumes the hover fill is
+ * light enough for near-black text.
+ *
+ * Our hover fill is a raised dark surface, so that rule turned button labels
+ * near-black on dark grey the moment the pointer touched them. Any Discourse
+ * rule using --secondary as a foreground has the same failure mode, so the fix
+ * is to state the hover colour explicitly rather than inherit theirs.
+ */
+html[data-dfp] .btn:hover,
+html[data-dfp] .btn:focus-visible,
+html[data-dfp] .btn.btn-default:hover,
+html[data-dfp] .btn.btn-flat:hover,
+html[data-dfp] .btn.no-text:hover,
+html[data-dfp] .btn.btn-icon:hover {
+  color: var(--dfp-text);
+}
+
+/* The icon needs its own rule, and the reason is pure specificity arithmetic.
+ * Discourse's `.btn:hover .d-icon { color: var(--secondary) }` scores three
+ * classes; the global `html[data-dfp] svg.d-icon` in base.css scores two
+ * classes plus two elements, so it loses. The label went readable and the icon
+ * beside it stayed near-black. Matching their structure with our prefix wins
+ * it back, and `inherit` means the icon simply tracks whatever the button's
+ * own hover colour is — no second place to keep in sync. */
+html[data-dfp] .btn:hover .d-icon,
+html[data-dfp] .btn:hover svg.d-icon,
+html[data-dfp] .btn:focus-visible .d-icon,
+html[data-dfp] .btn:active .d-icon,
+html[data-dfp] a:hover .d-icon {
+  color: inherit;
+  fill: currentColor;
+}
+
+/* Filled buttons carry their own foreground; accent-strong is dark enough that
+ * white is the correct label colour (see controls.css).
+ *
+ * `.btn.create` used to be listed here too, and it was wrong twice over: the
+ * topic-footer button it was aimed at already gets this from the scoped rules
+ * at 392-397 and 408-411, and unscoped it also matched the *flat* per-post
+ * Reply button, painting its label white on a transparent background on hover.
+ * `.btn-primary` is safe unscoped because a primary button is filled by
+ * definition; `.create` is not. */
+html[data-dfp] .btn.btn-primary:hover {
+  color: var(--dfp-on-accent);
+}
+
+html[data-dfp] .btn.btn-danger:hover {
+  color: var(--dfp-danger-fg);
+}
+
+/* Disabled controls must not offer hover feedback — a control that lights up
+ * and then refuses to act is worse than one that looks inert. */
+html[data-dfp] .btn:disabled:hover,
+html[data-dfp] .btn.disabled:hover {
+  background: var(--dfp-surface-2);
+  border-color: var(--dfp-border);
+  color: var(--dfp-text-3);
+  transform: none;
+}
+
+/* Menu rows: same "raise on hover" rule as everything else. */
+html[data-dfp] .menu-panel li a:hover,
+html[data-dfp] .menu-panel .widget-link:hover,
+html[data-dfp] .quick-access-panel li:hover,
+html[data-dfp] .user-menu .menu-panel li:hover {
+  background: var(--dfp-surface-3);
+  color: var(--dfp-text);
+}
+
+/* ── User menu (the panel behind your avatar) ─────────────────────────────
+ *
+ * Two structural faults made this hard to read, both measured:
+ *
+ *  1. Each row painted `rgb(12,14,20)` — the *page* background, darker than the
+ *     panel it sits in. Fifty read notifications therefore read as fifty holes
+ *     punched through the panel rather than as a list.
+ *  2. `.item-label` (who) and `.item-description` (which topic) are both
+ *     `display: inline`, so the username and the topic title ran together as
+ *     one sentence and wrapped to three lines at 289px wide. Every row was a
+ *     different height and none of them scanned.
+ *
+ * Fixed by giving each row a two-line grid: who on top, what underneath, both
+ * truncated to one line. Rows become uniform, the panel becomes scannable, and
+ * the icon finally has a column of its own to sit in.
+ */
+
+html[data-dfp] .user-menu .quick-access-panel {
+  padding: var(--dfp-s-2);
+  border-top-color: var(--dfp-border);
+}
+
+html[data-dfp] .user-menu .panel-body-contents ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+html[data-dfp] .user-menu li.notification,
+html[data-dfp] .quick-access-panel li.notification {
+  background: transparent;
+  border-radius: var(--dfp-r-sm);
+  padding: 0;
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-menu li.notification > a,
+html[data-dfp] .quick-access-panel li.notification > a {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--dfp-s-2);
+  padding: 7px var(--dfp-s-2);
+  border-radius: var(--dfp-r-sm);
+  inline-size: 100%;
+}
+
+html[data-dfp] .user-menu li.notification > a > .d-icon {
+  margin-block-start: 3px;
+  inline-size: 14px;
+  block-size: 14px;
+  flex: 0 0 auto;
+}
+
+html[data-dfp] .user-menu li.notification > a > div {
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Who — the person, so it carries the weight. */
+html[data-dfp] .user-menu li.notification .item-label {
+  display: block;
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-semibold);
+  color: var(--dfp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What — the topic. Muted rather than link-blue: fifty blue titles in a column
+ * is a wall, and the whole row is already a link. */
+html[data-dfp] .user-menu li.notification .item-description {
+  display: block;
+  font-size: var(--dfp-fs-xs);
+  color: var(--dfp-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-dfp] .user-menu li.notification:hover {
+  background: var(--dfp-surface-3);
+}
+
+/* Unread is a tint plus a brighter title, not a full-strength accent block. */
+html[data-dfp] .user-menu li.notification:not(.read),
+html[data-dfp] .quick-access-panel li.notification:not(.read) {
+  background: color-mix(in oklab, var(--dfp-accent) 10%, transparent);
+}
+
+html[data-dfp] .user-menu li.notification:not(.read):hover {
+  background: color-mix(in oklab, var(--dfp-accent) 18%, transparent);
+}
+
+html[data-dfp] .user-menu li.notification:not(.read) .item-description {
+  color: var(--dfp-text-2);
+}
+
+/* The icon is the only thing distinguishing a like from a reply from a group
+ * message, so it should be the one coloured element in the row. Discourse puts
+ * the type on the <li>. */
+html[data-dfp] .user-menu li.notification .d-icon {
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .user-menu li.notification.liked .d-icon,
+html[data-dfp] .user-menu li.notification.liked-consolidated .d-icon {
+  color: var(--dfp-danger);
+}
+
+html[data-dfp] .user-menu li.notification.replied .d-icon,
+html[data-dfp] .user-menu li.notification.posted .d-icon,
+html[data-dfp] .user-menu li.notification.mentioned .d-icon,
+html[data-dfp] .user-menu li.notification.quoted .d-icon {
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] .user-menu li.notification.private-message .d-icon,
+html[data-dfp] .user-menu li.notification.group-message-summary .d-icon {
+  color: var(--dfp-staff);
+}
+
+html[data-dfp] .user-menu li.notification.bookmark-reminder .d-icon {
+  color: var(--dfp-warning);
+}
+
+html[data-dfp] .user-menu li.notification.granted-badge .d-icon {
+  color: var(--dfp-success);
+}
+
+/* ── Tab rail ────────────────────────────────────────────────────────────
+ * The icon column on the right. It had no edge of its own, so it read as part
+ * of the list rather than as navigation for it. */
+
+html[data-dfp] .user-menu .menu-tabs-container {
+  padding: var(--dfp-s-2) 5px;
+  gap: 4px;
+  border-inline-start: 1px solid var(--dfp-border);
+  background: color-mix(in oklab, var(--dfp-bg) 45%, transparent);
+}
+
+html[data-dfp] .user-menu .menu-tabs-container .btn,
+html[data-dfp] .user-menu .user-menu-tab {
+  background: transparent;
+  border: 0;
+  color: var(--dfp-text-3);
+  border-radius: var(--dfp-r-sm);
+  inline-size: 34px;
+  block-size: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+html[data-dfp] .user-menu .menu-tabs-container .btn:hover,
+html[data-dfp] .user-menu .user-menu-tab:hover {
+  background: var(--dfp-surface-3);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .user-menu .menu-tabs-container .btn.active,
+html[data-dfp] .user-menu .user-menu-tab.active {
+  background: var(--dfp-accent-soft);
+  color: var(--dfp-accent);
+}
+
+/* Unread counts on a 34px tab have no room for a pill; a dot says the same
+ * thing without covering the icon. */
+html[data-dfp] .user-menu .user-menu-tab .badge-notification {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  min-inline-size: 7px;
+  block-size: 7px;
+  padding: 0;
+  border-radius: var(--dfp-r-full);
+  background: var(--dfp-accent);
+  font-size: 0;
+  color: transparent;
+  border: 2px solid var(--dfp-surface-2);
+  box-sizing: content-box;
+}
+
+/* ── Panel footer ───────────────────────────────────────────────────────── */
+
+html[data-dfp] .user-menu .panel-body-bottom {
+  padding-block-start: var(--dfp-s-2);
+  margin-block-start: var(--dfp-s-1);
+  border-top: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .user-menu .panel-body-bottom .btn {
+  inline-size: 100%;
+  justify-content: center;
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-2);
+  min-block-size: 32px;
+}
+
+html[data-dfp] .user-menu .panel-body-bottom .btn:hover {
+  background: var(--dfp-surface-2);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}
+
+/* ── User card ───────────────────────────────────────────────────────────
+ * The popover shown when you click an avatar. The generic overlay treatment in
+ * controls.css set its background and border, but a more specific Discourse
+ * rule kept `border-radius: 0` and `box-shadow: none` — so it landed as a hard
+ * rectangle with no elevation, which is why it read as unfinished next to every
+ * other popover in the product. The extra `.show` here wins that.
+ *
+ * The inner `.card-content` also paints its own rgba(17,18,23,.85), a colour
+ * from no palette, over the card's real background. Making it transparent lets
+ * the one surface show through instead of two stacked near-blacks. */
+
+/* `.show` only. `.no-bg` was in this list to cover users with no profile
+ * background image — but the unopened card stub Discourse leaves in the DOM
+ * also carries `.no-bg`, so including it painted that stub as a 585x2px bar
+ * across every profile page. `.show` is the class that actually means
+ * "this card is being displayed". */
+html[data-dfp] .user-card.show,
+html[data-dfp] .group-card.show {
+  border-radius: var(--dfp-r-lg);
+  box-shadow: var(--dfp-e-3);
+  overflow: hidden;
+  border: 1px solid var(--dfp-border-strong);
+  background: var(--dfp-surface-2);
+}
+
+/* The card must be opaque.
+ *
+ * Discourse paints `.card-content` at rgba(17,18,23,.85) — a colour from no
+ * palette, and translucent, so the post text underneath showed through the
+ * card. A popover you can read the page through is a popover you cannot read.
+ * Transparent here plus an opaque `.user-card` above gives exactly one solid
+ * surface instead of two stacked translucent ones. */
+html[data-dfp] .user-card .card-content,
+html[data-dfp] .group-card .card-content {
+  background: transparent;
+  padding: var(--dfp-s-5);
+}
+
+/* `no-bg` is Discourse's flag for "user has no profile background image", and
+ * it zeroes the card background — which with the above would leave the whole
+ * popover see-through. */
+html[data-dfp] .user-card.no-bg .card-content {
+  background: transparent;
+}
+
+/* "+N More" is not a button.
+ *
+ * Several attempts at this missed because they targeted `.badge-section .btn`.
+ * The element is actually `<a class="ember-view">` inside `.more-user-badges` —
+ * no button class at all, which is why it kept its square corners and page-
+ * coloured fill while every rule aimed at it did nothing. Matching the real
+ * element is the whole fix. */
+html[data-dfp] .user-card .more-user-badges,
+html[data-dfp] .user-card .more-user-badges a,
+html[data-dfp] .group-card .more-user-badges a {
+  background: transparent;
+  border: 1px dashed var(--dfp-border-strong);
+  border-radius: var(--dfp-r-full);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+  padding: 3px var(--dfp-s-2);
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: none;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* The wrapper itself must not double the pill. */
+html[data-dfp] .user-card .more-user-badges {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+html[data-dfp] .user-card .more-user-badges a:hover {
+  background: var(--dfp-surface-3);
+  border-style: solid;
+  color: var(--dfp-text-2);
+}
+
+/* The inner content layer sits 1px inside the card on every edge. Harmless
+ * while the card clips, but giving it the same geometry means a square corner
+ * can never show through if `overflow` is ever lost. */
+html[data-dfp] .user-card .card-content,
+html[data-dfp] .group-card .card-content {
+  border-radius: var(--dfp-r-lg);
+}
+
+html[data-dfp] .user-card .badge-section .show-badges,
+html[data-dfp] .user-card .badge-section .btn,
+html[data-dfp] .user-card .badge-section button {
+  background: transparent;
+  border: 1px dashed var(--dfp-border-strong);
+  border-radius: var(--dfp-r-full);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+  padding: 3px var(--dfp-s-2);
+  min-block-size: 0;
+  block-size: auto;
+  line-height: 1.4;
+  box-shadow: none;
+}
+
+html[data-dfp] .user-card .badge-section .show-badges:hover,
+html[data-dfp] .user-card .badge-section .btn:hover,
+html[data-dfp] .user-card .badge-section button:hover {
+  background: var(--dfp-surface-3);
+  border-style: solid;
+  color: var(--dfp-text-2);
+}
+
+/* Metadata reads as label/value pairs rather than a run-on sentence. */
+html[data-dfp] .user-card .metadata > * {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+html[data-dfp] .user-card .metadata .value,
+html[data-dfp] .user-card .metadata a {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* The chart popovers Discourse anchors off the topic map. The canvas itself is
+ * themed in JS (discourse/modules/chart-theme.ts) — CSS only owns the frame. */
+html[data-dfp] .fk-d-menu canvas {
+  max-inline-size: 100%;
+}
+
+html[data-dfp] .fk-d-menu .topic-map__chart-title,
+html[data-dfp] .fk-d-menu h3 {
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-md);
+  font-weight: var(--dfp-fw-semibold);
+  margin: 0 0 var(--dfp-s-3);
+}
+
+html[data-dfp] .fk-d-menu .topic-map__chart-caption,
+html[data-dfp] .fk-d-menu .chart-caption {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  margin-block-start: var(--dfp-s-3);
+  padding-block-start: var(--dfp-s-2);
+  border-top: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .user-card .card-row.first-row {
+  gap: var(--dfp-s-4);
+  align-items: flex-start;
+}
+
+/* The avatar must not escape the card.
+ *
+ * Discourse gives it a negative margin so it overlaps the trigger avatar
+ * underneath — a nice effect on a card with no border, but here it pushed a
+ * 120px square out past the rounded corner, which is what made the corners look
+ * broken: the avatar was covering them. Kept inside, sized down, and rounded to
+ * match the card's own geometry. */
+html[data-dfp] .user-card .user-card-avatar {
+  margin: 0;
+  flex: 0 0 auto;
+  inline-size: 76px;
+  block-size: 76px;
+  /* NOT overflow:hidden. The group flair is a sibling badge positioned at the
+   * avatar's bottom-right corner, so clipping the wrapper sliced it in half.
+   * The image gets its own radius instead, and the flair is free to sit over
+   * the corner the way it is meant to. */
+  overflow: visible;
+  position: relative;
+  line-height: 0;
+}
+
+html[data-dfp] .user-card .user-card-avatar img.avatar {
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: var(--dfp-r-md);
+  object-fit: cover;
+  border: 0;
+}
+
+/* The flair was rendering large enough to cover a quarter of the avatar and
+ * half of it fell outside the clip. Sized to a badge, pinned to the corner,
+ * and ringed in the card's surface so it reads as sitting *on* the avatar. */
+html[data-dfp] .user-card .user-card-avatar .avatar-flair {
+  position: absolute;
+  inset-block-end: -3px;
+  inset-inline-end: -3px;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: var(--dfp-r-full);
+  border: 2px solid var(--dfp-surface-2);
+  background-size: 15px 15px;
+  background-repeat: no-repeat;
+  background-position: center;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--dfp-e-1);
+}
+
+html[data-dfp] .user-card .user-card-avatar .avatar-flair .d-icon,
+html[data-dfp] .user-card .user-card-avatar .avatar-flair svg {
+  inline-size: 13px;
+  block-size: 13px;
+}
+
+html[data-dfp] .user-card .names {
+  padding-inline-start: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+html[data-dfp] .user-card .names__primary,
+html[data-dfp] .user-card .names .full-name {
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-xl);
+  font-weight: var(--dfp-fw-bold);
+  letter-spacing: var(--dfp-track-title);
+  line-height: var(--dfp-lh-tight);
+}
+
+html[data-dfp] .user-card .names__secondary,
+html[data-dfp] .user-card .names .username {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-md);
+  font-weight: var(--dfp-fw-normal);
+}
+
+html[data-dfp] .user-card .user-card-metadata,
+html[data-dfp] .user-card .metadata {
+  gap: var(--dfp-s-5);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  padding-block-start: var(--dfp-s-3);
+  margin-block-start: var(--dfp-s-3);
+  border-top: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .user-card .metadata .desc,
+html[data-dfp] .user-card .metadata h3 {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+html[data-dfp] .user-card .bio {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-snug);
+  margin-block-start: var(--dfp-s-3);
+}
+
+html[data-dfp] .user-card .badge-section {
+  margin-block-start: var(--dfp-s-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dfp-s-2);
+  align-items: center;
+}
+
+html[data-dfp] .user-card .user-badge {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-full);
+  padding: 3px var(--dfp-s-2);
+  font-size: var(--dfp-fs-xs);
+  color: var(--dfp-text-2);
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .user-card .user-badge:hover {
+  background: var(--dfp-surface-2);
+  border-color: var(--dfp-border-strong);
+}
+
+/* The action stack. Each button was full-width with generous vertical padding,
+ * so three of them formed a tall slab that dominated a card whose actual
+ * subject is the person. Compact, uniform, and only the first one filled. */
+html[data-dfp] .user-card .usercard-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+  inline-size: auto;
+  min-inline-size: 150px;
+}
+
+html[data-dfp] .user-card .usercard-controls .btn,
+html[data-dfp] .user-card .usercard-controls li .btn {
+  inline-size: 100%;
+  justify-content: flex-start;
+  gap: 7px;
+  min-block-size: 32px;
+  padding: 0 var(--dfp-s-3);
+  border-radius: var(--dfp-r-sm);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-medium);
+  white-space: nowrap;
+}
+
+html[data-dfp] .user-card .usercard-controls li {
+  list-style: none;
+  margin: 0;
+}
+
+/* Only "Message" is a primary action; the rest are navigation. */
+html[data-dfp] .user-card .usercard-controls .btn-primary {
+  background: var(--dfp-accent-strong);
+  color: var(--dfp-on-accent);
+}
+
+html[data-dfp] .user-card .usercard-controls .btn:not(.btn-primary) {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .user-card .usercard-controls .btn:not(.btn-primary):hover {
+  background: var(--dfp-surface-2);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────
+ * The header search field read as an unstyled input dropped into the menu. */
+
+html[data-dfp] .search-menu .search-input,
+html[data-dfp] .search-menu-container .search-input {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+}
+
+html[data-dfp] .search-menu .search-input:focus-within {
+  border-color: var(--dfp-accent);
+  box-shadow: 0 0 0 3px var(--dfp-accent-soft);
+}
+
+html[data-dfp] .search-menu input[type="text"],
+html[data-dfp] .search-menu input[type="search"] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .search-menu .results .search-result-topic:hover,
+html[data-dfp] .search-menu .results li:hover {
+  background: var(--dfp-surface-3);
+}

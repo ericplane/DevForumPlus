@@ -1,0 +1,153 @@
+/* Static design tokens.
+ *
+ * Colour tokens are generated (tokens.generated.css); everything here is
+ * hand-authored because it is structural, not derived. */
+
+html[data-dfp] {
+  /* ── Radius ──────────────────────────────────────────────────────────────
+   * DevForum ships --d-border-radius: 2px, which is most of why it reads as
+   * a decade old. `soft` is the default; `sharp` exists for people who
+   * genuinely prefer it rather than as an apology. */
+  --dfp-r-xs: 6px;
+  --dfp-r-sm: 8px;
+  --dfp-r-md: 12px;
+  --dfp-r-lg: 16px;
+  --dfp-r-full: 999px;
+
+  /* ── Spacing: strict 4px grid ─────────────────────────────────────────── */
+  --dfp-s-1: 4px;
+  --dfp-s-2: 8px;
+  --dfp-s-3: 12px;
+  --dfp-s-4: 16px;
+  --dfp-s-5: 24px;
+  --dfp-s-6: 32px;
+  --dfp-s-7: 48px;
+  --dfp-s-8: 64px;
+
+  /* Density multiplies these two; components reference them, not raw steps. */
+  --dfp-row-pad-y: var(--dfp-s-3);
+  --dfp-row-pad-x: var(--dfp-s-4);
+  --dfp-row-gap: 6px;
+
+  /* ── Type ─────────────────────────────────────────────────────────────────
+   * The forum's own BuilderSans stack is kept — it is the right typeface and
+   * it is already loaded. What changes is the scale and the leading: 15/1.50
+   * is too tight for threads that run to thousands of words. */
+  --dfp-font-scale: 1;
+  --dfp-fs-xs: calc(0.75rem * var(--dfp-font-scale));
+  --dfp-fs-sm: calc(0.8125rem * var(--dfp-font-scale));
+  --dfp-fs-md: calc(0.9375rem * var(--dfp-font-scale));
+  --dfp-fs-lg: calc(1.0625rem * var(--dfp-font-scale));
+  --dfp-fs-xl: calc(1.25rem * var(--dfp-font-scale));
+  --dfp-fs-title: calc(clamp(1.3rem, 1.08rem + 0.72vw, 1.7rem) * var(--dfp-font-scale));
+
+  --dfp-lh-body: 1.62;
+  --dfp-lh-snug: 1.4;
+  --dfp-lh-tight: 1.22;
+
+  /* Optical correction: display sizes need negative tracking to avoid
+   * looking loose, body sizes do not. */
+  --dfp-track-title: -0.012em;
+  --dfp-track-body: 0;
+
+  --dfp-fw-normal: 400;
+  --dfp-fw-medium: 500;
+  --dfp-fw-semibold: 600;
+  --dfp-fw-bold: 700;
+
+  /* ── Elevation ────────────────────────────────────────────────────────────
+   * Two layers: a tight contact shadow plus a wide ambient one. On dark
+   * surfaces shadow alone is nearly invisible, so components pair these with
+   * a hairline border. */
+  --dfp-e-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --dfp-e-2:
+    0 2px 4px rgb(0 0 0 / 0.26),
+    0 8px 16px -4px rgb(0 0 0 / 0.34);
+  --dfp-e-3:
+    0 4px 8px rgb(0 0 0 / 0.3),
+    0 16px 40px -8px rgb(0 0 0 / 0.46);
+
+  /* ── Motion ───────────────────────────────────────────────────────────── */
+  --dfp-dur-1: 120ms;
+  --dfp-dur-2: 200ms;
+  --dfp-dur-3: 320ms;
+  --dfp-ease: cubic-bezier(0.2, 0, 0, 1);
+  --dfp-ease-out: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --dfp-spring: linear(
+    0, 0.34 6%, 0.82 15%, 1.06 24%, 1.02 35%, 0.99 47%, 1
+  );
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
+  --dfp-content-max: 1100px;
+  --dfp-measure: 72ch;
+  --dfp-focus-ring: 2px;
+}
+
+/* ── Radius variants ────────────────────────────────────────────────────── */
+html[data-dfp][data-dfp-radius="sharp"] {
+  --dfp-r-xs: 2px;
+  --dfp-r-sm: 3px;
+  --dfp-r-md: 4px;
+  --dfp-r-lg: 6px;
+}
+
+html[data-dfp][data-dfp-radius="round"] {
+  --dfp-r-xs: 10px;
+  --dfp-r-sm: 14px;
+  --dfp-r-md: 18px;
+  --dfp-r-lg: 26px;
+}
+
+/* ── Density ─────────────────────────────────────────────────────────────
+ * Density changes spacing tokens only. No component may special-case it;
+ * if a component needs a per-density rule, the token set is wrong. */
+html[data-dfp][data-dfp-density="compact"] {
+  --dfp-row-pad-y: 7px;
+  --dfp-row-pad-x: var(--dfp-s-3);
+  --dfp-row-gap: 3px;
+  --dfp-lh-body: 1.52;
+}
+
+html[data-dfp][data-dfp-density="spacious"] {
+  --dfp-row-pad-y: var(--dfp-s-4);
+  --dfp-row-pad-x: var(--dfp-s-5);
+  --dfp-row-gap: 10px;
+  --dfp-lh-body: 1.7;
+}
+
+/* ── Content width ───────────────────────────────────────────────────────── */
+html[data-dfp][data-dfp-width="narrow"] {
+  --dfp-content-max: 860px;
+}
+html[data-dfp][data-dfp-width="wide"] {
+  --dfp-content-max: 1400px;
+}
+html[data-dfp][data-dfp-width="full"] {
+  --dfp-content-max: none;
+}
+
+/* ── Motion preferences ──────────────────────────────────────────────────
+ * One override collapses every duration in the product. Components never
+ * check the preference themselves. */
+html[data-dfp][data-dfp-motion="reduced"] {
+  --dfp-dur-2: 120ms;
+  --dfp-dur-3: 160ms;
+  --dfp-spring: var(--dfp-ease);
+}
+
+html[data-dfp][data-dfp-motion="off"],
+html[data-dfp][data-dfp-motion="off"] * {
+  --dfp-dur-1: 1ms;
+  --dfp-dur-2: 1ms;
+  --dfp-dur-3: 1ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-dfp],
+  [data-dfp] * {
+    --dfp-dur-1: 1ms;
+    --dfp-dur-2: 1ms;
+    --dfp-dur-3: 1ms;
+    --dfp-spring: linear(0, 1);
+  }
+}

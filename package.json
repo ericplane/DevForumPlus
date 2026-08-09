@@ -1,0 +1,38 @@
+{
+  "name": "devforum-plus",
+  "displayName": "DevForum Plus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A faster, cleaner, more capable devforum.roblox.com.",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev": "wxt",
+    "build": "npm run tokens && npm run icons && npm run rules && npm run check:styles && wxt build",
+    "zip": "npm run tokens && wxt zip",
+    "compile": "tsc --noEmit",
+    "test": "tsx tests/unit/detect.test.ts",
+    "tokens": "tsx scripts/build-tokens.ts",
+    "postinstall": "wxt prepare",
+    "harness": "tsx scripts/build-harness.ts",
+    "check:styles": "tsx scripts/check-styles.ts",
+    "check": "npm run compile && npm run check:styles && npm test",
+    "rules": "tsx scripts/build-rules.ts",
+    "api-index": "tsx scripts/build-api-index.ts",
+    "docs-index": "tsx scripts/build-docs-index.ts",
+    "icons": "tsx scripts/build-icons.ts"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.5",
+    "tsx": "^4.23.11",
+    "typescript": "^7.0.2",
+    "wxt": "^0.20.20",
+    "yaml": "^2.9.0"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.0",
+    "preact": "^10.29.8"
+  }
+}

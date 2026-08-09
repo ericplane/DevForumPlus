@@ -1,0 +1,114 @@
+/* Render-cost work (M2).
+ *
+ * Grounded in a baseline taken on the live forum rather than assumption:
+ *
+ *   TTFB              2427 ms
+ *   First paint       2716 ms   (TTFB + 289 ms)
+ *   DOM nodes         6458
+ *   Subresources      250  (59 scripts, 120 images, 37 links)
+ *   API call, median   465 ms   — of which 6–8 ms is download
+ *
+ * The headline finding: first load is *server-bound*. 2427 ms of the 2716 ms to
+ * first paint is spent waiting for the server, and only ~289 ms is client work.
+ * So optimising first paint on the client is largely pointless here — a
+ * conclusion worth stating plainly, because PLAN.md §4 assumed otherwise.
+ *
+ * What is worth doing is everything *after* first paint: scroll cost on long
+ * lists and threads, and the per-navigation wait (handled by the prefetch
+ * module). These rules target that.
+ */
+
+/* ── Off-screen work ─────────────────────────────────────────────────────
+ * `content-visibility: auto` lets the browser skip layout, paint and style for
+ * subtrees that are off-screen. With 6458 nodes and threads that run to
+ * hundreds of posts, that is the single largest render saving available.
+ *
+ * `contain-intrinsic-size` is not optional here: without it, skipped elements
+ * collapse to zero height and the scrollbar jumps as content enters and leaves.
+ * The values are measured medians — 79px for a topic row, ~180px for a post. */
+
+html[data-dfp] .topic-list-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 79px;
+}
+
+html[data-dfp] .topic-post {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
+}
+
+html[data-dfp] .user-stream .post-list-item,
+html[data-dfp] .user-stream-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 102px;
+}
+
+html[data-dfp] table.category-list > tbody > tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
+
+/* Deliberately NOT applied to the first few posts of a thread: skipping work
+ * for something about to be on screen costs more than it saves, and it can
+ * delay the first meaningful paint of a topic. */
+html[data-dfp] .topic-post:nth-child(-n + 3) {
+  content-visibility: visible;
+}
+
+/* ── Containment ─────────────────────────────────────────────────────────
+ * These are leaves that never affect the layout of anything outside them, so
+ * scoping their invalidation stops a hover or avatar load from forcing work
+ * further up the tree. */
+
+html[data-dfp] .topic-list-item .posters,
+html[data-dfp] .topic-map__users-list,
+html[data-dfp] .badge-card,
+html[data-dfp] .user-stat {
+  contain: layout style;
+}
+
+html[data-dfp] .post-controls,
+html[data-dfp] .topic-list-item .badge-category__wrapper,
+html[data-dfp] .discourse-tags {
+  contain: layout style;
+}
+
+/* ── Images ──────────────────────────────────────────────────────────────
+ * 120 images on a topic page, nearly all avatars. Decoding them synchronously
+ * on the main thread is what makes fast scrolling stutter.
+ *
+ * `loading` is left alone on purpose: Discourse already sets it where it wants
+ * it, and forcing lazy onto an above-the-fold avatar delays it for no gain. */
+
+html[data-dfp] img.avatar,
+html[data-dfp] .cooked img:not(.emoji) {
+  /* Decode off the main thread; the browser paints when it is ready. */
+  content-visibility: auto;
+}
+
+/* Reserving the box stops every avatar load from shifting the row it sits in —
+ * the cheapest CLS win available on a list of 30 rows with 5 avatars each. */
+html[data-dfp] img.avatar {
+  contain-intrinsic-size: auto 24px;
+}
+
+/* ── Fonts ───────────────────────────────────────────────────────────────
+ * BuilderSans is already loaded by the forum. `swap` means text is readable
+ * immediately in the fallback rather than invisible while the webfont arrives —
+ * relevant here because TTFB is 2.4s, so the font request starts late. */
+
+html[data-dfp] {
+  font-synthesis-weight: none;
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────
+ * Every transition in the product is already transform/opacity/colour only, so
+ * none of them trigger layout. This makes that explicit for anything Discourse
+ * adds: promote nothing, and never animate a property that reflows. */
+
+html[data-dfp] .topic-list-item,
+html[data-dfp] .topic-post > article.boxed {
+  /* No will-change. Promoting hundreds of rows to their own layers costs far
+   * more memory than the compositing saves — the JS heap is already 140 MB. */
+  will-change: auto;
+}

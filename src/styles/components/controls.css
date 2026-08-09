@@ -1,0 +1,566 @@
+/* Buttons, inputs, selects, badges, modals, menus. */
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+html[data-dfp] .btn {
+  border-radius: var(--dfp-r-sm);
+  font-weight: var(--dfp-fw-medium);
+  border: 1px solid transparent;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease),
+    transform var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .btn:active {
+  transform: translateY(1px);
+}
+
+html[data-dfp] .btn-default {
+  background: var(--dfp-surface-2);
+  border-color: var(--dfp-border);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .btn-default:hover {
+  background: var(--dfp-surface-3);
+  border-color: var(--dfp-border-strong);
+}
+
+/* Filled buttons use `--dfp-accent-strong`, not `--dfp-accent`.
+ *
+ * The plain accent is tuned to read as a link on a dark surface, so it is
+ * bright enough that white text fails against it and `--dfp-accent-fg`
+ * resolves to near-black. That is contrast-correct and looks wrong: a cyan
+ * button with black text is the one element that refuses to sit in a dark UI.
+ * accent-strong is the darkest step of the same hue that clears 4.5:1 against
+ * white (measured 4.70:1), so the button reads as light-on-dark like
+ * everything else. */
+html[data-dfp] .btn-primary {
+  background: var(--dfp-accent-strong);
+  color: var(--dfp-on-accent);
+  border-color: transparent;
+}
+
+html[data-dfp] .btn-primary:hover {
+  background: color-mix(in oklab, var(--dfp-accent-strong) 86%, var(--dfp-text));
+  color: var(--dfp-on-accent);
+}
+
+html[data-dfp] .btn-danger {
+  background: var(--dfp-danger);
+  color: var(--dfp-danger-fg);
+}
+
+html[data-dfp] .btn-flat {
+  color: var(--dfp-text-3);
+  background: transparent;
+}
+
+/* Icon-only buttons carry no text to inherit colour from, so without this
+ * they fall back to whatever Discourse set and disappear against the theme.
+ * Pairs with the `fill: currentColor` rule in base.css. */
+html[data-dfp] .btn.no-text,
+html[data-dfp] .btn.btn-icon {
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .btn.no-text:hover,
+html[data-dfp] .btn.btn-icon:hover {
+  color: var(--dfp-text);
+  background: var(--dfp-surface-3);
+}
+
+html[data-dfp] .btn-flat:hover {
+  background: var(--dfp-surface-2);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .btn:disabled,
+html[data-dfp] .btn.disabled {
+  opacity: 0.5;
+  transform: none;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+
+html[data-dfp] input[type="text"],
+html[data-dfp] input[type="search"],
+html[data-dfp] input[type="email"],
+html[data-dfp] input[type="password"],
+html[data-dfp] input[type="number"],
+html[data-dfp] textarea,
+html[data-dfp] select {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text);
+  transition:
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    box-shadow var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] input:focus,
+html[data-dfp] textarea:focus,
+html[data-dfp] select:focus {
+  border-color: var(--dfp-accent);
+  box-shadow: 0 0 0 3px var(--dfp-accent-soft);
+  outline: none;
+}
+
+html[data-dfp] ::placeholder {
+  color: var(--dfp-text-3);
+}
+
+/* ── Search ─────────────────────────────────────────────────────────────── */
+
+html[data-dfp] .search-menu .search-input,
+html[data-dfp] .floating-search-input-wrapper {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+}
+
+html[data-dfp] .search-menu .results .search-result-topic .topic-title {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+}
+
+/* ── Select kit (Discourse's dropdown component) ───────────────────────── */
+
+/* The category and tag drops in the list controls are <details>/<summary>
+ * pairs. Left with only input-ish styling they read as empty text fields
+ * sitting next to the nav pills. They are buttons, so make them look like
+ * the other buttons in that row. */
+html[data-dfp] .select-kit .select-kit-header {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-2);
+  font-weight: var(--dfp-fw-medium);
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .select-kit .select-kit-header:hover {
+  background: var(--dfp-surface-3);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}
+
+/* No rotation — Discourse swaps caret-right for caret-down itself, so rotating
+ * on top of that points the open-state caret sideways. See chrome.css. */
+html[data-dfp] .select-kit .select-kit-header .caret-icon {
+  color: var(--dfp-text-3);
+  transform: none;
+}
+
+/* A dropdown is a popover, so it gets the popover treatment.
+ *
+ * This rule used to say `--dfp-surface-3` at `--dfp-r-md` with `--dfp-e-2`,
+ * while `.menu-panel`, `.fk-d-menu` and the modals below all used
+ * `--dfp-surface-2` at `--dfp-r-lg` with `--dfp-e-3`. Measured on the /top
+ * period chooser: the panel painted #25282e — the lightest surface in the
+ * ramp — floating over a #0c0e14 page, so it read as a brighter, flatter,
+ * squarer box than every other overlay in the product.
+ *
+ * Nothing justified the split; it was two rules written at different times.
+ * One treatment for anything that floats. */
+html[data-dfp] .select-kit .select-kit-body {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border-strong);
+  border-radius: var(--dfp-r-lg);
+  box-shadow: var(--dfp-e-3);
+  overflow: hidden;
+}
+
+/* Rows sit inside a rounded panel, so the collection needs a little inset or
+ * the first and last row corners collide with the panel's radius. */
+html[data-dfp] .select-kit .select-kit-collection {
+  padding: var(--dfp-s-1);
+}
+
+html[data-dfp] .select-kit .select-kit-row {
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  border-radius: var(--dfp-r-sm);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-normal);
+}
+
+html[data-dfp] .select-kit .select-kit-row:hover,
+html[data-dfp] .select-kit .select-kit-row.is-highlighted {
+  background: var(--dfp-surface-3);
+}
+
+/* The current choice needs to be findable at a glance without competing with
+ * the hover state — hence the accent tint plus an accent label, rather than a
+ * heavier background that would read as "hovered". */
+html[data-dfp] .select-kit .select-kit-row.is-selected {
+  background: var(--dfp-accent-soft);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .select-kit .select-kit-row.is-selected.is-highlighted {
+  background: color-mix(in oklab, var(--dfp-accent) 26%, var(--dfp-surface-2));
+}
+
+/* ── Period chooser (/top) ───────────────────────────────────────────────
+ * Discourse styles this one as a heading rather than as a menu: measured at
+ * 17.2px / weight 700 per row, against ~13px everywhere else, inside a panel
+ * with 5px of padding. That is why it looked like a different component from
+ * the rest of the dropdowns — because it was styled like one.
+ *
+ * Each row is `.date-section` (the period name) plus `.top-date-string` (the
+ * range it covers), so the name carries the weight and the range recedes. */
+
+html[data-dfp] .select-kit.period-chooser .select-kit-row {
+  gap: var(--dfp-s-2);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-normal);
+}
+
+html[data-dfp] .select-kit.period-chooser .period-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dfp-s-2);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-normal);
+}
+
+html[data-dfp] .select-kit.period-chooser .date-section {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-medium);
+}
+
+/* Discourse's own rule for this is
+ *   .select-kit.dropdown-select-box.period-chooser .period-chooser-row .top-date-string
+ * which is six classes. A shorter selector loses on specificity and the range
+ * keeps `--primary-med-or-secondary-high` — readable, but the same weight as
+ * the period name, which defeats the hierarchy. Matched class-for-class plus
+ * the `html` element so it wins by one. */
+html[data-dfp]
+  .select-kit.dropdown-select-box.period-chooser
+  .period-chooser-row
+  .top-date-string {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+}
+
+/* The header button shows the same pair, and needs the same hierarchy. */
+html[data-dfp] .period-chooser-header .selected-name .top-date-string {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+}
+
+/* ── Menus, modals, popovers ────────────────────────────────────────────
+ * All three share one treatment: raised surface, stronger border, real
+ * shadow, and a scale-from-origin entrance that reads as "this came from
+ * the thing you clicked". */
+
+/* One painted surface per popover.
+ *
+ * This is what the user card's corners were about, and it was never the card.
+ * Discourse nests three boxes: `.fk-d-menu` (the popover), an inner
+ * `.fk-d-menu__inner-content`, and then the card itself. All three painted a
+ * background and a border, and the middle one measured 10px wider than the card
+ * on every side, in the *page* colour, at 8px radius against the other two at
+ * 16px — so its darker, tighter corners peeked out around the card's rounded
+ * ones at all four corners.
+ *
+ * Rounding the card harder could never fix that, because the artefact was
+ * behind it. The rule is: the outermost element owns the surface, border,
+ * radius and shadow; everything nested inside it is transparent. */
+
+html[data-dfp] .menu-panel,
+html[data-dfp] .fk-d-menu,
+html[data-dfp] .modal-inner-container,
+html[data-dfp] .d-modal__container {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border-strong);
+  border-radius: var(--dfp-r-lg);
+  box-shadow: var(--dfp-e-3);
+}
+
+/* The wrapper Discourse puts between the popover and its content. */
+html[data-dfp] .fk-d-menu__inner-content {
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+/* Cards render inside that wrapper, so they must not paint a second surface —
+ * doubling the border was also why the popover had two visible edges. */
+html[data-dfp] .fk-d-menu .user-card,
+html[data-dfp] .fk-d-menu .group-card,
+html[data-dfp] .menu-panel .user-card,
+html[data-dfp] .menu-panel .group-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+/* Standalone (not inside a popover) they still need their own surface — but
+ * only when actually shown. Discourse leaves an unopened card stub in the DOM
+ * on profile pages, and this rule was painting it as a stray 2px bar across the
+ * page. `.show` is the class Discourse adds when the card is displayed, so it
+ * is the right discriminator; a `:has()` content check was not enough because
+ * the stub does contain an empty `.card-content`. */
+html[data-dfp] .user-card.show,
+html[data-dfp] .group-card.show {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border-strong);
+  border-radius: var(--dfp-r-lg);
+  box-shadow: var(--dfp-e-3);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-dfp] .menu-panel,
+  [data-dfp] .fk-d-menu,
+  [data-dfp] .user-card {
+    animation: dfp-pop var(--dfp-dur-2) var(--dfp-ease);
+    transform-origin: var(--dfp-pop-origin, top center);
+  }
+}
+
+@keyframes dfp-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+html[data-dfp] .modal-backdrop,
+html[data-dfp] .d-modal__backdrop {
+  background: color-mix(in oklab, var(--dfp-bg) 72%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+/* ── Badges and flair ───────────────────────────────────────────────────── */
+
+html[data-dfp] .badge-notification {
+  border-radius: var(--dfp-r-full);
+  font-weight: var(--dfp-fw-semibold);
+  font-size: var(--dfp-fs-xs);
+}
+
+html[data-dfp] .avatar-flair {
+  border-radius: var(--dfp-r-full);
+}
+
+/* Tags are outlined where categories are filled.
+ *
+ * Both were filled pills before, which made a category and a tag look like the
+ * same kind of thing at a glance — you had to read them to tell which was
+ * which. Filled = the one place this topic lives; outlined = the several
+ * labels it happens to carry. The shape does the explaining. */
+html[data-dfp] .discourse-tag {
+  border-radius: var(--dfp-r-full);
+  padding: 2px var(--dfp-s-2);
+  background: transparent;
+  border: 1px solid var(--dfp-border);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.4;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .discourse-tag:hover {
+  background: var(--dfp-surface-3);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text-2);
+}
+
+/* ── Alerts ─────────────────────────────────────────────────────────────── */
+
+html[data-dfp] .alert {
+  border-radius: var(--dfp-r-md);
+  border: 1px solid var(--dfp-border);
+  background: var(--dfp-surface-2);
+}
+
+html[data-dfp] .alert-info {
+  border-color: color-mix(in oklab, var(--dfp-accent) 40%, transparent);
+  background: var(--dfp-accent-soft);
+}
+
+html[data-dfp] .alert-error,
+html[data-dfp] .alert-danger {
+  border-color: color-mix(in oklab, var(--dfp-danger) 40%, transparent);
+  background: var(--dfp-danger-soft);
+}
+
+/* ── Composer ───────────────────────────────────────────────────────────── */
+
+html[data-dfp] #reply-control {
+  background: var(--dfp-surface-1);
+  border-top: 1px solid var(--dfp-border-strong);
+  box-shadow: var(--dfp-e-3);
+}
+
+/* Rounded where it meets the page. The composer slides up over the topic and
+ * previously met it on a hard full-width edge. */
+html[data-dfp] #reply-control.open {
+  border-start-start-radius: var(--dfp-r-lg);
+  border-start-end-radius: var(--dfp-r-lg);
+}
+
+/* ── The editor frame ─────────────────────────────────────────────────────
+ *
+ * One frame, not two. Stock stacks them: `.d-editor-textarea-wrapper` carries a
+ * border at --dfp-bg, and the textarea inside carries its own border on
+ * --dfp-surface-2 — so the toolbar and the writing area read as two boxes with
+ * a seam between them. Worse, the radii were inverted: 4px on the wrapper
+ * against 8px on the children, which puts a rounder corner inside a sharper one.
+ *
+ * The wrapper becomes the only frame and the textarea gives up its chrome. */
+html[data-dfp] #reply-control .d-editor-textarea-wrapper {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  /* Clips the toolbar's top corners to the frame's curve. */
+  overflow: hidden;
+  transition:
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    box-shadow var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] #reply-control .d-editor-input {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: var(--dfp-s-3);
+  color: var(--dfp-text);
+  line-height: var(--dfp-lh-body);
+}
+
+/* Discourse marks focus by turning the whole frame its tertiary blue, which on
+ * a 700px panel is a lot of saturated edge for something that is merely "the
+ * cursor is in here". The border is mixed back toward the resting border colour
+ * so it reads as a lit edge rather than a highlighter, and the ring carries the
+ * rest of the signal. `:focus-within`, because the element that actually takes
+ * focus is the textarea inside the frame. */
+html[data-dfp] #reply-control .d-editor-textarea-wrapper:focus-within {
+  border-color: color-mix(in oklab, var(--dfp-accent) 55%, var(--dfp-border));
+  box-shadow: 0 0 0 3px var(--dfp-accent-soft);
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────
+ * Matched to the post action bar: same square targets, same radius, same hover
+ * film. Two bars of icon buttons in one product should not disagree. */
+
+html[data-dfp] #reply-control .d-editor-button-bar {
+  gap: 2px;
+  padding: var(--dfp-s-1) var(--dfp-s-2);
+  border-block-end: 1px solid var(--dfp-border);
+  background: color-mix(in oklab, var(--dfp-text) 3%, transparent);
+}
+
+html[data-dfp] .d-editor-button-bar .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--dfp-s-6);
+  min-block-size: var(--dfp-s-6);
+  padding: var(--dfp-s-2);
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+}
+
+/* Same reason as the post action bar: `--dfp-surface-3` is #ffffff in the light
+ * theme, identical to the composer behind it, so this hover — the only signal
+ * that the toolbar is interactive — was invisible there. */
+html[data-dfp] .d-editor-button-bar .btn:hover {
+  color: var(--dfp-text);
+  background: color-mix(in oklab, var(--dfp-text) 9%, transparent);
+}
+
+/* ── Preview ──────────────────────────────────────────────────────────────
+ * A sibling of the writing area, so it takes the same frame. Stock gives it no
+ * padding at all, which left rendered text sitting flush against its own edge
+ * while the textarea beside it was comfortably inset. */
+html[data-dfp] #reply-control .d-editor-preview-wrapper {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-3);
+  color: var(--dfp-text);
+  line-height: var(--dfp-lh-body);
+}
+
+/* ── Header and footer ────────────────────────────────────────────────────
+ * The title bar earns a little room and a rule under it, so the panel opens
+ * with a clear "what am I replying to" line rather than text floating above
+ * the editor. */
+
+html[data-dfp] #reply-control .reply-to {
+  align-items: center;
+  gap: var(--dfp-s-2);
+  padding-block-end: var(--dfp-s-2);
+  margin-block-end: var(--dfp-s-2);
+  border-block-end: 1px solid var(--dfp-border);
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] #reply-control .submit-panel {
+  gap: var(--dfp-s-3);
+  padding-block-start: var(--dfp-s-2);
+}
+
+html[data-dfp] #reply-control .submit-panel .save-or-cancel {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-3);
+}
+
+/* Close is an escape hatch, not a peer of Reply. It was rendering at the same
+ * weight as the primary button beside it. */
+html[data-dfp] #reply-control .submit-panel .cancel {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] #reply-control .submit-panel .cancel:hover {
+  color: var(--dfp-text);
+}
+
+/* The drag handle. Discourse builds this as a neutral track with a small pill
+ * on it (`::before`, 22.5×3px) — but the track was resolving to a solid
+ * --dfp-accent bar 11px tall running the full width of the composer, easily the
+ * loudest thing on screen, while the pill itself was transparent and therefore
+ * invisible. The retargeting that gives Discourse its colours reaches this one
+ * badly, so both ends are stated here: quiet track, visible handle. */
+html[data-dfp] #reply-control .grippie {
+  background: var(--dfp-surface-1);
+  border-block-end: 1px solid var(--dfp-border);
+  cursor: row-resize;
+}
+
+html[data-dfp] #reply-control .grippie::before {
+  background: var(--dfp-border-strong);
+  border-radius: var(--dfp-r-pill, 999px);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] #reply-control .grippie:hover::before {
+  background: var(--dfp-text-3);
+}

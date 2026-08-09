@@ -1,0 +1,137 @@
+/* M5 polish: loading states, navigation transitions, and the small responses
+ * that make a UI feel answerable.
+ *
+ * Everything here is gated on the motion setting the tokens already define
+ * (`data-dfp-motion`), and on `prefers-reduced-motion`, so none of it is a new
+ * accessibility decision — it inherits the one already made. */
+
+/* ── Skeletons ───────────────────────────────────────────────────────────
+ * Discourse shows a centred spinner while a route loads, which says "wait"
+ * without saying what for. These paint the shape of the thing that is coming.
+ *
+ * Scoped to Discourse's own placeholder elements rather than invented ones —
+ * `.topic-list-item.--loading` and `.post-stream .loading` are what it renders
+ * during a fetch. If a future Discourse stops emitting them, this quietly does
+ * nothing rather than leaving a fake row on screen. */
+
+html[data-dfp] .loading-container .spinner,
+html[data-dfp] .topic-list .loading-container {
+  /* The spinner stays for genuinely indeterminate waits; it just should not be
+   * the only thing on a 900px-tall empty page. */
+  opacity: 0.6;
+}
+
+html[data-dfp] .dfp-skel {
+  position: relative;
+  overflow: hidden;
+  background: var(--dfp-surface-2);
+  border-radius: var(--dfp-r-sm);
+}
+
+html[data-dfp] .dfp-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in oklab, var(--dfp-text) 6%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 220% 100%;
+  animation: dfp-shimmer 1.3s linear infinite;
+}
+
+@keyframes dfp-shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+/* ── Navigation transitions ──────────────────────────────────────────────
+ * `@view-transition` covers cross-document navigation — a hard load, a
+ * middle-click, a permalink. Discourse's in-app routing is same-document and
+ * would need `document.startViewTransition` wrapped around Ember's own render,
+ * which is not something to reach into from an extension: getting it wrong
+ * freezes the page mid-transition rather than degrading.
+ *
+ * So this improves the case it can reach safely and leaves the SPA alone. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: var(--dfp-ease, ease);
+}
+
+/* ── Micro-interactions ──────────────────────────────────────────────────
+ * Feedback on the three things people click most, and nothing else. A UI where
+ * everything animates is a UI where nothing reads as a response. */
+
+/* The like button is the one control with an emotional payload. */
+html[data-dfp] .post-controls .like-count,
+html[data-dfp] .discourse-reactions-reaction-button {
+  transition: transform var(--dfp-dur-1) var(--dfp-spring, var(--dfp-ease));
+}
+
+html[data-dfp] .discourse-reactions-reaction-button:active {
+  transform: scale(0.92);
+}
+
+/* Topic rows: a whole-row response, so the click target reads as the row and
+ * not just the title text. */
+html[data-dfp] .topic-list-item {
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* Anything that newly appears in a post — our own banners and cards — arrives
+ * rather than blinking into place. */
+html[data-dfp] .dfp-stale-post,
+html[data-dfp] .dfp-gate,
+html[data-dfp] .dfp-dupes,
+html[data-dfp] .dfp-draft,
+html[data-dfp] .dfp-code-note {
+  animation: dfp-settle var(--dfp-dur-2) var(--dfp-ease);
+}
+
+@keyframes dfp-settle {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Motion opt-outs ─────────────────────────────────────────────────────
+ * Both the OS preference and DFP's own setting. The tokens already collapse
+ * durations for `motion: off`, but an animation with a 1ms duration still
+ * *runs* — these stop them outright. */
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-dfp] .dfp-skel::after,
+  html[data-dfp] .dfp-stale-post,
+  html[data-dfp] .dfp-gate,
+  html[data-dfp] .dfp-dupes,
+  html[data-dfp] .dfp-draft,
+  html[data-dfp] .dfp-code-note {
+    animation: none;
+  }
+
+  @view-transition {
+    navigation: none;
+  }
+}
+
+html[data-dfp][data-dfp-motion="off"] .dfp-skel::after,
+html[data-dfp][data-dfp-motion="off"] .dfp-stale-post,
+html[data-dfp][data-dfp-motion="off"] .dfp-gate,
+html[data-dfp][data-dfp-motion="off"] .dfp-dupes,
+html[data-dfp][data-dfp-motion="off"] .dfp-draft,
+html[data-dfp][data-dfp-motion="off"] .dfp-code-note {
+  animation: none;
+}

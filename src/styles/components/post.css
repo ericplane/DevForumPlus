@@ -1,0 +1,1010 @@
+/* Post stream.
+ *
+ * Posts currently sit on the page background with a hairline separator, which
+ * makes a long thread read as one undifferentiated wall. Giving each post a
+ * surface does more for readability on this forum than any typographic change,
+ * because the threads that matter here run to dozens of replies.
+ */
+
+html[data-dfp] .topic-post {
+  margin-block-end: var(--dfp-s-3);
+}
+
+html[data-dfp] .topic-post > article.boxed {
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-4) var(--dfp-s-5);
+  transition: border-color var(--dfp-dur-2) var(--dfp-ease);
+}
+
+html[data-dfp] .topic-post > article.boxed:hover {
+  border-color: var(--dfp-border-strong);
+}
+
+/* The original post anchors the thread; it gets the only real elevation.
+ *
+ * Deliberately no `background` here. This selector carries an id, so any
+ * background it sets outranks the OP/staff/solution tints further down the
+ * file — the first post would have been the one post that never showed its
+ * identity colour. Elevation alone is enough to mark it as the anchor. */
+html[data-dfp] .topic-post.topic-owner #post_1,
+html[data-dfp] #post_1.boxed {
+  box-shadow: var(--dfp-e-1);
+}
+
+/* ── Post body fills its card ─────────────────────────────────────────────
+ * Discourse sizes the post body from a fixed `--topic-body-width` (690px on
+ * this instance). Stock, that just leaves whitespace on the page and nobody
+ * notices. Once the post has a card around it, the same 690px leaves a
+ * measured 113px of dead space against the card's right edge, and every post
+ * reads as misaligned.
+ *
+ * Letting the body flex to fill removes the gap. The resulting measure is
+ * wide, which is what the `width` setting (narrow / default / wide) is for —
+ * `narrow` brings it back to a tight column for long-form reading. */
+html[data-dfp] article.boxed > .row {
+  display: flex;
+  gap: var(--dfp-s-4);
+  align-items: flex-start;
+}
+
+html[data-dfp] .topic-body {
+  width: auto;
+  max-width: none;
+  flex: 1 1 auto;
+  /* Without this, long code blocks and tables blow the flex item out past
+   * the card instead of scrolling inside it. */
+  min-width: 0;
+}
+
+html[data-dfp] .topic-body .contents,
+html[data-dfp] .topic-body .cooked,
+html[data-dfp] .topic-body .post-menu-area {
+  width: auto;
+  max-width: none;
+}
+
+/* The card already supplies horizontal padding; Discourse's adds a second,
+ * asymmetric layer (measured 15px 11px 3.75px). */
+html[data-dfp] .topic-body .cooked {
+  padding-inline: 0;
+  padding-block: 0 var(--dfp-s-2);
+}
+
+html[data-dfp] .topic-body .post-menu-area {
+  padding-inline-start: 0;
+}
+
+/* A theme component paints 1px #2d2d2d borders onto .topic-body,
+ * .topic-avatar and .topic-map. Against the stock flat background they were
+ * invisible separators; inside a card they render as stray rules across the
+ * post. */
+html[data-dfp] .topic-body,
+html[data-dfp] .topic-avatar {
+  border: 0;
+}
+
+/* `.topic-timer-info` renders on every topic whether or not a timer exists.
+ * Empty, it still drew its 1px top border — a stray rule floating under the
+ * post card with nothing attached to it. */
+html[data-dfp] .topic-timer-info {
+  border-top: 0;
+  color: var(--dfp-text-3);
+}
+
+/* Measured 72px of empty space between the last post and the reply controls,
+ * with no element in between to account for it. */
+html[data-dfp] #topic-footer-buttons {
+  margin-top: var(--dfp-s-4);
+}
+
+html[data-dfp] .topic-area > .post-stream {
+  margin-bottom: 0;
+}
+
+html[data-dfp] .topic-avatar {
+  padding-top: 0;
+  flex: 0 0 auto;
+}
+
+/* ── Byline ─────────────────────────────────────────────────────────────── */
+
+html[data-dfp] .topic-meta-data {
+  align-items: center;
+  gap: var(--dfp-s-2);
+  margin-block-end: var(--dfp-s-3);
+}
+
+/* ── Byline: display name vs username ────────────────────────────────────
+ * Discourse renders `.first.full-name` and `.second.username` as siblings with
+ * nothing but whitespace between them, so "mobiser youss_elkhashaab" reads as
+ * one strange two-word name. They are different kinds of identifier and should
+ * look it: the display name is the person, the username is the handle. */
+
+html[data-dfp] .topic-meta-data .names {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dfp-s-2);
+  flex-wrap: wrap;
+}
+
+html[data-dfp] .topic-meta-data .names .full-name a,
+html[data-dfp] .topic-meta-data .names a {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+  font-size: var(--dfp-fs-md);
+}
+
+html[data-dfp] .topic-meta-data .names .username a,
+html[data-dfp] .topic-meta-data .names .second a {
+  color: var(--dfp-text-3);
+  font-weight: var(--dfp-fw-normal);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* The @ is the cheapest possible signal that this is a handle, and it means the
+ * two names never run together even at a glance. Only added when a separate
+ * display name exists — otherwise the single name IS the username and prefixing
+ * it would be wrong. */
+html[data-dfp] .topic-meta-data .names .full-name + .username a::before,
+html[data-dfp] .topic-meta-data .names .first + .second a::before {
+  content: "@";
+  opacity: 0.7;
+}
+
+html[data-dfp] .topic-meta-data .user-title {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+}
+
+/* Staff are visually distinct from ordinary posters and from links. On a forum
+ * where "did Roblox respond?" is the question, this is load-bearing. */
+html[data-dfp] .topic-meta-data .names .group--Roblox_Staff a,
+html[data-dfp] .topic-meta-data .names .staff a {
+  color: var(--dfp-staff);
+}
+
+/* ── Post identity: staff, solution, original poster ─────────────────────
+ *
+ * Scrolling a 380-reply thread, three posts matter more than the rest: did
+ * Roblox answer, was it solved, and which ones are the OP. All three were
+ * distinguishable only by reading the byline.
+ *
+ * A left rail carries it. This is the opposite call from the topic list, where
+ * the rail was removed — and deliberately so: there every row had one, which
+ * made it noise. Here only a handful of posts in a long thread qualify, so the
+ * rail is rare enough to mean something and lets you find staff replies by
+ * scrolling rather than reading.
+ *
+ * Three distinct hues, none of them the link colour, and each paired with a
+ * tint so the signal survives for anyone who cannot separate the hues. */
+
+html[data-dfp] .topic-post > article.boxed {
+  border-inline-start: 3px solid transparent;
+}
+
+/* Tint strengths are the point.
+ *
+ * The first attempt used 6% mixes, which is invisible on a dark surface — the
+ * three post types looked identical, which is a fair description of a signal
+ * that does not signal. These are the values that actually read while scrolling
+ * without turning the thread into a colour chart: OP lower because it is
+ * common, staff and solution higher because they are rare and are what people
+ * are hunting for. */
+
+/* Staff — purple. The loudest, because "did Roblox reply" is the question
+ * people open Bug Reports and Feature Requests to answer.
+ *
+ * Matched several ways on purpose. The `group-` class comes from the poster's
+ * *primary* group, which is not the same for everyone at Roblox — one staff
+ * member measured as `group-Roblox_Staff` with no `.staff` class on the name at
+ * all, while another carried `staff admin moderator`. Keying on any single one
+ * of those silently misses whole categories of staff, which is the worst
+ * possible failure for this particular signal. */
+html[data-dfp] .topic-post.group-Roblox_Staff > article.boxed,
+html[data-dfp] .topic-post:has(.names .staff) > article.boxed,
+html[data-dfp] .topic-post:has(.names .moderator) > article.boxed,
+html[data-dfp] .topic-post:has(.names .admin) > article.boxed,
+html[data-dfp] .topic-post:has(.user-title--roblox-staff) > article.boxed,
+html[data-dfp] .topic-post:has(.names [class*="group--Roblox_Staff"]) > article.boxed,
+html[data-dfp] .topic-post:has(a.user-group[href="/g/Roblox_Staff"]) > article.boxed {
+  border-color: color-mix(in oklab, var(--dfp-staff) 34%, var(--dfp-border));
+  border-inline-start: 3px solid var(--dfp-staff);
+  background: color-mix(in oklab, var(--dfp-staff) 14%, var(--dfp-surface-1));
+}
+
+/* Original poster — blue. Kept lighter than the other two on purpose: on a
+ * 380-reply thread the OP might be a third of the posts, and at staff strength
+ * that would shade the whole page instead of marking anything. */
+html[data-dfp] .topic-post.topic-owner > article.boxed {
+  border-inline-start: 3px solid var(--dfp-accent);
+  background: color-mix(in oklab, var(--dfp-accent) 7%, var(--dfp-surface-1));
+}
+
+/* Staff who are also the OP: staff wins, it is the rarer and stronger signal. */
+html[data-dfp] .topic-post.topic-owner.group-Roblox_Staff > article.boxed {
+  border-inline-start-color: var(--dfp-staff);
+  background: color-mix(in oklab, var(--dfp-staff) 14%, var(--dfp-surface-1));
+}
+
+html[data-dfp] .post-info .relative-date,
+html[data-dfp] .post-infos .post-date {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+html[data-dfp] .topic-avatar img.avatar,
+html[data-dfp] .post-avatar img.avatar {
+  border-radius: var(--dfp-r-full);
+  border: 1px solid var(--dfp-border);
+}
+
+/* ── Accepted answer ─────────────────────────────────────────────────────
+ * discourse-solved marks it; the stock treatment is a small icon that is easy
+ * to scroll past on a 90-reply thread. */
+/* Solution — green, and it outranks OP: on a solved thread the accepted answer
+ * is the single post most people are scrolling to find. */
+html[data-dfp] .topic-post.accepted-answer > article.boxed,
+html[data-dfp] .accepted-answer > .boxed,
+html[data-dfp] .topic-post.accepted-answer.topic-owner > article.boxed {
+  border-color: color-mix(in oklab, var(--dfp-solved) 44%, var(--dfp-border));
+  border-inline-start: 3px solid var(--dfp-solved);
+  background: color-mix(in oklab, var(--dfp-solved) 14%, var(--dfp-surface-1));
+}
+
+/* ── "Solved by X in post #17" ───────────────────────────────────────────
+ * The banner above an accepted answer. It was painting a lighter background
+ * than the post it sits on, so the block had a pale seam along its edge that
+ * belonged to no surface in the palette. Tinted to match the solution it
+ * announces. */
+html[data-dfp] .solved-panel,
+html[data-dfp] .accepted-answer-quote,
+html[data-dfp] .topic-post .accepted-answer-header,
+html[data-dfp] aside.quote.accepted-answer {
+  background: color-mix(in oklab, var(--dfp-solved) 10%, var(--dfp-surface-2));
+  border: 1px solid color-mix(in oklab, var(--dfp-solved) 28%, transparent);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-2);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* The check icon sits in a grey box of its own inside the green banner, which
+ * reads as a stray unstyled control rather than a status marker. Strip the box,
+ * colour the mark. */
+html[data-dfp] .solved-panel .d-icon,
+html[data-dfp] .accepted-answer-quote .d-icon,
+html[data-dfp] .topic-post .accepted-answer-header .d-icon,
+html[data-dfp] aside.quote.accepted-answer .title .d-icon,
+html[data-dfp] .accepted-answer .d-icon-square-check,
+html[data-dfp] .solved-panel .d-icon-square-check {
+  color: var(--dfp-solved);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* Some builds render it as a real checkbox rather than an icon. */
+html[data-dfp] .solved-panel input[type="checkbox"],
+html[data-dfp] .accepted-answer-quote input[type="checkbox"],
+html[data-dfp] aside.quote.accepted-answer input[type="checkbox"] {
+  accent-color: var(--dfp-solved);
+  background: transparent;
+  border-color: color-mix(in oklab, var(--dfp-solved) 45%, transparent);
+}
+
+/* The title strip inside the quote carries its own background; let the one
+ * above show through so there is a single surface rather than two. */
+html[data-dfp] aside.quote.accepted-answer .title,
+html[data-dfp] .accepted-answer-quote .title {
+  background: transparent;
+  border-bottom-color: color-mix(in oklab, var(--dfp-solved) 20%, transparent);
+}
+
+/* ── Post controls ──────────────────────────────────────────────────────── */
+
+html[data-dfp] .post-controls .btn {
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-3);
+  transition:
+    color var(--dfp-dur-1) var(--dfp-ease),
+    background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* The fill is mixed from the text colour, not `--dfp-surface-3`. In the light
+ * theme surface-1, -2 and -3 all resolve to #ffffff (tokens.generated.css:124),
+ * and the post card underneath is surface-1 — so this hover state, the only
+ * thing telling a light-theme user these icons are buttons, was invisible. A
+ * text-mix reads on all four themes. */
+html[data-dfp] .post-controls .btn:hover {
+  color: var(--dfp-text);
+  background: color-mix(in oklab, var(--dfp-text) 9%, transparent);
+}
+
+html[data-dfp] .post-controls .btn.like:hover,
+html[data-dfp] .post-controls .toggle-like:hover {
+  color: var(--dfp-danger);
+}
+
+html[data-dfp] .post-controls .btn.has-like {
+  color: var(--dfp-danger);
+}
+
+/* A like should feel like something. One spring, one property, compositor
+ * only — and it collapses to nothing under reduced motion via the token. */
+html[data-dfp] .post-controls .toggle-like .d-icon {
+  transition: transform var(--dfp-dur-2) var(--dfp-spring);
+}
+
+html[data-dfp] .post-controls .toggle-like:active .d-icon {
+  transform: scale(1.28);
+}
+
+/* ── Post chrome: one anchor per region ─────────────────────────────────────
+ *
+ * The byline meta, the replies expander and the action bar each shipped four
+ * controls at the same visual weight, so the eye had no entry point in any of
+ * them. The move is the same in all three: pick the one element carrying the
+ * region's meaning, leave it where it is, and drop everything around it one
+ * step in size and one step in colour.
+ *
+ * Built by subtraction on purpose. This chrome repeats under every post on a
+ * 380-reply thread, so a ladder of grey rectangles would fix the grouping
+ * problem by creating a worse one. Nothing here is hidden, and nothing gains a
+ * border or a fill at rest.
+ *
+ * Everything is anchored on `.topic-post` to clear Discourse's own rules
+ * (~(0,3,2)) without reaching for `!important`. Every selector below was
+ * checked against the live DOM — in particular `.post-info.edits > button`,
+ * which carries `.widget-button.btn-flat` and no bare `.btn`, so the obvious
+ * `.post-info.edits .btn` would have matched nothing. */
+
+/* ── Region A: byline meta ───────────────────────────────────────────────
+ * Anchor: the post date. It is the only item present on every post — edits
+ * appear on ~10%, the reply-to tab on ~75% — and on a forum where answers age
+ * badly it is the field that decides whether the post is worth reading. */
+
+html[data-dfp] .topic-post .topic-meta-data .post-infos {
+  align-items: center;
+  gap: var(--dfp-s-2);
+  line-height: var(--dfp-lh-tight);
+}
+
+/* Tabular figures so a column of dates down a long thread does not shuffle
+ * sideways between "Jan 4" and "Jan 14". The inner `.relative-date` is matched
+ * as well as the wrapper because base.css paints every `a` accent, and a rule
+ * on the wrapper alone would lose on the element that actually paints text. */
+html[data-dfp] .topic-post .post-infos .post-date,
+html[data-dfp] .topic-post .post-infos .post-date .relative-date {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* It is a permalink to the post and never looked like one. */
+html[data-dfp] .topic-post .post-infos a.post-date:hover,
+html[data-dfp] .topic-post .post-infos a.post-date:hover .relative-date {
+  color: var(--dfp-text);
+}
+
+/* The edit count is the most misread item on a post: a bare number beside a
+ * pencil, at the same size as the like and reply counts, reads as another
+ * count of the same kind. The number stays — nothing else in this view says
+ * how often a post was edited — but it stops competing. */
+html[data-dfp] .topic-post .post-infos .post-info.edits > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-block-size: var(--dfp-s-5);
+  padding: 2px var(--dfp-s-1);
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  transition:
+    color var(--dfp-dur-1) var(--dfp-ease),
+    background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .topic-post .post-infos .post-info.edits > button .d-button-label {
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The reply target is a control — it loads the parent post — so it still has
+ * to answer a pointer, but as a footnote rather than a second byline. The name
+ * is kept: only 4 of 15 reply-to tabs on a sampled topic also had a quote
+ * naming the same person, so on the other 11 this is the only statement of
+ * what the post is answering. */
+html[data-dfp] .topic-post .post-infos a.reply-to-tab {
+  align-items: center;
+  gap: var(--dfp-s-1);
+  min-block-size: var(--dfp-s-5);
+  padding: 2px var(--dfp-s-1);
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-normal);
+  transition:
+    color var(--dfp-dur-1) var(--dfp-ease),
+    background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .topic-post .post-infos a.reply-to-tab img.avatar {
+  inline-size: 16px;
+  block-size: 16px;
+  border-radius: var(--dfp-r-full);
+  flex: 0 0 auto;
+}
+
+/* An unbounded username is the widest this row ever gets, and a byline that
+ * wraps pushes the post body down. The full name survives on the avatar's own
+ * `title` and at the link target. */
+html[data-dfp] .topic-post .post-infos a.reply-to-tab > span {
+  max-inline-size: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `em`, not a spacing token: `--dfp-s-*` are literal px while `--dfp-fs-*` is
+ * the axis the user actually scales, so icons sized against text must be
+ * relative or they drift out of proportion at the largest text setting. */
+html[data-dfp] .topic-post .post-infos .post-info.edits > button .d-icon,
+html[data-dfp] .topic-post .post-infos a.reply-to-tab .d-icon {
+  inline-size: 0.95em;
+  block-size: 0.95em;
+}
+
+/* Both byline controls take the same hover film as the action bar, so "this is
+ * pressable" is said once, the same way, everywhere in a post. */
+html[data-dfp] .topic-post .post-infos .post-info.edits > button:hover,
+html[data-dfp] .topic-post .post-infos a.reply-to-tab:hover {
+  color: var(--dfp-text-2);
+  background: color-mix(in oklab, var(--dfp-text) 9%, transparent);
+}
+
+/* The one item in the row that is not pressable. Now that its neighbours light
+ * up under the pointer, it has to visibly decline to. Left otherwise alone:
+ * Discourse drives this dot's meaning, and re-encoding read state here risks
+ * turning a read marker into a permanent unread one. */
+html[data-dfp] .topic-post .post-infos .read-state {
+  flex: 0 0 auto;
+  cursor: default;
+}
+
+/* ── Region B: replies expander ──────────────────────────────────────────
+ * This is navigation, not an action, so it sits a step below the action bar
+ * opposite it — but it has to read as something that opens, which it did not.
+ * It gets a hit area under the pointer and a legible open state. */
+
+html[data-dfp] .topic-post .post-controls .show-replies {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  min-block-size: var(--dfp-s-5);
+  padding: var(--dfp-s-1) var(--dfp-s-2);
+  /* Pulls the label's optical edge back to the post body's left margin: the
+   * padding grows the target without indenting the text away from the prose. */
+  margin-inline-start: calc(var(--dfp-s-2) * -1);
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-normal);
+  line-height: var(--dfp-lh-tight);
+}
+
+html[data-dfp] .topic-post .post-controls .show-replies .d-button-label {
+  font-size: inherit;
+}
+
+/* Sized here rather than relying on Discourse to do it. An `<svg>` with no
+ * intrinsic size falls back to 300×150, and the visual harness — which loads
+ * this stylesheet without Discourse's — rendered exactly that. On the live site
+ * their rule covers it, so this is insurance against the day it does not. */
+html[data-dfp] .topic-post .post-controls .show-replies .d-icon {
+  inline-size: 1.15em;
+  block-size: 1.15em;
+}
+
+/* Verified on the live page: opening sets `aria-expanded="true"` AND swaps the
+ * glyph from `chevron-down` to `chevron-up`. Since Discourse already turns the
+ * chevron itself, this only supplies the fill — rotating a glyph that has
+ * already flipped would point it back down.
+ *
+ * Deliberately NOT keyed off `nav.post-controls.collapsed`: that class tracks
+ * the ellipsis overflow menu, which lives in the same nav, so it would light
+ * this control up when the user opened the *action* menu. */
+html[data-dfp] .topic-post .post-controls .show-replies[aria-expanded="true"] {
+  color: var(--dfp-text-2);
+  background: color-mix(in oklab, var(--dfp-text) 7%, transparent);
+}
+
+/* ── Region C: action bar ────────────────────────────────────────────────
+ * Anchor: Reply. The fix is deliberately not to make Reply louder — twenty
+ * accent pills down a thread would out-shout the posts. Instead the other
+ * three flatten onto one rhythm, and Reply keeps the only word, the only
+ * medium weight, the only horizontal padding, and one step of colour. */
+
+html[data-dfp] .topic-post .post-controls .actions {
+  align-items: center;
+  gap: 2px;
+  /* The nav is `justify-content: space-between`. On the ~20% of posts with no
+   * replies button the bar is the only child and would slide left; this holds
+   * it right whether or not the left-hand control exists. */
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+/* One size for the whole bar. Stock ships 17.24px on Reply against ~13px on its
+ * neighbours, which is most of why this row read as assembled rather than
+ * designed. `min-block-size` is the accessibility floor; the padding sets the
+ * real height, so targets grow with the type scale and never fall below it. */
+html[data-dfp] .topic-post .post-controls .actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dfp-s-2);
+  min-block-size: var(--dfp-s-6);
+  padding: var(--dfp-s-2);
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-normal);
+  line-height: var(--dfp-lh-tight);
+}
+
+html[data-dfp] .topic-post .post-controls .actions .btn .d-button-label {
+  font-size: inherit;
+}
+
+html[data-dfp] .topic-post .post-controls .actions .btn .d-icon {
+  inline-size: 1.15em;
+  block-size: 1.15em;
+}
+
+/* Direct children only, so the like toggle nested inside `.double-button` keeps
+ * the tighter geometry below. Symmetric padding around a square icon is what
+ * makes the two icon-only controls come out square, giving the bar one rhythm
+ * instead of widths of 72 / 87 / 37 / 37. */
+html[data-dfp] .topic-post .post-controls .actions > .btn.no-text {
+  min-inline-size: var(--dfp-s-6);
+}
+
+/* Every icon-only control still ships a `.d-button-label`, and it is not empty
+ * — it holds a zero-width space (U+200B). So it measures 0px while the flex
+ * `gap` above dutifully reserves 8px next to it, and the glyph ends up 8px from
+ * one edge and 16px from the other inside a pill that should be square. That
+ * off-centre hover box is the whole defect; the gap is simply wrong when there
+ * is no label to separate from. */
+html[data-dfp] .topic-post .post-controls .actions .btn.no-text {
+  gap: 0;
+}
+
+html[data-dfp] .topic-post .post-controls .actions .like-count {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The heart and its number are one object, not two of the four controls; the
+ * uniform padding above would otherwise put 16px of dead air between an icon
+ * and the number counting it. Matched by position rather than class so it holds
+ * whichever order the build renders them in.
+ *
+ * `.double-button` is a plain wrapper, not a `.btn`, so it is invisible to the
+ * rules above — it shipped a 4px radius around two 6px children. Restated here
+ * so the pair has one outline. */
+html[data-dfp] .topic-post .post-controls .actions .double-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border-radius: var(--dfp-r-xs);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .topic-post .post-controls .actions .double-button > :not(:only-child):first-child {
+  padding-inline-end: var(--dfp-s-1);
+}
+
+html[data-dfp] .topic-post .post-controls .actions .double-button > :not(:only-child):last-child {
+  padding-inline-start: var(--dfp-s-1);
+}
+
+/* The hover belongs to the pair, not to each half. Left as-is the count lit a
+ * 30px pill and the heart a separate 35px one, so the object this rule spent
+ * its effort welding together came apart again the moment you pointed at it.
+ * The wrapper takes the fill; the children give theirs up. */
+html[data-dfp] .topic-post .post-controls .actions .double-button:hover {
+  background: color-mix(in oklab, var(--dfp-text) 9%, transparent);
+}
+
+html[data-dfp] .topic-post .post-controls .actions .double-button > .btn:hover {
+  background: transparent;
+}
+
+/* Reply: one step up in colour and weight, and the only control here that pays
+ * for horizontal space. That is the whole promotion.
+ *
+ * Matched on `.post-action-menu__reply` alone and deliberately NOT on `.create`,
+ * which is not the unique marker it looks like — the flag button ships
+ * `post-action-menu__flag create` too, so keying off `.create` promoted the
+ * flag to Reply's colour, weight and padding. Verified on the live page. */
+html[data-dfp] .topic-post .post-controls .actions .btn.post-action-menu__reply {
+  color: var(--dfp-text-2);
+  font-weight: var(--dfp-fw-medium);
+  padding-inline: var(--dfp-s-3);
+}
+
+/* Two groups, one gap: [like] [Reply] · [more] [share]. A margin rather than a
+ * divider — a rule here would be a fifth thing to look at, and a margin removes
+ * itself when the button is absent. */
+html[data-dfp] .topic-post .post-controls .actions .show-more-actions {
+  margin-inline-start: var(--dfp-s-3);
+}
+
+/* Restated because the `.actions .btn` reset above out-specifies the like rules
+ * near the top of this section; without these an already-liked heart goes grey.
+ * A cascade consequence of the reset, not decoration. */
+html[data-dfp] .topic-post .post-controls .toggle-like:hover,
+html[data-dfp] .topic-post .post-controls .btn.like:hover {
+  color: var(--dfp-danger);
+}
+
+html[data-dfp] .topic-post .post-controls .actions .btn.has-like,
+html[data-dfp] .topic-post .post-controls .actions .toggle-like.has-like {
+  color: var(--dfp-danger);
+}
+
+/* The bar's one colour event, and the only place accent appears on a post.
+ * Same reason as above for not using `.create` here. */
+html[data-dfp] .topic-post .post-controls .actions .btn.post-action-menu__reply:hover,
+html[data-dfp] .topic-post .post-controls .actions .btn.post-action-menu__reply:focus-visible {
+  color: var(--dfp-accent);
+  background: var(--dfp-accent-soft);
+}
+
+/* base.css puts the focus ring 2px outside its element. With a 2px gap in this
+ * bar, a ring on any middle button would overlap both neighbours exactly. Inset
+ * it — there is 8px of padding inside each control, so it still clears the
+ * glyph. */
+html[data-dfp] .topic-post .post-controls .actions .btn:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ── Who liked / who read ────────────────────────────────────────────────
+ *
+ * Clicking the like count expands this list, and on a popular post it is a lot
+ * of people — the post that prompted this had 83, which Discourse laid out as
+ * three dense rows of 24px circles butted against each other with a stray
+ * "liked this" stranded at the end. It read as a data dump rather than a list
+ * of people.
+ *
+ * Turned into a facepile: the avatars overlap, each carrying a ring in the post
+ * colour so it still reads as a separate face. Nobody is hidden — every one of
+ * the 83 is still a link to a profile — but overlapping takes the same list
+ * from three rows to two, and the ring is what stops it becoming a smear.
+ *
+ * The block also gets a hairline and some room above it, because it belongs to
+ * the post it expanded from and previously just floated under the action bar. */
+
+/* `:has(a)` is load-bearing, not defensive. Discourse renders BOTH lists —
+ * `.who-read` and `.who-liked` — on every post and leaves them empty until you
+ * expand one. An unconditional border therefore drew a rule under the action
+ * bar for a list containing nobody, so a post with the likers open showed two
+ * divider lines. Only a list with faces in it gets a line. */
+html[data-dfp] .topic-post .post-menu-area .small-user-list:has(a) {
+  margin-block-start: var(--dfp-s-2);
+  padding-block-start: var(--dfp-s-3);
+  border-block-start: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .topic-post .post-menu-area .small-user-list-content {
+  align-items: center;
+  gap: var(--dfp-s-2);
+}
+
+/* The bottom of this block is Discourse's 20px `.post-menu-area` margin, while
+ * the top is the 12px above the faces — which reads as the block sagging. Only
+ * matched when a list actually has faces in it, so posts without one keep the
+ * spacing Discourse intended. */
+html[data-dfp] .topic-post .post-menu-area:has(.small-user-list a) {
+  margin-block-end: var(--dfp-s-3);
+}
+
+/* Discourse right-aligns this list so it hangs under the right-hand action bar.
+ * That works for the three or four faces it was designed around; at 83 it fills
+ * the width and wraps, and right-alignment puts the ragged edge on the LEFT —
+ * the second row started 146px in. A list of people should start where reading
+ * starts, and it lets "liked this" fall naturally after the last face. */
+html[data-dfp] .topic-post .post-menu-area .small-user-list,
+html[data-dfp] .topic-post .post-menu-area .small-user-list-content {
+  justify-content: flex-start;
+  text-align: start;
+}
+
+/* Discourse spaces these with a per-anchor margin; dropped in favour of the
+ * flex gap above so one thing controls the rhythm.
+ *
+ * No overlap and no ring. An earlier version overlapped the faces and gave each
+ * a 2px ring in the post colour to keep them apart — necessary when all 83 were
+ * on screen, but the ring reads as a hard black outline on the dark themes, and
+ * once the list folds to twelve there is nothing to solve: twelve faces occupy
+ * 376px of an 861px row with room to spare. */
+html[data-dfp] .topic-post .post-menu-area .small-user-list-content > a {
+  margin: 0;
+  border-radius: var(--dfp-r-full);
+  transition: transform var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .topic-post .post-menu-area .small-user-list-content > a img.avatar {
+  display: block;
+  border-radius: var(--dfp-r-full);
+}
+
+/* Small lift on the face under the pointer — these are people, and the only
+ * other cue that one is hoverable is the user card that appears a beat later. */
+html[data-dfp] .topic-post .post-menu-area .small-user-list-content > a:hover,
+html[data-dfp] .topic-post .post-menu-area .small-user-list-content > a:focus-visible {
+  transform: translateY(-2px);
+}
+
+/* "liked this" — a label, not a peer of the faces. */
+html[data-dfp] .topic-post .post-menu-area .small-user-list .list-description {
+  margin-inline-start: var(--dfp-s-1);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* Folded by discourse/modules/facepile.ts. Twelve faces is about one calm row;
+ * the rest are hidden rather than removed, so the toggle is instant and no
+ * profile link is lost. */
+html[data-dfp] .topic-post .post-menu-area .small-user-list[data-dfp-faces="shut"] .dfp-face--extra {
+  display: none;
+}
+
+html[data-dfp] .topic-post .post-menu-area .dfp-face-more {
+  margin-inline-start: var(--dfp-s-2);
+  padding: 2px var(--dfp-s-2);
+  border: 1px dashed var(--dfp-border);
+  border-radius: var(--dfp-r-pill, 999px);
+  background: transparent;
+  color: var(--dfp-text-3);
+  font: inherit;
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  cursor: pointer;
+  transition:
+    color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .topic-post .post-menu-area .dfp-face-more:hover {
+  border-style: solid;
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .topic-post .post-menu-area .dfp-face-more:focus-visible {
+  outline: 2px solid var(--dfp-accent);
+  outline-offset: 2px;
+}
+
+/* ── Quotes ─────────────────────────────────────────────────────────────── */
+
+html[data-dfp] aside.quote {
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  background: var(--dfp-surface-2);
+  overflow: hidden;
+  margin-block: var(--dfp-s-4);
+}
+
+/* The title bar must reach both edges.
+ *
+ * Discourse styles quotes for a left accent border, which leaves the title with
+ * its own left border and the blockquote with `border-radius: 0 8px 8px 0` —
+ * square on the left, rounded on the right. Inside a uniformly rounded card
+ * that shows up as a narrow band of a different shade down the left of the
+ * title row. The aside owns the shape; nothing inside it should carve its own. */
+html[data-dfp] aside.quote > .title {
+  background: var(--dfp-surface-3);
+  border: 0;
+  border-bottom: 1px solid var(--dfp-border);
+  border-radius: 0;
+  margin: 0;
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  font-size: var(--dfp-fs-sm);
+  color: var(--dfp-text-3);
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+}
+
+html[data-dfp] aside.quote > .title img.avatar {
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: var(--dfp-r-full);
+}
+
+/* The expand/collapse controls belong at the trailing edge, not wherever the
+ * name happens to end. */
+html[data-dfp] aside.quote > .title .quote-controls {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dfp-s-1);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] aside.quote blockquote {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  margin: 0;
+  padding: var(--dfp-s-3);
+}
+
+/* ── Topic title ────────────────────────────────────────────────────────── */
+
+html[data-dfp] .fancy-title,
+html[data-dfp] #topic-title h1 a {
+  font-size: var(--dfp-fs-title);
+  font-weight: var(--dfp-fw-bold);
+  line-height: var(--dfp-lh-tight);
+  letter-spacing: var(--dfp-track-title);
+  color: var(--dfp-text);
+}
+
+/* The topic map sits *inside* the OP's card, which is surface-2. Giving it
+ * surface-1 made it darker than its own container — elevation running the
+ * wrong way. Transparent with a hairline keeps it subordinate either way. */
+html[data-dfp] .topic-map {
+  background: transparent;
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  max-width: none;
+  padding-inline: var(--dfp-s-3);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .topic-map__stat,
+html[data-dfp] .topic-map .number {
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .small-action {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+}
+
+/* ── "last visit" divider ────────────────────────────────────────────────
+ *
+ * Markup is:
+ *   .small-action.topic-post-visited > .topic-post-visited-line > .…-message
+ *
+ * Three problems, all visible in the rendered page:
+ *
+ *  1. The container computed to height 0, so the rule sat on top of the posts
+ *     around it instead of between them. That is the "looks off" symptom.
+ *  2. The line took its colour from --danger (red) while the label took
+ *     --tertiary (blue) — one divider, two unrelated colours.
+ *  3. The label was positioned by letting an opaque background punch a hole in
+ *     the line, which only centres if the label happens to land mid-span. It
+ *     did not: measured 46% across, and further off on other topics.
+ *
+ * Rebuilt as a flex row with the rule drawn as two flexible pseudo-elements,
+ * so the label is exactly centred by construction at any width, and the
+ * divider occupies real height instead of overlapping its neighbours. */
+
+html[data-dfp] .small-action.topic-post-visited {
+  block-size: auto;
+  padding-block: var(--dfp-s-2);
+  margin-block: var(--dfp-s-3);
+  border: 0;
+}
+
+html[data-dfp] .topic-post-visited-line {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-3);
+  /* `flex`, not just `inline-size: 100%`.
+   *
+   * The parent `.small-action` is itself a flex row, and as a flex item this
+   * line was left at `flex: 0 1 auto` — measured 757px inside a 975px
+   * container, so the rule stopped short and the label sat left of centre with
+   * 218px of dead space to its right. That is the "off" look; the centring
+   * below was already correct, it was just centring within a short line.
+   *
+   * A percentage width did not survive here, and `flex` is the honest way to
+   * say "take the row" to a flex item regardless. */
+  flex: 1 1 auto;
+  inline-size: 100%;
+  border: 0;
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] .topic-post-visited-line::before,
+html[data-dfp] .topic-post-visited-line::after {
+  content: "";
+  flex: 1 1 auto;
+  block-size: 1px;
+  background: color-mix(in oklab, var(--dfp-accent) 38%, transparent);
+}
+
+html[data-dfp] .topic-post-visited-message {
+  background: transparent;
+  color: var(--dfp-accent);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+html[data-dfp] .topic-timeline .timeline-scrollarea {
+  border-color: var(--dfp-border);
+}
+
+/* ── "N months later" time gap ───────────────────────────────────────────
+ *
+ * The sibling of the last-visit divider above, and it had the same two faults
+ * plus one of its own. Measured markup:
+ *
+ *   div.time-gap.small-action            975px, flex
+ *     ├─ div.topic-avatar                 45px, EMPTY
+ *     └─ div.small-action-desc.timegap   712px, border-top: 1px, "3 months later"
+ *
+ *  1. `.topic-avatar` renders with no content at all — a dead 45px column that
+ *     shoves the whole divider right of every post it sits between.
+ *  2. The rule is a `border-top` on the label, so it spans 712 of 975px and
+ *     stops short, leaving the line visibly unbalanced.
+ *  3. The label is left-aligned on top of that border rather than sitting in it.
+ *
+ * Rebuilt to match the last-visit divider exactly — centred label, rule drawn
+ * as two flexible pseudo-elements — because they are the same kind of object: a
+ * break in the stream. The only deliberate difference is colour: last-visit is
+ * about *you* and earns the accent, while a time gap is ambient and takes the
+ * muted border treatment. */
+
+html[data-dfp] .time-gap.small-action {
+  align-items: center;
+  margin-block: var(--dfp-s-4);
+  padding: 0;
+}
+
+/* Discourse renders this empty here. Hiding an element it fills elsewhere would
+ * be wrong, so this is scoped to the time gap alone. */
+html[data-dfp] .time-gap.small-action .topic-avatar {
+  display: none;
+}
+
+html[data-dfp] .time-gap .small-action-desc.timegap {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-3);
+  flex: 1 1 auto;
+  /* The partial rule this replaces. */
+  border: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+html[data-dfp] .time-gap .small-action-desc.timegap::before,
+html[data-dfp] .time-gap .small-action-desc.timegap::after {
+  content: "";
+  flex: 1 1 auto;
+  block-size: 1px;
+  background: var(--dfp-border);
+}

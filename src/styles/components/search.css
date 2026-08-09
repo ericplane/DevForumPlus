@@ -1,0 +1,110 @@
+/* ── Full-page search ──────────────────────────────────────────────────────
+ *
+ * `/search` was inheriting the generic treatments — category badges, tags, the
+ * header card, inputs — but nothing had been written for the results
+ * themselves, which is the surface people arrive on from Google and the one
+ * where a wrong answer costs most.
+ *
+ * Three things were missing: results ran together as one undifferentiated
+ * column, the date was welded onto the front of the excerpt where it could not
+ * be scanned, and solved threads were marked with a grey glyph the same colour
+ * as everything around it.
+ */
+
+/* ── Results ────────────────────────────────────────────────────────────── */
+
+html[data-dfp] .search-container .fps-result {
+  padding-block: var(--dfp-s-3);
+  border-block-end: 1px solid var(--dfp-border);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .search-container .fps-result:last-child {
+  border-block-end: 0;
+}
+
+/* Mixed from the text colour: --dfp-surface-1..3 all resolve to #ffffff in the
+ * light theme, so a surface-based hover would be invisible there. */
+html[data-dfp] .search-container .fps-result:hover {
+  background: color-mix(in oklab, var(--dfp-text) 4%, transparent);
+}
+
+html[data-dfp] .search-container .fps-result .search-link {
+  font-size: var(--dfp-fs-lg);
+  font-weight: var(--dfp-fw-medium);
+  line-height: var(--dfp-lh-snug);
+}
+
+html[data-dfp] .search-container .fps-result .blurb {
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  line-height: var(--dfp-lh-body);
+}
+
+/* The date is its own element but read as the first words of the excerpt.
+ * Given weight and separation it becomes the scannable column it should be. */
+html[data-dfp] .search-container .fps-result .blurb .date {
+  color: var(--dfp-text-3);
+  font-weight: var(--dfp-fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Discourse bolds the matched terms inside the excerpt. Worth more than bold —
+ * this is the only reason the result is on the page. */
+html[data-dfp] .search-container .fps-result .blurb strong,
+html[data-dfp] .search-container .fps-result .blurb .search-highlight {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+/* ── Status glyphs ──────────────────────────────────────────────────────── */
+
+/* Solved and locked both render as `.topic-status` icons in the same muted
+ * grey, so the single most useful fact about a search result — that the thread
+ * reached an answer — was indistinguishable from the fact that it was closed.
+ * Only the solved tick is coloured; everything else stays quiet. */
+html[data-dfp] .search-container .fps-result .topic-status .d-icon-far-square-check,
+html[data-dfp] .search-container .fps-result .topic-status .d-icon-square-check {
+  color: var(--dfp-solved);
+}
+
+/* ── Age ────────────────────────────────────────────────────────────────
+ * Written by discourse/modules/search-signals.ts, which only marks results two
+ * years or older. Deliberately a chip rather than a colour on the whole row:
+ * old is not the same as wrong, and half of these results are old. */
+
+html[data-dfp] .dfp-search-age {
+  display: inline-block;
+  margin-inline: var(--dfp-s-1) var(--dfp-s-1);
+  padding-inline: var(--dfp-s-2);
+  border: 1px solid color-mix(in oklab, var(--dfp-warning) 34%, transparent);
+  border-radius: var(--dfp-r-pill, 999px);
+  background: var(--dfp-warning-soft);
+  color: var(--dfp-warning);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+/* ── Header and sort ────────────────────────────────────────────────────── */
+
+html[data-dfp] .search-container .search-header {
+  border-radius: var(--dfp-r-lg);
+  border: 1px solid var(--dfp-border);
+}
+
+html[data-dfp] .search-container .search-header h1 {
+  font-size: var(--dfp-fs-xl);
+  letter-spacing: var(--dfp-track-title);
+}
+
+/* The term echoed back in the heading carries a `<mark>`; it takes the same
+ * pair base.css defines for highlights in posts rather than the UA default,
+ * which renders black-on-blue here. */
+html[data-dfp] .search-container .search-header mark {
+  background: var(--dfp-mark-bg);
+  color: var(--dfp-mark-fg);
+  border-radius: var(--dfp-r-xs);
+  padding-inline: 3px;
+}

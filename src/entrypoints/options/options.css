@@ -1,0 +1,242 @@
+/* Options page.
+ *
+ * Standalone: this renders in an extension tab, not on the forum, so it cannot
+ * borrow the `html[data-dfp]` token layer that the content script injects. The
+ * handful of values it needs are declared here against the same ramp, and it
+ * follows the OS colour scheme rather than DFP's own theme setting — an
+ * extension page that ignores the system theme looks broken next to the browser
+ * chrome around it. */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: light-dark(#f6f7f9, #0c0e14);
+  --surface: light-dark(#ffffff, #14171c);
+  --surface-2: light-dark(#f0f2f5, #1c1f25);
+  --border: light-dark(#dfe3e8, #2b2f36);
+  --text: light-dark(#212327, #eff4fc);
+  --text-2: light-dark(#4a4f57, #b4b8c0);
+  --text-3: light-dark(#6d737c, #868a91);
+  --accent: light-dark(#0077b2, #37b3ff);
+  --danger: light-dark(#b3261e, #f4645d);
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px/1.55 system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+.opt {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.opt__head {
+  position: relative;
+  margin-block-end: 32px;
+}
+
+.opt__head h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.opt__sub {
+  margin: 0;
+  max-width: 34rem;
+  color: var(--text-2);
+}
+
+/* Confirmation without a dialog: settings save on change, so the only thing
+ * needed is proof it happened. */
+.opt__saved {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.opt__saved[data-on="1"] {
+  opacity: 1;
+  transform: none;
+}
+
+.opt__section {
+  margin-block-end: 36px;
+}
+
+.opt__section h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+
+.opt__note {
+  margin: 0 0 14px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.mods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.mod + .mod {
+  border-block-start: 1px solid var(--border);
+}
+
+.mod__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.mod__row:hover {
+  background: var(--surface-2);
+}
+
+.mod__row input {
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  inline-size: 16px;
+  block-size: 16px;
+  flex: 0 0 auto;
+}
+
+.mod__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-inline-size: 0;
+}
+
+.mod__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 550;
+}
+
+.mod__where {
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.mod__strike {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--danger) 14%, transparent);
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mod__blurb {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.opt__btn {
+  margin-block-start: 14px;
+  padding: 7px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.opt__btn:hover {
+  background: var(--surface-2);
+}
+
+.opt__btn:active {
+  transform: translateY(1px);
+}
+
+.opt__btn--danger {
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 35%, var(--border));
+}
+
+.opt__btn--danger:hover {
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+}
+
+/* Loading state. Settings come from chrome.storage, which is fast but not
+ * synchronous — a blank page for one frame reads as broken. */
+.skeleton-page {
+  block-size: 320px;
+  border-radius: var(--radius);
+  background: linear-gradient(
+    100deg,
+    var(--surface) 30%,
+    var(--surface-2) 50%,
+    var(--surface) 70%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-page {
+    animation: none;
+  }
+  .opt__saved,
+  .mod__row,
+  .opt__btn {
+    transition: none;
+  }
+}

@@ -1,0 +1,318 @@
+/* Code blocks — visual pass only.
+ *
+ * This is deliberately just presentation. The real work on code blocks
+ * (Luau-correct highlighting, deprecated-API detection, Creator Docs on hover)
+ * is a separate milestone with its own build pipeline, and dressing up the
+ * wrong grammar's output would only make the mishighlighting look intentional.
+ *
+ * What this does fix now: monospace stack, real padding, a scroll container
+ * that does not push the page sideways, and legible inline code.
+ */
+
+html[data-dfp] {
+  --dfp-mono:
+    ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code",
+    Menlo, Consolas, monospace;
+}
+
+html[data-dfp] .cooked pre,
+html[data-dfp] .d-editor-preview pre {
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  padding: var(--dfp-s-4);
+  margin-block: var(--dfp-s-4);
+  overflow-x: auto;
+  /* Wide code scrolls inside its own box; the page body never does. */
+  max-width: 100%;
+  tab-size: 4;
+}
+
+html[data-dfp] .cooked pre code,
+html[data-dfp] .d-editor-preview pre code {
+  font-family: var(--dfp-mono);
+  font-size: var(--dfp-fs-sm);
+  line-height: 1.6;
+  color: var(--dfp-text);
+  background: transparent;
+  padding: 0;
+  font-variant-ligatures: none;
+}
+
+/* Inline code sits inside running prose, so it needs to be distinguishable
+ * without breaking the line rhythm. */
+html[data-dfp] .cooked code:not(pre code) {
+  font-family: var(--dfp-mono);
+  font-size: 0.9em;
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-xs);
+  padding: 0.1em 0.35em;
+  color: var(--dfp-text);
+  white-space: nowrap;
+}
+
+/* Discourse injects its own control cluster into every <pre>:
+ *   <div class="codeblock-button-wrapper"> with .copy-cmd and .fullscreen-cmd
+ * positioned absolutely at the top right. An earlier draft put a language
+ * label there and it collided with those buttons — style theirs instead. */
+html[data-dfp] .cooked pre {
+  position: relative;
+}
+
+html[data-dfp] .codeblock-button-wrapper {
+  display: flex;
+  gap: var(--dfp-s-1);
+  padding: var(--dfp-s-2);
+}
+
+html[data-dfp] .codeblock-button-wrapper .btn {
+  background: var(--dfp-surface-3);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+  opacity: 0;
+  transition:
+    opacity var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease),
+    background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .cooked pre:hover .codeblock-button-wrapper .btn,
+html[data-dfp] .codeblock-button-wrapper .btn:focus-visible {
+  opacity: 1;
+}
+
+html[data-dfp] .codeblock-button-wrapper .btn:hover {
+  background: var(--dfp-surface-2);
+  color: var(--dfp-text);
+  border-color: var(--dfp-border-strong);
+}
+
+/* highlight.js token colours, retargeted at DFP tokens so code blocks belong
+ * to the same palette as everything else.
+ *
+ * Worth knowing what this is actually colouring: the forum's
+ * `highlighted_languages` setting lists `lua` and has no `luau` entry, and
+ * fenced blocks render as `class="lang-lua hljs language-lua"`. So every Luau
+ * snippet on this site is tokenised by the *Lua* grammar — type annotations,
+ * `::` casts, `continue`, generics and string interpolation all come out
+ * wrong. Recolouring cannot fix that; a real Luau grammar (M3) can. These
+ * rules only stop code blocks from clashing with the rest of the palette. */
+html[data-dfp] .hljs-keyword,
+html[data-dfp] .hljs-selector-tag,
+html[data-dfp] .hljs-literal {
+  color: var(--dfp-staff);
+}
+
+html[data-dfp] .hljs-string,
+html[data-dfp] .hljs-attr {
+  color: var(--dfp-success);
+}
+
+html[data-dfp] .hljs-number,
+html[data-dfp] .hljs-symbol {
+  color: var(--dfp-warning);
+}
+
+html[data-dfp] .hljs-comment,
+html[data-dfp] .hljs-quote {
+  color: var(--dfp-text-3);
+  font-style: italic;
+}
+
+html[data-dfp] .hljs-title,
+html[data-dfp] .hljs-function .hljs-title,
+html[data-dfp] .hljs-section {
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] .hljs-params {
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .hljs-built_in,
+html[data-dfp] .hljs-type {
+  color: var(--dfp-deprecated);
+}
+
+html[data-dfp] .hljs-variable,
+html[data-dfp] .hljs-name {
+  color: var(--dfp-text);
+}
+
+/* ── DFP Luau code intelligence (M3) ─────────────────────────────────────
+ * When `.dfp-luau` is present, the block was re-tokenised by our own Luau
+ * tokenizer and the highlight.js Lua markup is gone. The hljs rules above
+ * still apply to every other language on the forum. */
+
+html[data-dfp] code.dfp-luau .dfp-tok-kw {
+  color: var(--dfp-staff);
+}
+
+html[data-dfp] code.dfp-luau .dfp-tok-builtin {
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] code.dfp-luau .dfp-tok-str {
+  color: var(--dfp-success);
+}
+
+html[data-dfp] code.dfp-luau .dfp-tok-num {
+  color: var(--dfp-warning);
+}
+
+html[data-dfp] code.dfp-luau .dfp-tok-com {
+  color: var(--dfp-text-3);
+  font-style: italic;
+}
+
+html[data-dfp] code.dfp-luau .dfp-tok-op {
+  color: var(--dfp-text-2);
+}
+
+/* ── Deprecation marks ───────────────────────────────────────────────────
+ * A wavy underline, not a highlight. These sit in other people's posts —
+ * often years old and uneditable — so the mark has to be findable without
+ * claiming the post is wrong or making the code harder to read. */
+
+html[data-dfp] .dfp-dep {
+  text-decoration: underline wavy;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: help;
+  border-radius: 2px;
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .dfp-dep:hover {
+  background: color-mix(in oklab, currentColor 14%, transparent);
+}
+
+html[data-dfp] .dfp-dep--error {
+  text-decoration-color: var(--dfp-danger);
+}
+
+html[data-dfp] .dfp-dep--warn {
+  text-decoration-color: var(--dfp-deprecated);
+}
+
+html[data-dfp] .dfp-dep--info {
+  text-decoration-color: var(--dfp-text-3);
+}
+
+/* ── Creator Docs links ──────────────────────────────────────────────────
+ * Dotted rather than solid: a link on every class name would turn a snippet
+ * into a wall of blue. It should be discoverable on hover, not shouted. */
+
+html[data-dfp] .dfp-doc-link {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in oklab, var(--dfp-text-3) 55%, transparent);
+  text-underline-offset: 3px;
+}
+
+html[data-dfp] .dfp-doc-link:hover {
+  color: var(--dfp-accent);
+  text-decoration-color: var(--dfp-accent);
+}
+
+/* ── Findings summary ────────────────────────────────────────────────────
+ * A sibling immediately before the <pre>, styled to read as its cap. It is not
+ * a child of the block because Discourse's copy and fullscreen buttons act on
+ * the block, and a note inside would end up pasted into someone's editor.
+ *
+ * The pair is joined by removing the seam between them: the note loses its
+ * bottom border and the <pre> loses its top radius and top margin. */
+
+html[data-dfp] .dfp-code-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-block: var(--dfp-s-4) 0;
+  padding: 6px var(--dfp-s-4);
+  background: color-mix(in oklab, var(--dfp-deprecated) 12%, var(--dfp-surface-2));
+  border: 1px solid color-mix(in oklab, var(--dfp-deprecated) 26%, var(--dfp-border));
+  border-block-end: 0;
+  border-start-start-radius: var(--dfp-r-md);
+  border-start-end-radius: var(--dfp-r-md);
+  color: var(--dfp-deprecated);
+  font-family: var(--dfp-font, inherit);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  white-space: normal;
+}
+
+html[data-dfp] .dfp-code-note + pre {
+  margin-block-start: 0;
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+/* ── Code block chrome (M3) ──────────────────────────────────────────────
+ * These live inside Discourse's own `.codeblock-button-wrapper`, so they
+ * inherit its position and only need to match its buttons. */
+
+html[data-dfp] .dfp-code-lang {
+  align-self: center;
+  padding-inline-end: var(--dfp-s-1);
+  color: var(--dfp-text-3);
+  font-family: var(--dfp-mono);
+  font-size: var(--dfp-fs-xs);
+  letter-spacing: 0.02em;
+  /* Always readable — it labels the block rather than acting on it, so it does
+   * not hide until hover the way the buttons do. */
+  opacity: 0.75;
+  user-select: none;
+}
+
+html[data-dfp] .dfp-code-btn {
+  padding: 2px var(--dfp-s-2);
+  font-family: var(--dfp-font, inherit);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+html[data-dfp] .dfp-code-btn[aria-pressed="true"] {
+  background: var(--dfp-accent-soft);
+  border-color: color-mix(in oklab, var(--dfp-accent) 40%, transparent);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] pre.dfp-code--wrapped code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Collapse. The fade tells you there is more without needing a label, and the
+ * button below says how much. */
+html[data-dfp] pre.dfp-code--clipped {
+  max-height: 22rem;
+  overflow-y: hidden;
+  mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+}
+
+html[data-dfp] .dfp-code-expand {
+  display: block;
+  width: 100%;
+  margin-block: calc(var(--dfp-s-2) * -1) var(--dfp-s-4);
+  padding: var(--dfp-s-2);
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .dfp-code-expand:hover {
+  background: var(--dfp-surface-3);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}
