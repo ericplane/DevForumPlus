@@ -36,6 +36,13 @@ export default defineConfig({
     description:
       "A faster, cleaner, more capable devforum.roblox.com. Modern design, instant navigation, and Luau-aware code intelligence.",
 
+    /* No `version` key. WXT takes it from package.json, which makes that the
+     * single source of truth and `npm version <x>` the only way to bump it.
+     *
+     * It used to be declared here as well, and the two drifted within one
+     * release: wxt.config.ts said 1.1.0 while package.json still said 0.1.0.
+     * Two places to edit is one place to forget. */
+
     // Exactly one origin. No <all_urls>, no tabs, no cookies, no webRequest.
     host_permissions: ["https://devforum.roblox.com/*"],
 
