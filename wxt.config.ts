@@ -35,7 +35,6 @@ export default defineConfig({
     short_name: "DevForum+",
     description:
       "A faster, cleaner, more capable devforum.roblox.com. Modern design, instant navigation, and Luau-aware code intelligence.",
-    version: "1.1.0",
 
     // Exactly one origin. No <all_urls>, no tabs, no cookies, no webRequest.
     host_permissions: ["https://devforum.roblox.com/*"],
