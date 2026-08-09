@@ -67,8 +67,12 @@ jobs:
       - name: Check
         run: npm run check
 
+      # `.output/` is gitignored so CI starts clean anyway, but removing it makes
+      # the same commands reproducible locally, where a stale build from before
+      # a version bump is exactly what makes the two targets disagree.
       - name: Build and zip
         run: |
+          rm -rf .output
           npm run zip
           npx wxt zip -b firefox
 
@@ -76,15 +80,26 @@ jobs:
       # wxt.config.ts and has no connection to the git tag. Tagging v0.2.0 with
       # the config still on 0.1.0 produces zips a store will reject as a
       # duplicate upload — caught here instead of three days later.
+      # The version comes from package.json. A tag can be created against a
+      # commit that predates the bump — which is what happened on v1.1.0, where
+      # the tag pointed one commit before the version change and CI correctly
+      # built 0.1.0. Both targets are checked, because a stale .output is the
+      # other way these two ever disagree.
       - name: Verify version matches the tag
         if: github.event_name == 'release'
         run: |
-          manifest_version="$(node -p "require('./.output/chrome-mv3/manifest.json').version")"
           tag="${GITHUB_REF_NAME#v}"
-          echo "manifest: $manifest_version   tag: $tag"
-          if [ "$manifest_version" != "$tag" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match manifest version $manifest_version."
-            echo "Bump 'version' in wxt.config.ts, commit, and re-tag."
+          fail=0
+          for browser in chrome firefox; do
+            got="$(node -p "require('./.output/${browser}-mv3/manifest.json').version")"
+            echo "${browser}: ${got}   tag: ${tag}"
+            [ "$got" = "$tag" ] || fail=1
+          done
+          if [ "$fail" = "1" ]; then
+            echo "::error::Built version does not match tag $GITHUB_REF_NAME."
+            echo "The version lives in package.json. Check the tag points at the commit"
+            echo "that contains the bump — 'git rev-list -n1 $GITHUB_REF_NAME' — then:"
+            echo "  npm version $tag && git push --follow-tags"
             exit 1
           fi
 
