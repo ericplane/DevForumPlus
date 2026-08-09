@@ -12,7 +12,7 @@ keeping the features.
 
 ### Code
 
-**Luau code intelligence.** The forum highlights Luau using highlight.js's *Lua* grammar. Type
+**Luau code intelligence.** The forum highlights Luau using highlight.js's _Lua_ grammar. Type
 annotations, `::` casts, `continue`, generics, compound assignment and string interpolation all
 render wrong. DFP re-highlights with a tokenizer written for Luau.
 
@@ -80,11 +80,11 @@ Then load it:
 
 The toolbar popup reports which boot rung engaged — the first thing to check if something looks off.
 
-| Command           | What it does                                                    |
-| ----------------- | --------------------------------------------------------------- |
-| `npm run build`   | Tokens → style checks → build to `.output/chrome-mv3`           |
-| `npm run dev`     | WXT dev server with hot reload                                  |
-| `npm run check`   | Typecheck, style guardrails, unit tests                         |
+| Command           | What it does                                                     |
+| ----------------- | ---------------------------------------------------------------- |
+| `npm run build`   | Tokens → style checks → build to `.output/chrome-mv3`            |
+| `npm run dev`     | WXT dev server with hot reload                                   |
+| `npm run check`   | Typecheck, style guardrails, unit tests                          |
 | `npm run tokens`  | Regenerate colours; **fails the build** on a contrast regression |
 | `npm run harness` | Build `.output/harness.html`, the visual regression page         |
 
@@ -115,8 +115,6 @@ custom properties at DFP tokens — one assignment restyles hundreds of rules ac
 never wrote a selector for. DFP's CSS is deliberately **unlayered**: Discourse's is too, and an
 `@layer` always loses to unlayered rules regardless of specificity. `npm run check:styles` enforces
 that, quarantines `!important`, and caps it.
-
-More detail lives in [PLAN.md](PLAN.md) and in the header comment of each module.
 
 ---
 
