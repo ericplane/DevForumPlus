@@ -103,6 +103,24 @@ jobs:
             exit 1
           fi
 
+      # Stable, version-free asset names.
+      #
+      # The download URL for a release asset embeds its filename, so a versioned
+      # name means a new URL every release and a new folder on disk every time
+      # someone updates. For an unpacked install that is the expensive path:
+      # Chrome derives the extension id from the directory, so a new folder is a
+      # new extension — settings, drafts and the topic cache all reset. With a
+      # fixed name you extract over the same folder and press reload.
+      #
+      # Nothing is lost by dropping the version from the filename: the release
+      # itself carries it, and so does the manifest inside each zip.
+      - name: Name artifacts consistently
+        run: |
+          cd .output
+          mv -f *-chrome.zip DevForumPlus-Chrome.zip
+          mv -f *-firefox.zip DevForumPlus-Firefox.zip
+          mv -f *-sources.zip DevForumPlus-Sources.zip
+
       - name: List artifacts
         run: ls -lh .output/*.zip
 

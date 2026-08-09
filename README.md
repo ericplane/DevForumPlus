@@ -73,6 +73,16 @@ nvm use && npm install && npm run build
 
 Then load it:
 
+### From a release
+
+Download `DevForumPlus-Chrome.zip` or `DevForumPlus-Firefox.zip` from the
+[latest release](../../releases/latest) and extract it. The asset names never change, so
+**updating is: extract over the same folder, then press reload in the browser.** Keep the folder
+path stable — Chrome derives the extension id from it, and a new folder is a new extension, which
+resets settings, drafts and the topic cache.
+
+### From source
+
 **Chromium** — open `chrome://extensions` (or `brave://extensions`), enable **Developer mode**,
 **Load unpacked**, select `.output/chrome-mv3`.
 
