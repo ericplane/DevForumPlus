@@ -80,13 +80,32 @@ jobs:
       - name: Check
         run: npm run check
 
-      # The steps above all pass happily on a tree that does not bundle, so the
-      # build is its own gate: nothing unbuildable should be mergeable.
+      # Cached on the generator, so a re-run does not re-download the 4.6 MB
+      # tarball. Same key as release.yml.
+      - name: Cache Creator Docs source
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache
+          key: creator-docs-${{ hashFiles('scripts/build-docs-index.ts') }}
+
+      # `public/docs/` is gitignored, so a fresh checkout has none of it.
       #
-      # `public/docs/` is deliberately not generated first. The Creator Docs
-      # checkout is ~9.5 MB, the build succeeds without it (the extension just
-      # ships with no hover documentation), and release.yml already generates it
-      # where its absence would actually reach a user. Paying for it on every
-      # push would catch nothing this step does not.
+      # This step used to be skipped here, on the reasoning that "the build
+      # succeeds without it — the extension just ships with no hover
+      # documentation". That reasoning was the bug. It shipped exactly that way
+      # for a long time: every Creator Docs hover card rendered nothing, in code
+      # blocks and in prose alike, while the build reported success. The build
+      # now refuses without the shards (scripts/check-assets.ts), and CI has to
+      # build what actually ships or it is gating a different artifact.
+      #
+      # Deliberately NOT paired with release.yml's "generated sources are
+      # current" check: that one fails when Roblox moves upstream, which is
+      # correct for a release and pure noise on every push.
+      - name: Generate bundled data
+        run: npm run docs-index
+
+      # The steps above all pass happily on a tree that does not bundle, so the
+      # build is its own gate: nothing unbuildable should be mergeable. Builds
+      # both targets — see package.json; `wxt build` alone is Chrome only.
       - name: Build
         run: npm run build
