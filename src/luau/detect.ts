@@ -24,22 +24,59 @@ export interface Finding {
   entry: ApiEntry;
 }
 
-/** Previous significant token, skipping trivia. */
-function prevSignificant(tokens: Token[], i: number): Token | null {
-  for (let j = i - 1; j >= 0; j--) {
-    const t = tokens[j]!;
-    if (t.kind !== "whitespace" && t.kind !== "comment") return t;
-  }
-  return null;
+/**
+ * Kinds that can spell an API name.
+ *
+ * `legacy` is here because it was carved out of `builtin`, and this predicate is
+ * the reason it could be: the scanner below is keyed off token kind in a dozen
+ * places, so a new kind that any one of them forgot would have silently stopped
+ * every finding on `wait`, `spawn` and `tick` — the most common findings there
+ * are — with nothing failing loudly. Ask this, never `kind === "ident"`.
+ */
+function isName(t: Token): boolean {
+  return t.kind === "ident" || t.kind === "builtin" || t.kind === "legacy";
 }
 
-function nextSignificant(tokens: Token[], i: number): Token | null {
-  for (let j = i + 1; j < tokens.length; j++) {
-    const t = tokens[j]!;
-    if (t.kind !== "whitespace" && t.kind !== "comment") return t;
-  }
-  return null;
+/**
+ * Kinds that can spell a name the *author* chose: a local, a parameter, a method.
+ *
+ * Deliberately excludes `builtin`, which is how `local print = …` has always
+ * been left alone here. `legacy` belongs: `loadstring` and `ypcall` were plain
+ * idents before they got their own kind, and someone's own `function t:wait()`
+ * is still their own.
+ */
+function isPlainName(t: Token): boolean {
+  return t.kind === "ident" || t.kind === "legacy";
 }
+
+/** Index of the previous significant token, or -1. */
+function prevSigIdx(tokens: Token[], i: number): number {
+  for (let j = i - 1; j >= 0; j--) {
+    const k = tokens[j]!.kind;
+    if (k !== "whitespace" && k !== "comment") return j;
+  }
+  return -1;
+}
+
+/** Index of the first significant token at or after `from`, or -1. */
+function nextSigIdx(tokens: Token[], from: number): number {
+  for (let j = from; j < tokens.length; j++) {
+    const k = tokens[j]!.kind;
+    if (k !== "whitespace" && k !== "comment") return j;
+  }
+  return -1;
+}
+
+/**
+ * These return indices rather than tokens on purpose.
+ *
+ * The token-returning versions forced every caller that needed to keep walking
+ * to find its way back with `tokens.indexOf(…)`, and there were eighteen of
+ * those between here and the renderer: a 3,263-token block spent 7.44M
+ * comparisons inside them, 70% of it in `isDefinitionSite` alone. Indices took a
+ * 1,247-line block from 30.4ms to 6.7ms. Nothing below may reintroduce an
+ * `indexOf` on this path.
+ */
 
 /** Strip one layer of quotes from a string token. */
 function stringValue(token: Token): string {
@@ -112,35 +149,28 @@ const STOPS = new Set(["local", "if", "then", "end", "return", "while", "for", "
 export function inferLocalTypes(tokens: Token[]): Map<string, string> {
   const types = new Map<string, string>();
 
-  const sig = (from: number): { tok: Token; i: number } | null => {
-    for (let j = from; j < tokens.length; j++) {
-      const t = tokens[j]!;
-      if (t.kind !== "whitespace" && t.kind !== "comment") return { tok: t, i: j };
-    }
-    return null;
-  };
-
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]!;
     if (t.kind !== "keyword" || t.value !== "local") continue;
 
-    const name = sig(i + 1);
-    if (!name || name.tok.kind !== "ident") continue;
+    const nameIdx = nextSigIdx(tokens, i + 1);
+    if (nameIdx < 0 || !isPlainName(tokens[nameIdx]!)) continue;
+    const name = tokens[nameIdx]!;
 
     /* `local hum: Humanoid = …`. An annotation outranks anything inferred from
      * the right-hand side, because the author stated it outright. Told apart
      * from `local x = a:b()` by the colon sitting directly after the name. */
-    const colon = sig(name.i + 1);
-    if (colon && colon.tok.value === ":") {
-      const ann = sig(colon.i + 1);
-      if (ann && (ann.tok.kind === "ident" || ann.tok.kind === "builtin")) {
-        types.set(name.tok.value, ann.tok.value);
+    const colonIdx = nextSigIdx(tokens, nameIdx + 1);
+    if (colonIdx >= 0 && tokens[colonIdx]!.value === ":") {
+      const annIdx = nextSigIdx(tokens, colonIdx + 1);
+      if (annIdx >= 0 && isName(tokens[annIdx]!)) {
+        types.set(name.value, tokens[annIdx]!.value);
         continue;
       }
     }
 
-    const eq = sig(name.i + 1);
-    if (!eq || eq.tok.value !== "=") continue;
+    const eqIdx = nextSigIdx(tokens, nameIdx + 1);
+    if (eqIdx < 0 || tokens[eqIdx]!.value !== "=") continue;
 
     /* Walk the right-hand side for `<.|:> <fn> ( "<string>"`, rather than only
      * looking immediately after `=`. That is what lets a receiver reached
@@ -149,40 +179,40 @@ export function inferLocalTypes(tokens: Token[]): Map<string, string> {
      *
      * Bounded by the next statement keyword so this never runs away down the
      * file, and by a token budget for pathological one-liners. */
-    let j = eq.i + 1;
+    let j = eqIdx + 1;
     let budget = 24;
     while (budget-- > 0) {
-      const step = sig(j);
-      if (!step) break;
-      if (step.tok.kind === "keyword" && STOPS.has(step.tok.value)) break;
+      const stepIdx = nextSigIdx(tokens, j);
+      if (stepIdx < 0) break;
+      const step = tokens[stepIdx]!;
+      if (step.kind === "keyword" && STOPS.has(step.value)) break;
 
-      const sep = step.tok.value;
-      if (sep !== "." && sep !== ":") {
-        j = step.i + 1;
+      if (step.value !== "." && step.value !== ":") {
+        j = stepIdx + 1;
         continue;
       }
 
-      const fn = sig(step.i + 1);
-      if (!fn) break;
-      const paren = sig(fn.i + 1);
-      const arg = paren && paren.tok.value === "(" ? sig(paren.i + 1) : null;
-      if (!arg || arg.tok.kind !== "string") {
-        j = fn.i + 1;
+      const fnIdx = nextSigIdx(tokens, stepIdx + 1);
+      if (fnIdx < 0) break;
+      const parenIdx = nextSigIdx(tokens, fnIdx + 1);
+      const argIdx = parenIdx >= 0 && tokens[parenIdx]!.value === "(" ? nextSigIdx(tokens, parenIdx + 1) : -1;
+      if (argIdx < 0 || tokens[argIdx]!.kind !== "string") {
+        j = fnIdx + 1;
         continue;
       }
 
-      const recvName = recvValue(tokens, step.i);
-      const fnName = fn.tok.value;
+      const recvName = recvValue(tokens, stepIdx);
+      const fnName = tokens[fnIdx]!.value;
 
       const isNew = recvName === "Instance" && fnName === "new";
       const isService = fnName === "GetService" && GLOBAL_TYPES[recvName ?? ""] === "DataModel";
 
       if (isNew || isService || CLASS_TYPED_CALLS.has(fnName)) {
-        types.set(name.tok.value, stringValue(arg.tok));
+        types.set(name.value, stringValue(tokens[argIdx]!));
         break;
       }
 
-      j = fn.i + 1;
+      j = fnIdx + 1;
     }
   }
 
@@ -199,17 +229,17 @@ export function inferLocalTypes(tokens: Token[]): Map<string, string> {
     for (let i = 0; i < tokens.length; i++) {
       const t = tokens[i]!;
       if (t.kind !== "keyword" || t.value !== "local") continue;
-      const name = nextSignificantFrom(tokens, i + 1);
-      if (!name || name.tok.kind !== "ident" || types.has(name.tok.value)) continue;
-      const eq = nextSignificantFrom(tokens, name.i + 1);
-      if (!eq || eq.tok.value !== "=") continue;
-      const head = nextSignificantFrom(tokens, eq.i + 1);
-      if (!head) continue;
+      const nameIdx = nextSigIdx(tokens, i + 1);
+      if (nameIdx < 0 || !isPlainName(tokens[nameIdx]!) || types.has(tokens[nameIdx]!.value)) continue;
+      const eqIdx = nextSigIdx(tokens, nameIdx + 1);
+      if (eqIdx < 0 || tokens[eqIdx]!.value !== "=") continue;
+      const headIdx = nextSigIdx(tokens, eqIdx + 1);
+      if (headIdx < 0) continue;
 
-      const chain = chainType(tokens, head.i, types);
+      const chain = chainType(tokens, headIdx, types);
       // Only when the chain actually stepped through a member — a bare
       // `local a = b` alias is not what this is for.
-      if (chain && chain.end > head.i) types.set(name.tok.value, chain.type);
+      if (chain && chain.end > headIdx) types.set(tokens[nameIdx]!.value, chain.type);
     }
 
     bindEventParams(tokens, types);
@@ -237,7 +267,7 @@ function chainType(
   types: Map<string, string>,
 ): { type: string; end: number } | null {
   const head = tokens[i];
-  if (!head || (head.kind !== "ident" && head.kind !== "builtin")) return null;
+  if (!head || !isName(head)) return null;
 
   let current = types.get(head.value) ?? GLOBAL_TYPES[head.value];
   if (!current) return null;
@@ -245,19 +275,44 @@ function chainType(
   let end = i;
   let j = i + 1;
   for (;;) {
-    const sep = nextSignificantFrom(tokens, j);
-    if (!sep || (sep.tok.value !== "." && sep.tok.value !== ":")) break;
-    const member = nextSignificantFrom(tokens, sep.i + 1);
-    if (!member || (member.tok.kind !== "ident" && member.tok.kind !== "builtin")) break;
+    const sepIdx = nextSigIdx(tokens, j);
+    if (sepIdx < 0) break;
+    const sep = tokens[sepIdx]!;
+    if (sep.value !== "." && sep.value !== ":") break;
+    const memberIdx = nextSigIdx(tokens, sepIdx + 1);
+    if (memberIdx < 0 || !isName(tokens[memberIdx]!)) break;
 
-    const next = memberType(current, member.tok.value);
+    const next = memberType(current, tokens[memberIdx]!.value);
     if (!next) break;
     current = next;
-    end = member.i;
-    j = member.i + 1;
+    end = memberIdx;
+    j = memberIdx + 1;
   }
 
   return { type: current, end };
+}
+
+/**
+ * The index of the bracket matching the closer at `closeIdx`, or -1.
+ *
+ * String tokens are skipped so a `")"` inside a literal cannot unbalance the
+ * count.
+ */
+function matchingOpen(tokens: Token[], closeIdx: number): number {
+  const close = tokens[closeIdx]?.value;
+  if (close !== ")" && close !== "]" && close !== "}") return -1;
+  const open = close === ")" ? "(" : close === "]" ? "[" : "{";
+  let depth = 0;
+  for (let j = closeIdx; j >= 0; j--) {
+    const t = tokens[j]!;
+    if (t.kind === "string" || t.kind === "comment") continue;
+    if (t.value === close) depth++;
+    else if (t.value === open) {
+      depth--;
+      if (depth === 0) return j;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -278,51 +333,33 @@ export function exprTypeBefore(
   sepIdx: number,
   types: Map<string, string>,
 ): string | undefined {
-  let j = sepIdx - 1;
-  while (j >= 0 && (tokens[j]!.kind === "whitespace" || tokens[j]!.kind === "comment")) j--;
-  const prev = tokens[j];
-  if (!prev) return undefined;
+  const prevIdx = prevSigIdx(tokens, sepIdx);
+  if (prevIdx < 0) return undefined;
+  const prev = tokens[prevIdx]!;
 
-  if (prev.kind === "ident" || prev.kind === "builtin") {
+  if (isName(prev)) {
     return types.get(prev.value) ?? GLOBAL_TYPES[prev.value];
   }
 
   // A call expression: walk back over the balanced parens to its callee.
   if (prev.value !== ")") return undefined;
-  let depth = 0;
-  let k = j;
-  for (; k >= 0; k--) {
-    const v = tokens[k]!.value;
-    if (tokens[k]!.kind === "string") continue;
-    if (v === ")") depth++;
-    else if (v === "(") {
-      depth--;
-      if (depth === 0) break;
-    }
-  }
-  if (k < 0) return undefined;
+  const openIdx = matchingOpen(tokens, prevIdx);
+  if (openIdx < 0) return undefined;
 
-  const arg = nextSignificantFrom(tokens, k + 1);
-  const fn = prevSignificant(tokens, k);
-  if (!arg || !fn || arg.tok.kind !== "string") return undefined;
+  const argIdx = nextSigIdx(tokens, openIdx + 1);
+  const fnIdx = prevSigIdx(tokens, openIdx);
+  if (argIdx < 0 || fnIdx < 0 || tokens[argIdx]!.kind !== "string") return undefined;
+  const fn = tokens[fnIdx]!;
 
-  const sep = prevSignificant(tokens, tokens.indexOf(fn));
-  const recv = sep ? prevSignificant(tokens, tokens.indexOf(sep)) : null;
+  const sepBefore = prevSigIdx(tokens, fnIdx);
+  const recvIdx = sepBefore >= 0 ? prevSigIdx(tokens, sepBefore) : -1;
+  const recv = recvIdx >= 0 ? tokens[recvIdx]! : null;
   const recvType = recv ? (types.get(recv.value) ?? GLOBAL_TYPES[recv.value]) : undefined;
 
   const isService = fn.value === "GetService" && recvType === "DataModel";
   const isNew = fn.value === "new" && recv?.value === "Instance";
-  if (isService || isNew || CLASS_TYPED_CALLS.has(fn.value)) return stringValue(arg.tok);
+  if (isService || isNew || CLASS_TYPED_CALLS.has(fn.value)) return stringValue(tokens[argIdx]!);
   return undefined;
-}
-
-/** First significant token at or after `from`. */
-function nextSignificantFrom(tokens: Token[], from: number): { tok: Token; i: number } | null {
-  for (let j = from; j < tokens.length; j++) {
-    const t = tokens[j]!;
-    if (t.kind !== "whitespace" && t.kind !== "comment") return { tok: t, i: j };
-  }
-  return null;
 }
 
 /**
@@ -344,83 +381,279 @@ function bindEventParams(tokens: Token[], types: Map<string, string>): void {
     if (t.kind !== "ident" || !CONNECTORS.has(t.value)) continue;
 
     // `<chain>.Event : Connect ( function ( p1, p2 )`
-    const colon = prevSignificant(tokens, i);
-    if (!colon || (colon.value !== ":" && colon.value !== ".")) continue;
-    const evt = prevSignificant(tokens, tokens.indexOf(colon));
-    if (!evt || (evt.kind !== "ident" && evt.kind !== "builtin")) continue;
+    const colonIdx = prevSigIdx(tokens, i);
+    if (colonIdx < 0) continue;
+    const colon = tokens[colonIdx]!;
+    if (colon.value !== ":" && colon.value !== ".") continue;
+    const evtIdx = prevSigIdx(tokens, colonIdx);
+    if (evtIdx < 0 || !isName(tokens[evtIdx]!)) continue;
+    const evt = tokens[evtIdx]!;
 
     // The receiver is whatever chain sits before the event name.
-    const evtPos = tokens.indexOf(evt);
-    const sep2 = prevSignificant(tokens, evtPos);
-    if (!sep2 || (sep2.value !== "." && sep2.value !== ":")) continue;
-    const owner = exprTypeBefore(tokens, tokens.indexOf(sep2), types);
+    const sep2 = prevSigIdx(tokens, evtIdx);
+    if (sep2 < 0 || (tokens[sep2]!.value !== "." && tokens[sep2]!.value !== ":")) continue;
+    const owner = exprTypeBefore(tokens, sep2, types);
     if (!owner) continue;
 
     const paramTypes = eventParamTypes(owner, evt.value);
     if (!paramTypes) continue;
 
     // `Connect ( function ( a , b )`
-    const open = nextSignificantFrom(tokens, i + 1);
-    if (!open || open.tok.value !== "(") continue;
-    const fn = nextSignificantFrom(tokens, open.i + 1);
-    if (!fn || fn.tok.value !== "function") continue;
-    const argsOpen = nextSignificantFrom(tokens, fn.i + 1);
-    if (!argsOpen || argsOpen.tok.value !== "(") continue;
+    const openIdx = nextSigIdx(tokens, i + 1);
+    if (openIdx < 0 || tokens[openIdx]!.value !== "(") continue;
+    const fnIdx = nextSigIdx(tokens, openIdx + 1);
+    if (fnIdx < 0 || tokens[fnIdx]!.value !== "function") continue;
+    const argsOpen = nextSigIdx(tokens, fnIdx + 1);
+    if (argsOpen < 0 || tokens[argsOpen]!.value !== "(") continue;
 
-    let k = argsOpen.i + 1;
+    let k = argsOpen + 1;
     let slot = 0;
     for (;;) {
-      const p = nextSignificantFrom(tokens, k);
-      if (!p || p.tok.value === ")") break;
-      if (p.tok.kind === "ident") {
+      const pIdx = nextSigIdx(tokens, k);
+      if (pIdx < 0 || tokens[pIdx]!.value === ")") break;
+      if (isPlainName(tokens[pIdx]!)) {
         const type = paramTypes[slot];
         // Only bind names whose declared type is something that can own members.
-        if (type && !types.has(p.tok.value)) types.set(p.tok.value, type);
+        if (type && !types.has(tokens[pIdx]!.value)) types.set(tokens[pIdx]!.value, type);
         slot++;
       }
-      const comma = nextSignificantFrom(tokens, p.i + 1);
-      if (!comma || comma.tok.value !== ",") break;
-      k = comma.i + 1;
+      const commaIdx = nextSigIdx(tokens, pIdx + 1);
+      if (commaIdx < 0 || tokens[commaIdx]!.value !== ",") break;
+      k = commaIdx + 1;
     }
   }
 }
 
 /** The identifier immediately before the `.`/`:` at `sepIndex`, if any. */
 function recvValue(tokens: Token[], sepIndex: number): string | undefined {
-  for (let j = sepIndex - 1; j >= 0; j--) {
+  const j = prevSigIdx(tokens, sepIndex);
+  if (j < 0) return undefined;
+  return isName(tokens[j]!) ? tokens[j]!.value : undefined;
+}
+
+/** Keywords that cannot appear inside a parameter list or a table type. */
+const LIST_EDGE = new Set([
+  "end", "then", "do", "return", "if", "elseif", "else", "while", "repeat",
+  "until", "local", "for", "in",
+]);
+
+/**
+ * The innermost bracket left open before `i`, or -1.
+ *
+ * Bounded: a runaway backward scan on a 3,000-token block is the cost this whole
+ * file was just rewritten to avoid, and "no enclosing list" is the answer that
+ * fails safe — it means an identifier stays a value.
+ */
+function enclosingOpener(tokens: Token[], i: number): number {
+  let depth = 0;
+  let budget = 200;
+  for (let j = i - 1; j >= 0 && budget-- > 0; j--) {
+    const t = tokens[j]!;
+    if (t.kind === "whitespace" || t.kind === "comment" || t.kind === "string") continue;
+    const v = t.value;
+    if (v === ")" || v === "]" || v === "}") depth++;
+    else if (v === "(" || v === "[" || v === "{") {
+      if (depth === 0) return j;
+      depth--;
+    } else if (t.kind === "keyword" && LIST_EDGE.has(v)) return -1;
+  }
+  return -1;
+}
+
+/**
+ * The `<` opening the generic list that contains `i`, or -1.
+ *
+ * `<` is also less-than, so this only steps over tokens that can appear inside a
+ * type list and gives up the moment it sees anything else. `f(a, b)` bails at
+ * the `(` after two steps, which is the point: a wrong answer here paints an
+ * ordinary expression as a type.
+ */
+function openGenericBefore(tokens: Token[], i: number): number {
+  let depth = 0;
+  let seen = 0;
+  for (let j = i - 1; j >= 0 && seen < 40; j--) {
     const t = tokens[j]!;
     if (t.kind === "whitespace" || t.kind === "comment") continue;
-    return t.kind === "ident" || t.kind === "builtin" ? t.value : undefined;
+    seen++;
+    const v = t.value;
+    if (v === ">") {
+      depth++;
+      continue;
+    }
+    if (v === "<") {
+      if (depth === 0) return j;
+      depth--;
+      continue;
+    }
+    if (isName(t)) continue;
+    if (v === "," || v === "." || v === "?" || v === "|" || v === "&" || v === "{" || v === "}") continue;
+    return -1;
   }
-  return undefined;
+  return -1;
+}
+
+/** Does the `(` at `k` open a function's parameters rather than a call's arguments? */
+function opensParamList(tokens: Token[], k: number): boolean {
+  if (tokens[k]?.value !== "(") return false;
+  const p = prevSigIdx(tokens, k);
+  if (p < 0) return false;
+  const t = tokens[p]!;
+  // `function(x: T)` — anonymous.
+  if (t.kind === "keyword" && t.value === "function") return true;
+  // `function f(x: T)`, `function M:update(x: T)`.
+  return isName(t) && isFunctionNameSite(tokens, p);
+}
+
+/** Does the `<` at `k` open a generic list — `type Map<K, V>`, `Array<string>`? */
+function opensGeneric(tokens: Token[], k: number, depth: number): boolean {
+  const nameIdx = prevSigIdx(tokens, k);
+  if (nameIdx < 0 || !isName(tokens[nameIdx]!)) return false;
+  const declIdx = prevSigIdx(tokens, nameIdx);
+  if (declIdx >= 0) {
+    const decl = tokens[declIdx]!;
+    if (decl.kind === "keyword" && decl.value === "type") return true;
+  }
+  return isTypePositionAt(tokens, nameIdx, declIdx, depth + 1);
+}
+
+/**
+ * Is the token at `k` the start of the right-hand side of `type X = …`?
+ *
+ * Everything right of that `=` is a type, however it is spelled — a table, a
+ * function type, a union, a bare name.
+ */
+function afterTypeAlias(tokens: Token[], k: number): boolean {
+  const eq = prevSigIdx(tokens, k);
+  if (eq < 0 || tokens[eq]!.value !== "=" || tokens[eq]!.kind !== "operator") return false;
+  let n = prevSigIdx(tokens, eq);
+  // `type Map<K, V> = …` — step back over the generic list to reach the name.
+  if (n >= 0 && tokens[n]!.value === ">") {
+    const open = openGenericBefore(tokens, n);
+    n = open >= 0 ? prevSigIdx(tokens, open) : -1;
+  }
+  if (n < 0 || !isName(tokens[n]!)) return false;
+  const kw = prevSigIdx(tokens, n);
+  return kw >= 0 && tokens[kw]!.kind === "keyword" && tokens[kw]!.value === "type";
+}
+
+/**
+ * Does the `{` at `k` open a table *type* rather than a table constructor?
+ *
+ * `{ x: number }` and `{ f(), obj:Method() }` are told apart by what stands in
+ * front of the brace, never by what is inside it.
+ */
+function opensTypeTable(tokens: Token[], k: number, depth: number): boolean {
+  if (tokens[k]?.value !== "{") return false;
+  return isTypePositionAt(tokens, k, prevSigIdx(tokens, k), depth + 1);
+}
+
+/**
+ * Is the `:` at `colonIdx` an annotation rather than a method call?
+ *
+ * This is the one genuinely ambiguous character in Luau's surface syntax, and
+ * getting it wrong is expensive in both directions: `obj:GetName()` read as an
+ * annotation loses the method colour and the docs link, and `x: number` read as
+ * a call paints the type in the gold reserved for `:Connect`.
+ *
+ * The answer is never the colon itself, always the *declarator* — the token in
+ * front of whatever the colon is attached to. `local x`, a parameter list's `(`
+ * or `,`, and a table type's `{` or `;` all declare; the same `(` and `,` inside
+ * a *call* do not, which is why each one is checked against what actually opened
+ * the list rather than accepted on sight.
+ */
+export function isAnnotationColon(tokens: Token[], colonIdx: number, depth = 0): boolean {
+  if (tokens[colonIdx]?.value !== ":") return false;
+  if (depth > 4) return false;
+  const p = prevSigIdx(tokens, colonIdx);
+  if (p < 0) return false;
+  const prev = tokens[p]!;
+
+  /* `function f(a: number): boolean` — a return type, where there is no name in
+   * front of the colon at all. The `)` has to be the one closing a parameter
+   * list: `game:GetService("X"):FindFirstChild(…)` puts a `)` here too, and that
+   * is a method call on a call result. */
+  if (prev.value === ")") {
+    const open = matchingOpen(tokens, p);
+    return open >= 0 && opensParamList(tokens, open);
+  }
+
+  if (!isName(prev)) return false;
+  const d = prevSigIdx(tokens, p);
+  if (d < 0) return false;
+  const decl = tokens[d]!;
+
+  if (decl.kind === "keyword" && decl.value === "local") return true;
+  if (decl.value === "(") return opensTypeParens(tokens, d, depth);
+  if (decl.value === "{") return opensTypeTable(tokens, d, depth);
+  if (decl.value === "," || decl.value === ";") {
+    const open = enclosingOpener(tokens, d);
+    if (open < 0) return false;
+    const o = tokens[open]!.value;
+    if (o === "(") return opensTypeParens(tokens, open, depth);
+    if (o === "{") return opensTypeTable(tokens, open, depth);
+  }
+  return false;
+}
+
+/**
+ * A `(` whose contents can carry annotations: a real parameter list, or the
+ * parameter list of a function *type* — `type Handler = (msg: string) -> ()`.
+ */
+function opensTypeParens(tokens: Token[], k: number, depth: number): boolean {
+  return (
+    opensParamList(tokens, k) ||
+    isTypePositionAt(tokens, k, prevSigIdx(tokens, k), depth + 1)
+  );
 }
 
 /**
  * Is the identifier at `i` naming a type rather than a value?
  *
- * Two unambiguous forms, and nothing else:
+ * Every annotation in one signature has to agree, because the failure was not
+ * "one token is the wrong colour". On
  *
- *     local part :: BodyVelocity      -- a cast
- *     local part: BodyVelocity = …    -- an annotation
+ *     local function f(a: number, b: string): boolean
  *
- * The annotation case has to be told apart from a method call, which also puts
- * an identifier after `:`. The difference is what precedes the receiver:
- * `local x: T` has a declaration keyword behind it, `obj:method()` does not.
+ * `number` came out unstyled, `string` in builtin blue and `boolean` in the gold
+ * reserved for `:Connect` — three annotations reading as three different kinds
+ * of thing — and `type Point = { x: number, y: number }` gave two identical
+ * fields two different colours, because the comma arm happened to rescue every
+ * field but the first.
  */
-export function isTypePosition(tokens: Token[], i: number, prev: Token): boolean {
-  if (prev.kind === "operator" && prev.value === "::") return true;
-  if (prev.value !== ":") return false;
+export function isTypePosition(tokens: Token[], i: number, prevIdx: number): boolean {
+  return isTypePositionAt(tokens, i, prevIdx, 0);
+}
 
-  const name = prevSignificant(tokens, tokens.indexOf(prev));
-  if (!name || name.kind !== "ident") return false;
-  const decl = prevSignificant(tokens, tokens.indexOf(name));
-  if (!decl) return false;
-  // `local x: T`, and the parameter forms `function f(x: T)` / `(a, x: T)`.
-  return (
-    (decl.kind === "keyword" && decl.value === "local") ||
-    decl.value === "(" ||
-    decl.value === ","
-  );
+function isTypePositionAt(tokens: Token[], i: number, prevIdx: number, depth: number): boolean {
+  if (prevIdx < 0 || depth > 4) return false;
+  const prev = tokens[prevIdx]!;
+
+  // `x :: T` and `(…) -> T` — unambiguous.
+  if (prev.kind === "operator" && (prev.value === "::" || prev.value === "->")) return true;
+
+  // `type Point = …` — the name being declared. The tokenizer only calls `type`
+  // a keyword where it declares, so `type(v)` never reaches this.
+  if (prev.kind === "keyword" && prev.value === "type") return true;
+
+  // `T | U`, `T & U` — an arm is a type when the arm before it is one. (Neither
+  // character is a binary operator in Luau expressions, so nothing else reaches
+  // here.)
+  if (prev.kind === "operator" && (prev.value === "|" || prev.value === "&")) {
+    const arm = prevSigIdx(tokens, prevIdx);
+    if (arm < 0 || !isName(tokens[arm]!)) return false;
+    return isTypePositionAt(tokens, arm, prevSigIdx(tokens, arm), depth + 1);
+  }
+
+  // `Array<string>`, `type Map<K, V>` — inside a generic argument list.
+  if (prev.value === "<" || prev.value === ",") {
+    const open = prev.value === "<" ? prevIdx : openGenericBefore(tokens, i);
+    if (open >= 0 && opensGeneric(tokens, open, depth)) return true;
+  }
+
+  // `type Handler = (msg: string) -> ()` — the whole right-hand side is a type.
+  if (prev.value === "=" && afterTypeAlias(tokens, i)) return true;
+
+  return prev.value === ":" && isAnnotationColon(tokens, prevIdx, depth);
 }
 
 /**
@@ -431,20 +664,135 @@ export function isTypePosition(tokens: Token[], i: number, prev: Token): boolean
  * own API is wrong. Walks back through any dotted path — `function a.b.c:m()` —
  * to see whether the chain starts at `function`.
  */
-function isDefinitionSite(tokens: Token[], i: number): boolean {
-  let cursor: Token | null = tokens[i]!;
+export function isDefinitionSite(tokens: Token[], i: number): boolean {
+  let cursor = i;
   // Alternate <ident> <. or :> going left, up to a few segments.
-  for (let hops = 0; cursor && hops < 8; hops++) {
-    const sep: Token | null = prevSignificant(tokens, tokens.indexOf(cursor));
-    if (!sep || (sep.value !== "." && sep.value !== ":")) return false;
-    const owner: Token | null = prevSignificant(tokens, tokens.indexOf(sep));
-    if (!owner) return false;
-    const before: Token | null = prevSignificant(tokens, tokens.indexOf(owner));
-    if (before?.kind === "keyword" && before.value === "function") return true;
-    if (!before || (before.value !== "." && before.value !== ":")) return false;
+  for (let hops = 0; cursor >= 0 && hops < 8; hops++) {
+    const sep = prevSigIdx(tokens, cursor);
+    if (sep < 0) return false;
+    const sv = tokens[sep]!.value;
+    if (sv !== "." && sv !== ":") return false;
+    const owner = prevSigIdx(tokens, sep);
+    if (owner < 0) return false;
+    const beforeIdx = prevSigIdx(tokens, owner);
+    if (beforeIdx < 0) return false;
+    const before = tokens[beforeIdx]!;
+    if (before.kind === "keyword" && before.value === "function") return true;
+    if (before.value !== "." && before.value !== ":") return false;
     cursor = owner;
   }
   return false;
+}
+
+/**
+ * Is the token at `i` the *name* in a function declaration, in any of its forms?
+ *
+ * `local function step()`, `function foo()`, `function M.init()` and
+ * `function M:update()` produced no class, no class, a field colour and a method
+ * colour — four spellings of one thing, wearing three different colours, and a
+ * definition byte-identical to every one of its call sites.
+ *
+ * It also decides where a docs link must *not* go. On `local Sound = {}` /
+ * `function Sound:Play()`, the member resolver produced `Sound.Play`, which the
+ * isolated world confirms against the real member index and turns into a live
+ * link to the engine's `Sound.Play` — someone else's method, on someone else's
+ * class. 53 of the 647 documented class names are ordinary module names.
+ */
+export function isFunctionNameSite(tokens: Token[], i: number): boolean {
+  const t = tokens[i];
+  if (!t || !isName(t)) return false;
+  /* The declared name is the last hop of the chain: in `function M.init()` the
+   * `M` is an ordinary table reference and keeps the colour it wears at every
+   * other mention of it. Luau always parenthesises a declaration, so the `(` —
+   * or a generic list — is what ends the chain. */
+  const nxt = nextSigIdx(tokens, i + 1);
+  if (nxt < 0) return false;
+  const nv = tokens[nxt]!.value;
+  if (nv !== "(" && nv !== "<") return false;
+  const p = prevSigIdx(tokens, i);
+  if (p >= 0 && tokens[p]!.kind === "keyword" && tokens[p]!.value === "function") return true;
+  return isDefinitionSite(tokens, i);
+}
+
+/**
+ * Every name the snippet introduces for itself: locals, parameters, loop
+ * variables and the names of the functions it declares.
+ *
+ * A name is not a class just because it is spelled like one. `local Sound = {}`,
+ * `local Model = …`, `for _, Tool in pairs(…)` — Player, Sound, Camera, Model,
+ * Tool and Frame are all real Roblox classes *and* the names people give their
+ * own modules, and linking those to create.roblox.com is the "lying affordance"
+ * the renderer's own contract forbids. Where the class was actually inferred the
+ * caller uses the inference; this set is only ever a veto on spelling.
+ */
+export function declaredNames(tokens: Token[]): Set<string> {
+  const names = new Set<string>();
+
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (t.kind !== "keyword") continue;
+
+    if (t.value === "local" || t.value === "for") {
+      let j = nextSigIdx(tokens, i + 1);
+      // `local function f()` declares `f` too; the parameters are picked up by
+      // the `function` arm below on the next iteration.
+      if (j >= 0 && tokens[j]!.kind === "keyword" && tokens[j]!.value === "function") {
+        j = nextSigIdx(tokens, j + 1);
+      }
+      // `local a, b, c` / `for k, v in …`. Stops at `:`, `=`, `in` or anything
+      // else, so an annotation's type name is never collected as a declaration.
+      for (; j >= 0; ) {
+        if (!isName(tokens[j]!)) break;
+        names.add(tokens[j]!.value);
+        const c = nextSigIdx(tokens, j + 1);
+        if (c < 0 || tokens[c]!.value !== ",") break;
+        j = nextSigIdx(tokens, c + 1);
+      }
+      continue;
+    }
+
+    // `type Tool = { … }` — a name the author defined, whatever the engine also
+    // calls one of its classes.
+    if (t.value === "type") {
+      const n = nextSigIdx(tokens, i + 1);
+      if (n >= 0 && isName(tokens[n]!)) names.add(tokens[n]!.value);
+      continue;
+    }
+
+    if (t.value !== "function") continue;
+
+    // Skip the name chain — `M.init`, `M:update` — to the parameter list.
+    let j = nextSigIdx(tokens, i + 1);
+    while (j >= 0 && tokens[j]!.value !== "(") {
+      const v = tokens[j]!.value;
+      if (!isName(tokens[j]!) && v !== "." && v !== ":") break;
+      if (isName(tokens[j]!)) names.add(tokens[j]!.value);
+      j = nextSigIdx(tokens, j + 1);
+    }
+    if (j < 0 || tokens[j]!.value !== "(") continue;
+
+    /* Parameters only, never their annotations: `function f(part: Part)` must
+     * not add `Part`. A name counts when it opens the list or follows a comma at
+     * depth zero; everything after it belongs to its type. */
+    let expect = true;
+    let depth = 0;
+    for (let k = nextSigIdx(tokens, j + 1); k >= 0; k = nextSigIdx(tokens, k + 1)) {
+      const v = tokens[k]!.value;
+      if (v === "(" || v === "{" || v === "[") depth++;
+      else if (v === ")" || v === "}" || v === "]") {
+        if (depth === 0) break;
+        depth--;
+      } else if (depth === 0 && v === ",") {
+        expect = true;
+        continue;
+      } else if (depth === 0 && expect && isName(tokens[k]!)) {
+        names.add(tokens[k]!.value);
+      }
+      expect = false;
+    }
+  }
+
+  return names;
 }
 
 /**
@@ -459,7 +807,7 @@ function locallyDefined(tokens: Token[]): Set<string> {
   const names = new Set<string>();
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]!;
-    if (t.kind !== "ident") continue;
+    if (!isPlainName(t)) continue;
     if (isDefinitionSite(tokens, i)) names.add(t.value);
   }
   return names;
@@ -474,14 +822,15 @@ export function detect(source: string): Finding[] {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]!;
 
-    // Only identifiers and builtins can name an API. Comments and strings are
-    // skipped implicitly by never being considered here — except for the
-    // Instance.new("ClassName") case handled below, which reads the string
-    // deliberately.
-    if (t.kind !== "ident" && t.kind !== "builtin") continue;
+    // Only names can name an API. Comments and strings are skipped implicitly by
+    // never being considered here — except for the Instance.new("ClassName")
+    // case handled below, which reads the string deliberately.
+    if (!isName(t)) continue;
 
-    const prev = prevSignificant(tokens, i);
-    const next = nextSignificant(tokens, i);
+    const prevIdx = prevSigIdx(tokens, i);
+    const prev = prevIdx >= 0 ? tokens[prevIdx]! : null;
+    const nextIdx = nextSigIdx(tokens, i + 1);
+    const next = nextIdx >= 0 ? tokens[nextIdx]! : null;
     const afterDot = prev?.kind === "punct" && (prev.value === "." || prev.value === ":");
 
     // ── Class names in type position ─────────────────────────────────────
@@ -493,7 +842,7 @@ export function detect(source: string): Finding[] {
     // variable names: `local Skin = Instance.new("StringValue", …)` was marked
     // because `Skin` happens to be a deprecated class. A name is not a use.
     const asType = (API_INDEX.classes as Record<string, ApiEntry>)[t.value];
-    if (asType && prev && isTypePosition(tokens, i, prev)) {
+    if (asType && isTypePosition(tokens, i, prevIdx)) {
       findings.push({ start: t.start, end: t.end, text: t.value, kind: "class", entry: asType });
       continue;
     }
@@ -508,8 +857,9 @@ export function detect(source: string): Finding[] {
       // a name with a modern API that differs only in access form —
       // `event:wait()` is deprecated, `task.wait()` is the correct answer — so
       // flagging by name alone would call the right code wrong.
-      const isMethod = prev.value === ":";
-      const receiver = prevSignificant(tokens, tokens.indexOf(prev));
+      const isMethod = prev!.value === ":";
+      const receiverIdx = prevSigIdx(tokens, prevIdx);
+      const receiver = receiverIdx >= 0 ? tokens[receiverIdx]! : null;
       const receiverName = receiver?.value ?? "";
 
       // Two sources, in order of confidence.
@@ -559,14 +909,14 @@ export function detect(source: string): Finding[] {
 
     // ── Classes inside Instance.new("…") ─────────────────────────────────
     if (t.value === "Instance") {
-      const dot = nextSignificant(tokens, i);
-      if (dot?.value !== ".") continue;
-      const nw = nextSignificant(tokens, tokens.indexOf(dot));
-      if (nw?.value !== "new") continue;
-      const paren = nextSignificant(tokens, tokens.indexOf(nw));
-      if (paren?.value !== "(") continue;
-      const arg = nextSignificant(tokens, tokens.indexOf(paren));
-      if (!arg || arg.kind !== "string") continue;
+      if (next?.value !== ".") continue;
+      const nwIdx = nextSigIdx(tokens, nextIdx + 1);
+      if (nwIdx < 0 || tokens[nwIdx]!.value !== "new") continue;
+      const parenIdx = nextSigIdx(tokens, nwIdx + 1);
+      if (parenIdx < 0 || tokens[parenIdx]!.value !== "(") continue;
+      const argIdx = nextSigIdx(tokens, parenIdx + 1);
+      if (argIdx < 0 || tokens[argIdx]!.kind !== "string") continue;
+      const arg = tokens[argIdx]!;
 
       const className = stringValue(arg);
       const classEntry = (API_INDEX.classes as Record<string, ApiEntry>)[className];
@@ -582,14 +932,14 @@ export function detect(source: string): Finding[] {
 
       // The two-argument form parents before properties are set, so the engine
       // replicates every subsequent assignment separately.
-      const afterArg = nextSignificant(tokens, tokens.indexOf(arg));
-      if (afterArg?.value === ",") {
+      const afterArgIdx = nextSigIdx(tokens, argIdx + 1);
+      if (afterArgIdx >= 0 && tokens[afterArgIdx]!.value === ",") {
         // Span the whole `, parent` argument, not just the comma. A wavy
         // underline four pixels wide is not a finding anyone will notice, and
         // the argument is what has to be deleted.
         let depth = 0;
-        let end = afterArg.end;
-        for (let j = tokens.indexOf(afterArg); j < tokens.length; j++) {
+        let end = tokens[afterArgIdx]!.end;
+        for (let j = afterArgIdx; j < tokens.length; j++) {
           const tk = tokens[j]!;
           if (tk.value === "(") depth++;
           else if (tk.value === ")") {
@@ -600,7 +950,7 @@ export function detect(source: string): Finding[] {
         }
         const p = API_INDEX.patterns.instanceNewParent;
         findings.push({
-          start: afterArg.start,
+          start: tokens[afterArgIdx]!.start,
           end,
           text: "Instance.new(…, parent)",
           kind: "pattern",

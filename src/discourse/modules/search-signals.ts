@@ -1,5 +1,6 @@
 import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
+import { onDomChange } from "../dom-watch";
 
 /**
  * Age marks on full-page search results.
@@ -82,7 +83,7 @@ function scan(root: ParentNode, now: number): void {
 export function searchSignals(api: PluginApi): DfpModule {
   return {
     id: "search-signals",
-    budgetMs: 6,
+    budgetMs: 80,
 
     install() {
       const run = () => {
@@ -99,7 +100,7 @@ export function searchSignals(api: PluginApi): DfpModule {
 
       /* Results stream in as you scroll, and re-running a search replaces the
        * whole list. */
-      const observer = new MutationObserver((records) => {
+      onDomChange((records) => {
         const now = Date.now();
         for (const rec of records) {
           for (const node of rec.addedNodes) {
@@ -109,7 +110,6 @@ export function searchSignals(api: PluginApi): DfpModule {
           }
         }
       });
-      observer.observe(document.documentElement, { childList: true, subtree: true });
     },
   };
 }

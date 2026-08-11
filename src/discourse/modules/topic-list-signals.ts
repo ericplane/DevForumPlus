@@ -58,7 +58,7 @@ export function classesFor(topic: DiscourseTopic, now: number): string[] {
 export function topicListSignals(api: PluginApi): DfpModule {
   return {
     id: "topic-list-signals",
-    budgetMs: 4,
+    budgetMs: 80,
     install() {
       nowMs = Date.now();
       clock ??= setInterval(() => {

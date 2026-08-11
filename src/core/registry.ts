@@ -20,7 +20,26 @@ export interface ModuleRecord {
 
 export interface DfpModule {
   id: ModuleId;
-  /** Install budget in ms. Exceeding it three loads running auto-disables. */
+  /**
+   * Main-thread budget for one page load, in ms. Exceeding it three loads
+   * running auto-disables the module.
+   *
+   * This used to be the budget for `install()` alone, which measured nothing:
+   * every module's install is a registration that returns in ~0ms, and the
+   * actual work happens later in decorator sweeps and DOM watchers. So no
+   * module could ever strike, on any page, however slow it was — the whole
+   * self-disabling safety net was decorative. decorate.ts had even documented
+   * the consequence, deferring its first sweep specifically to stay outside the
+   * measured window.
+   *
+   * Now it is everything the module does after boot: decorator callbacks
+   * (decorate.ts) and DOM watchers (dom-watch.ts) are timed and charged here.
+   *
+   * The numbers are ALARMS, not tuning knobs. They sit well above measured cost
+   * — a strike costs the user a feature, so a budget that is merely tight is
+   * worse than one that is loose. Tighten them once real numbers exist, and
+   * never on a hunch.
+   */
   budgetMs: number;
   /**
    * Returns true if this module can run in the current environment (right
@@ -45,6 +64,53 @@ export interface RegistryOptions {
 }
 
 const STRIKES_TO_DISABLE = 3;
+
+// ── Work accounting ─────────────────────────────────────────────────────────
+//
+// Module-level rather than instance state because the helpers that charge time
+// — decorate.ts, dom-watch.ts — are plain functions with no registry in hand,
+// and there is exactly one registry per page.
+
+/** Set only while a module's `install()` is on the stack. */
+let installing: ModuleId | null = null;
+
+/** ms of main-thread time charged to each module since boot. */
+const spent = new Map<ModuleId, number>();
+const budgets = new Map<ModuleId, number>();
+/** One strike per page load: a module over budget stays over budget. */
+const struck = new Set<ModuleId>();
+let report: ((id: ModuleId, ms: number) => void) | null = null;
+
+/**
+ * Which module is installing right now.
+ *
+ * Helpers call this at REGISTRATION time to capture an owner, then charge that
+ * owner whenever the callback they registered actually runs. Reading it later
+ * would always answer `null`, since install has long returned by then.
+ */
+export function installingModule(): ModuleId | null {
+  return installing;
+}
+
+/** Charge `ms` to a module, striking once if that takes it over budget. */
+export function charge(id: string | null, ms: number): void {
+  if (id === null) return;
+  const key = id as ModuleId;
+  const total = (spent.get(key) ?? 0) + ms;
+  spent.set(key, total);
+
+  const budget = budgets.get(key);
+  if (budget === undefined || struck.has(key) || total <= budget) return;
+  struck.add(key);
+  report?.(key, total);
+}
+
+/** What each module has actually cost this page. Exported for diagnostics. */
+export function moduleWork(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [id, ms] of spent) out[id] = Math.round(ms * 10) / 10;
+  return out;
+}
 
 /**
  * Module lifecycle with a hard rule: a broken or slow feature disables itself
@@ -90,17 +156,25 @@ export class ModuleRegistry {
     }
 
     try {
+      /* The budget covers everything this module goes on to do, not the
+       * registration that returns immediately. `installing` is what lets
+       * decorate.ts and dom-watch.ts attribute their callbacks to whoever
+       * registered them; `report` turns going over into a strike whenever that
+       * happens — usually long after this function has returned. */
+      budgets.set(mod.id, mod.budgetMs);
+      report = (id, ms) => this.opts.onStrike(id, ms);
+
+      installing = mod.id;
       const { ms } = measure(`install:${mod.id}`, mod.install);
-      if (ms > mod.budgetMs) {
-        this.opts.onStrike(mod.id, ms);
-        this.record({ id: mod.id, status: "installed", installMs: ms, strikes: strikes + 1 });
-      } else {
-        // `strikes: 0` here only ever reached the in-memory diagnostic record;
-        // the persisted counter was write-only-upward. Clear it for real.
-        if (strikes > 0) this.opts.onClearStrike?.(mod.id);
-        this.record({ id: mod.id, status: "installed", installMs: ms, strikes: 0 });
-      }
+      installing = null;
+
+      /* Cleared optimistically. A module that goes over budget later in the
+       * page strikes then, and a strike is persisted immediately — so the
+       * counter cannot be cleared and re-earned in the wrong order. */
+      if (strikes > 0) this.opts.onClearStrike?.(mod.id);
+      this.record({ id: mod.id, status: "installed", installMs: ms, strikes: 0 });
     } catch (err) {
+      installing = null;
       // A module that throws during install is dead for this page load, but
       // the exception stops here. It never reaches Discourse.
       this.record({

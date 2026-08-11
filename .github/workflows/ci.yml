@@ -1,0 +1,92 @@
+# Run the repo's checks on every push and pull request.
+#
+# Everything here already ran in release.yml, which is exactly the problem this
+# fixes: until this file existed, the first time the typecheck, the style
+# guardrails, the unit tests and the palette contrast assertions ran was the
+# moment someone cut a release — the one moment there is no time to fix them.
+name: CI
+
+on:
+  # Every branch, not just main: the point is that a change has already been
+  # checked by the time it is worth opening a PR for. Naming `branches` at all
+  # also excludes tag pushes, which never match it — otherwise `npm version &&
+  # git push --follow-tags` would start a second, pointless build racing the
+  # release one.
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read # nothing here writes; release.yml is the only workflow that needs more
+
+# A second push to a branch makes the first run's answer worthless, so stop
+# paying for it. release.yml deliberately has no equivalent: a half-cancelled
+# release leaves a release with some of its assets attached.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    # A PR from a branch in this repo is already covered by the `push` run on
+    # that same commit, and keeping both doubles the CI on every PR to reach an
+    # identical result. A PR from a fork produces no push event here, so it is
+    # the one case that genuinely needs the `pull_request` trigger.
+    if: >-
+      github.event_name == 'push'
+      || github.event.pull_request.head.repo.full_name != github.repository
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The toolchain needs 20.11+ for `import.meta.dirname`; .nvmrc is the
+      # single source of truth, so CI cannot drift from local.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # `package-lock.json` is gitignored in this repo, so `npm ci` has nothing
+      # to work from. Deliberate rather than an oversight — see .gitignore. The
+      # same absence rules out `setup-node`'s `cache: npm`, which fails the run
+      # outright when it finds no lock file to key the cache on.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      # `check` and `build` below both rebuild the palette, so this step exists
+      # for its name. The contrast assertions are the check most likely to fail
+      # after a theme edit, and that failure should announce itself in the job
+      # summary rather than be forty lines into another step's log.
+      - name: Palette contrast assertions
+        run: npm run tokens
+
+      # tokens.generated.css is committed and nothing regenerates it at runtime,
+      # so editing a theme spec without re-running `npm run tokens` ships a
+      # stylesheet that is not the one the assertions above just passed. Worse
+      # when the spec adds a variable: every rule referencing it resolves to
+      # nothing and renders unstyled, with no error anywhere.
+      - name: Check the generated palette is committed
+        run: |
+          if ! git diff --quiet -- src/styles/tokens.generated.css; then
+            echo "::error::src/styles/tokens.generated.css is stale."
+            echo "A theme spec in scripts/build-tokens.ts changed without regenerating it."
+            echo "Run 'npm run tokens', review the diff, and commit it."
+            git diff -- src/styles/tokens.generated.css
+            exit 1
+          fi
+
+      # Typecheck, style guardrails and unit tests.
+      - name: Check
+        run: npm run check
+
+      # The steps above all pass happily on a tree that does not bundle, so the
+      # build is its own gate: nothing unbuildable should be mergeable.
+      #
+      # `public/docs/` is deliberately not generated first. The Creator Docs
+      # checkout is ~9.5 MB, the build succeeds without it (the extension just
+      # ships with no hover documentation), and release.yml already generates it
+      # where its absence would actually reach a user. Paying for it on every
+      # push would catch nothing this step does not.
+      - name: Build
+        run: npm run build

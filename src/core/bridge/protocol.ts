@@ -86,7 +86,21 @@ export function isMainReady(v: unknown): v is MainReadyMessage {
   return isObj(v) && v["type"] === MAIN_READY_TYPE;
 }
 
-/** Runs on the ISOLATED side, where the sender is not fully trusted. */
+/**
+ * Runs on the ISOLATED side, where the sender is not fully trusted.
+ *
+ * Every variant of `Request` needs a case here. The `default` fails closed,
+ * which is the right default for a validator but makes an omission silent and
+ * one-directional: `strikes:clear` was in the union and handled on both ends,
+ * yet dropped here for its whole life. The visible symptom was not an error but
+ * a counter that could only ever go up — so a module that went over budget on
+ * three slow loads spread across months stayed auto-disabled for good, which is
+ * the opposite of the "consecutive failures" rule registry.ts documents.
+ *
+ * TypeScript cannot catch this: `v["t"]` is `unknown`, so an unlisted case is
+ * indistinguishable from a hostile message. tests/unit/protocol.test.ts asserts
+ * every variant round-trips instead.
+ */
 export function isRequest(v: unknown): v is Request {
   if (!isObj(v) || typeof v["id"] !== "number") return false;
   switch (v["t"]) {
@@ -95,6 +109,8 @@ export function isRequest(v: unknown): v is Request {
       return true;
     case "strikes:bump":
       return isModuleId(v["module"]) && typeof v["ms"] === "number";
+    case "strikes:clear":
+      return isModuleId(v["module"]);
     case "diag:push":
       return isDiagnostics(v["diagnostics"]);
     default:

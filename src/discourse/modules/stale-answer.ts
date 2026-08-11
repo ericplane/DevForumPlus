@@ -106,7 +106,7 @@ function enhance(element: HTMLElement, createdAt: string, postNumber: number): v
 export function staleAnswer(api: PluginApi): DfpModule {
   return {
     id: "stale-answer",
-    budgetMs: 6,
+    budgetMs: 100,
 
     install() {
       decorateCooked(

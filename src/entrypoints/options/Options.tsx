@@ -116,6 +116,44 @@ const MODULES: Record<ModuleId, ModuleInfo> = {
       "Keeps chronological order, so permalinks and find-in-page still work.",
     where: "Topic footer",
   },
+  "quiet-replies": {
+    title: "Quiet replies",
+    blurb:
+      "Adds a toggle that folds runs of replies carrying no information — \"thanks\", \"+1\", \"bump\" — " +
+      "into one line you can expand. Never folds the opening post, an accepted answer, a reply " +
+      "someone answered, or anything containing code.",
+    where: "Topic timeline",
+  },
+  "asset-preview": {
+    title: "Asset previews",
+    blurb:
+      "Turns rbxassetid:// references and Roblox catalog links into real links, with a thumbnail " +
+      "on hover. The thumbnail is fetched only when you point at one.",
+    where: "Any post referencing an asset",
+  },
+  "topic-preview": {
+    title: "Topic previews",
+    blurb:
+      "Hovering a link to another thread shows its title, whether it was solved, and how " +
+      "old it is — so a six-year-old answer is obvious before you click. Uses the same " +
+      "request DFP already makes to open a topic, and never contacts anything but the forum.",
+    where: "Any post linking a thread",
+  },
+  "docs-links": {
+    title: "Creator Docs links",
+    blurb:
+      "Gives a Creator Docs link in a post the same hover card the API names inside code " +
+      "blocks already get. Reads the docs index that ships with the extension, so it makes " +
+      "no request at all.",
+    where: "Any post linking the docs",
+  },
+  "op-pin": {
+    title: "Pin the opening post",
+    blurb:
+      "Adds a toggle that keeps the opening post in a column beside the replies, " +
+      "scrolling on its own. Off by default; wide screens only, on topics with a few replies.",
+    where: "Topic timeline",
+  },
 };
 
 export function Options(): JSX.Element {

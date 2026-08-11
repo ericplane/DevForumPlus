@@ -358,3 +358,152 @@ html[data-dfp] .cooked audio::-webkit-media-controls-panel {
 html[data-dfp] .cooked audio a {
   color: var(--dfp-accent);
 }
+
+/* ── Roblox asset references ─────────────────────────────────────────────
+ *
+ * `rbxassetid://1234567` and roblox.com/library links, turned into a link plus
+ * a thumbnail on hover. The module is
+ * src/discourse/modules/asset-preview.ts; the header there explains why the
+ * thumbnail is a bare <img> against a redirect endpoint and never a fetch.
+ *
+ * Two rules the shape of this depends on:
+ *
+ *   - nothing is shown at rest. A post quoting eight sound ids must not become
+ *     a wall of eight images, which is the same judgement the language label
+ *     (code.css) and the findings bar (code-intel's addSummary) already made.
+ *   - the card is mounted only once its image has loaded, so there is no
+ *     empty, loading or broken state for this stylesheet to describe. If the
+ *     asset is gone, the reference is simply a link. */
+
+/* Dotted, matching .dfp-doc-link, and for the same reason: a solid underline on
+ * every asset id would turn a list of sound ids into a wall of blue. It should
+ * be findable on hover, not shouted — and `color: inherit` keeps an id sitting
+ * inside inline <code> looking like code. */
+html[data-dfp] .cooked .dfp-asset {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in oklab, var(--dfp-text-3) 55%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+html[data-dfp] .cooked .dfp-asset:hover,
+html[data-dfp] .cooked .dfp-asset:focus-visible {
+  color: var(--dfp-accent);
+  text-decoration-color: var(--dfp-accent);
+}
+
+/* The hover card.
+ *
+ * Fixed and parented to <body> — inside `.cooked` it would be clipped by the
+ * `overflow-x: auto` on code blocks, and by anything Discourse gives a
+ * transform, which re-anchors `position: fixed` to itself.
+ *
+ * `top`/`left` rather than the logical properties used everywhere else in this
+ * file, because the module computes physical viewport coordinates: JS sets
+ * `translate` and this sets the origin those coordinates are measured from. A
+ * logical origin would flip out from under them under `dir="rtl"`.
+ *
+ * No z-index. There is not one anywhere in this stylesheet and this is not the
+ * place to start: the card opens downward from a link in the post column, where
+ * nothing is stacked.
+ *
+ * No entry animation either. polish.css owns the settle animation and the
+ * motion opt-out that switches it off, and both are lists of class names this
+ * file cannot add to — an animation declared here would keep running for
+ * someone who asked for no motion at all. */
+html[data-dfp] .dfp-asset-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 3px;
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  box-shadow: var(--dfp-e-2);
+  /* The card is exactly its image; without this the line box adds a few pixels
+   * of descender space under it and the padding stops looking even. */
+  line-height: 0;
+  /* Never eats the click meant for the link it is describing, and cannot be
+   * hovered onto — which is what removes the close-delay bookkeeping a card you
+   * can move into needs. */
+  pointer-events: none;
+}
+
+html[data-dfp] .dfp-asset-preview img {
+  display: block;
+  inline-size: auto;
+  block-size: auto;
+  /* 150px against a 250px source: the extra pixels are for 2× displays. Big
+   * enough to tell a decal from a mesh from a UI sprite, which is the whole
+   * job, and small enough not to cover the sentence it came from. */
+  max-inline-size: 150px;
+  max-block-size: 150px;
+  border-radius: var(--dfp-r-xs);
+  /* Decals and UI sprites are transparent PNGs. Without a plate underneath, a
+   * white logo on transparency is invisible on the dark themes and a dark one
+   * vanishes on light. */
+  background: var(--dfp-surface-3);
+}
+
+/* ── Games get a different card, because a game is not a square ────────────
+ *
+ * Through the asset endpoint a place comes back as its icon — a square logo
+ * that tells you almost nothing. The game endpoints answer with the 768×432
+ * splash people actually recognise, plus the two facts a reader on this forum
+ * wants about a linked game: who made it and how big it is.
+ *
+ * Wider than the asset card at 260px, because a 16:9 image at 150px is 84px
+ * tall and unreadable, and because there is now a line of text under it that
+ * needs somewhere to sit. Still far short of covering the sentence it came from. */
+html[data-dfp] .dfp-asset-preview--game {
+  /* The asset card is exactly its image and kills the line box for it. This one
+   * has real text in it and needs leading back. */
+  line-height: var(--dfp-lh-body);
+  padding: 3px 3px var(--dfp-s-2);
+}
+
+html[data-dfp] .dfp-asset-preview__game img {
+  max-inline-size: 260px;
+  max-block-size: none;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+html[data-dfp] .dfp-asset-preview__title {
+  margin-block-start: var(--dfp-s-2);
+  padding-inline: var(--dfp-s-1);
+  max-inline-size: 260px;
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-semibold);
+  /* Roblox game names run long and are frequently decorative. One line, cut
+   * cleanly — the card is an identification aid, not a listing. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The creator is the line allowed to lose its tail. Studio names run long and
+ * decorative — "Eurotunnel | Le Shuttle" — and of the three lines here it is
+ * the one a reader can most afford to see clipped. */
+html[data-dfp] .dfp-asset-preview__by {
+  padding-inline: var(--dfp-s-1);
+  max-inline-size: 260px;
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The counts get their own line so a long studio name can never push them off
+ * the end, which is exactly what happened when all three shared one row. */
+html[data-dfp] .dfp-asset-preview__meta {
+  padding-inline: var(--dfp-s-1);
+  max-inline-size: 260px;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

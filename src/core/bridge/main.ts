@@ -119,8 +119,13 @@ export class MainBridge {
     }
   }
 
+  /* Fire-and-forget, like its two neighbours below — but it was the one that
+   * forgot to swallow the rejection, and `send` rejects on a 5s timeout. While
+   * the validator was dropping this message the reply never came, so every
+   * clean install of a previously-struck module raised an unhandled rejection
+   * five seconds later, in the page's own console, blamed on the forum. */
   clearStrike(module: ModuleId): void {
-    this.send({ t: "strikes:clear", module });
+    void this.send({ t: "strikes:clear", module }).catch(() => {});
   }
 
   bumpStrike(module: ModuleId, ms: number): void {

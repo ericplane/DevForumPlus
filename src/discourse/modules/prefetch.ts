@@ -299,7 +299,7 @@ function installHoverIntent(): void {
 export function prefetch(): DfpModule {
   return {
     id: "prefetch",
-    budgetMs: 4,
+    budgetMs: 60,
 
     isAvailable() {
       const open = Object.getOwnPropertyDescriptor(XMLHttpRequest.prototype, "open");

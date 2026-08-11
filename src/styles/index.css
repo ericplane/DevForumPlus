@@ -32,6 +32,7 @@
  * behaviour, so it must be able to override what the files above set. */
 @import "./components/interactive.css";
 @import "./components/reading.css";
+@import "./components/quiet.css";
 @import "./polish.css";
 
 /* Render-cost rules, after the components they apply to. */

@@ -99,7 +99,10 @@ html[data-dfp] #topic-footer-buttons {
   margin-top: var(--dfp-s-4);
 }
 
-html[data-dfp] .topic-area > .post-stream {
+/* Descendant, not child. Verified live, the real chain is
+ *   section.topic-area > .posts-wrapper > .ember-view > .post-stream
+ * so the direct-child form this shipped as never matched anything. */
+html[data-dfp] .topic-area .post-stream {
   margin-bottom: 0;
 }
 
@@ -879,6 +882,100 @@ html[data-dfp] .topic-map .number {
 html[data-dfp] .small-action {
   color: var(--dfp-text-3);
   font-size: var(--dfp-fs-sm);
+}
+
+/* ── Status actions: "Opened on…", "Closed…", "Pinned…" ───────────────────
+ *
+ * Third member of the stream-break family, after the last-visit divider and the
+ * time gap, and it arrived with the same two faults as both:
+ *
+ *   article.small-action
+ *     ├─ div.topic-avatar            a 45px column holding one 14px icon
+ *     └─ div.small-action-desc       border-top spanning only part of the row
+ *        └─ div.small-action-contents  avatar + "Opened <date>"
+ *
+ * The wide avatar column pushed the content right of every post around it, and
+ * the partial `border-top` drew a rule that started under the text and stopped
+ * short — which is the loose horizontal line that made this look broken.
+ *
+ * Unlike its two siblings this one is left-aligned rather than centred, and the
+ * difference is deliberate: a time gap and a last-visit mark are pure dividers,
+ * while this is an EVENT WITH AN ACTOR — an icon, a face and a name. Centring
+ * an avatar in a rule reads as decoration; leading with it and letting the rule
+ * run out to the right reads as "this happened, and the thread continues".
+ *
+ * Scoped away from both siblings, which already have their own treatment. */
+html[data-dfp] article.small-action:not(.time-gap):not(.topic-post-visited) {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-3);
+  margin-block: var(--dfp-s-4);
+  padding: 0;
+  border: 0;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+}
+
+/* The icon shrinks to itself instead of reserving a post-width avatar column. */
+html[data-dfp] article.small-action:not(.time-gap):not(.topic-post-visited) > .topic-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  inline-size: auto;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+html[data-dfp] article.small-action:not(.time-gap):not(.topic-post-visited) .d-icon {
+  inline-size: 14px;
+  block-size: 14px;
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] article.small-action:not(.time-gap):not(.topic-post-visited) .small-action-desc {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-3);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  /* The partial rule this replaces. */
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+html[data-dfp] article.small-action:not(.time-gap):not(.topic-post-visited) .small-action-contents {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  min-inline-size: 0;
+  flex: 0 1 auto;
+}
+
+html[data-dfp] article.small-action:not(.time-gap):not(.topic-post-visited) .small-action-contents p {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-dfp] article.small-action:not(.time-gap):not(.topic-post-visited) .avatar {
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: 50%;
+}
+
+/* The rule runs out to the right, drawn as a flexible pseudo-element so it
+ * ends at the row's edge whatever the label's width — the same construction the
+ * other two dividers use, and the reason none of them can stop short again. */
+html[data-dfp]
+  article.small-action:not(.time-gap):not(.topic-post-visited)
+  .small-action-desc::after {
+  content: "";
+  flex: 1 1 auto;
+  block-size: 1px;
+  min-inline-size: var(--dfp-s-5);
+  background: var(--dfp-border);
 }
 
 /* ── "last visit" divider ────────────────────────────────────────────────

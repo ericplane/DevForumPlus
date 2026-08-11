@@ -110,14 +110,30 @@ function ensureSource(): string {
   }
   console.log("  docs-index: extracting…");
   mkdirSync(cacheDir, { recursive: true });
-  execFileSync("tar", [
-    "xzf",
-    cacheTar,
-    "-C",
-    cacheDir,
-    "--strip-components=1",
-    "creator-docs-main/content/en-us/reference/engine",
-  ]);
+  /* Extracted from the cache directory with RELATIVE paths, which is the whole
+   * trick and is not cosmetic.
+   *
+   * GNU tar — first on PATH wherever Git for Windows is installed — reads an
+   * absolute `C:\Users\…\creator-docs.tar.gz` as `host:path` and tries to open a
+   * remote archive: "Cannot connect to C: resolve failed", then a gzip EOF as
+   * the empty stream unwinds. `--force-local` fixes that for GNU tar and is
+   * rejected outright by the bsdtar that Windows 10+ and macOS ship, and both
+   * are called `tar`, so there is no flag that is right everywhere.
+   *
+   * Running from `cwd` with relative names means no argument ever looks like a
+   * host, so neither tar has anything to disagree about.
+   *
+   * This mattered more than a build wart: the generator exited non-zero,
+   * `public/docs/` was never written, those shards are gitignored, and
+   * `npm run build` never ran this script — so every docs hover card silently
+   * rendered nothing on a Windows checkout. The card code was fine. Its data
+   * had never existed. */
+  execFileSync(
+    "tar",
+    ["-xzf", basename(cacheTar), "-C", basename(cacheDir), "--strip-components=1",
+     "creator-docs-main/content/en-us/reference/engine"],
+    { cwd: dirname(cacheTar), stdio: "pipe" },
+  );
   return cacheDir;
 }
 

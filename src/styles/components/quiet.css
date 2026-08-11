@@ -1,0 +1,103 @@
+/* Quiet replies — the fold itself. See quiet-replies.ts for what is folded and
+ * why the rule is so shy about it.
+ *
+ * Everything here hangs off `data-dfp-quiet` on the root plus two classes the
+ * module writes on the post row, so turning the feature off is one attribute
+ * and leaves no residue: the rows keep their classes for a frame, nothing reads
+ * them, and the next pass takes them back.
+ *
+ * What is hidden is the `<article>`, never the row. The row stays in flow
+ * carrying the fold line, so the post keeps a real box at the position it
+ * really has in the stream — which is also what lets the module derive every
+ * run's boundaries from the DOM alone. */
+
+html[data-dfp][data-dfp-quiet] .topic-post.dfp-quiet:not(.dfp-quiet--open) > article {
+  display: none;
+}
+
+/* A folded row is otherwise an empty box, and post.css gives every row 12px of
+ * margin. On a run of six that is 72px of nothing left behind by a feature
+ * whose entire purpose is to give scrolling back. The one fold line carries its
+ * own spacing instead.
+ *
+ * `content-visibility` is the other half, and it is not optional. perf.css puts
+ * `content-visibility: auto` with a measured 180px `contain-intrinsic-size` on
+ * every `.topic-post`, so an off-screen folded row would still reserve 180px
+ * for a post that is now one line tall — and then collapse to that line as it
+ * scrolled into range, shifting everything below it under the reader's eyes.
+ * A folded row has nothing left to skip, so skipping it buys nothing anyway.
+ * op-pin's column opts out of the same rule, for the same reason. */
+html[data-dfp][data-dfp-quiet] .topic-post.dfp-quiet:not(.dfp-quiet--open) {
+  margin-block-end: 0;
+  content-visibility: visible;
+}
+
+/* ── The fold line ─────────────────────────────────────────────────────────
+ * "A reading aid, not a moderation verdict." So: no surface, no badge, no
+ * count-in-a-pill — a hairline rule and small tertiary text at the weight of a
+ * timestamp. It should be possible to scroll past this without noticing it, and
+ * to find it immediately when you go looking. */
+
+html[data-dfp] .dfp-quiet-fold {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dfp-s-2);
+  inline-size: 100%;
+  margin-block: var(--dfp-s-1);
+  padding: var(--dfp-s-1) var(--dfp-s-3);
+  background: none;
+  border: 0;
+  /* Left rail only, at the same 3px the post cards use for their type stripe,
+   * so a fold line reads as standing in for posts rather than as a control
+   * belonging to the post above it. */
+  border-inline-start: 3px solid var(--dfp-border);
+  color: var(--dfp-text-3);
+  /* A `<button>` does not inherit the page's font — the UA sheet gives it its
+   * own. Without this the one line standing in for six posts is the only text
+   * on the page not set in the forum's face, which is exactly the sort of
+   * detail that makes an addition look bolted on. */
+  font-family: inherit;
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.6;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .dfp-quiet-fold:hover {
+  border-inline-start-color: var(--dfp-border-strong);
+  color: var(--dfp-text-2);
+}
+
+html[data-dfp] .dfp-quiet-fold__count {
+  flex: 0 1 auto;
+}
+
+/* The verb, kept apart from the count and underlined, because the count alone
+ * does not say that anything can be done about it. */
+html[data-dfp] .dfp-quiet-fold__hint {
+  flex: 0 0 auto;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+html[data-dfp] .dfp-quiet-fold:hover .dfp-quiet-fold__hint {
+  color: var(--dfp-accent);
+}
+
+html[data-dfp] .dfp-quiet-fold:focus-visible {
+  outline: 2px solid var(--dfp-accent);
+  outline-offset: 2px;
+  border-radius: var(--dfp-r-sm);
+}
+
+/* Matches the thread-view and op-pin toggles beside it in the timeline rail —
+ * three DFP controls in one column that disagreed about what "on" looks like
+ * would read as three unrelated extensions. */
+html[data-dfp] .dfp-quiet-toggle[aria-pressed="true"] {
+  background: var(--dfp-accent-soft);
+  border-color: color-mix(in oklab, var(--dfp-accent) 40%, transparent);
+  color: var(--dfp-accent);
+}

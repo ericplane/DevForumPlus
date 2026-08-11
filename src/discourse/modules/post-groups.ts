@@ -1,6 +1,7 @@
 import type { DfpModule } from "../../core/registry";
 import { chip, type GroupLike } from "../group-chips";
 import type { PluginApi } from "../types";
+import { onDomChange } from "../dom-watch";
 
 /**
  * The flair group as a named chip in the post byline.
@@ -110,7 +111,7 @@ function scan(root: ParentNode): void {
 export function postGroups(api: PluginApi): DfpModule {
   return {
     id: "post-groups",
-    budgetMs: 6,
+    budgetMs: 100,
 
     install() {
       const run = () => {
@@ -127,7 +128,7 @@ export function postGroups(api: PluginApi): DfpModule {
       api.onPageChange(() => setTimeout(run, 120));
 
       // Posts stream in as you scroll.
-      const observer = new MutationObserver((records) => {
+      onDomChange((records) => {
         for (const rec of records) {
           for (const node of rec.addedNodes) {
             if (!(node instanceof HTMLElement)) continue;
@@ -136,7 +137,6 @@ export function postGroups(api: PluginApi): DfpModule {
           }
         }
       });
-      observer.observe(document.documentElement, { childList: true, subtree: true });
     },
   };
 }

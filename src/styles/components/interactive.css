@@ -134,15 +134,67 @@ html[data-dfp] .topic-timeline .timeline-date-wrapper {
   line-height: 1.3;
 }
 
-/* Nothing in the rail should clip its own text. */
+/* Nothing in the rail should clip its own text.
+ *
+ * `.timeline-replies` belongs in this list and was missed, which only shows up
+ * deep in a big topic: Discourse gives it `overflow: hidden`, the rule above
+ * adds `nowrap`, and together they cut the counter off mid-number — "5795 / 9174"
+ * rendered as "5795 / 91". Measured: 66px of box around 85px of text.
+ *
+ * `max-content` rather than a fixed width because the counter's width is a
+ * function of the topic's size, and the rail is sized by its widest child — so
+ * a hardcoded number would either clip a bigger topic or spend rail width, and
+ * rail width comes straight out of the reply column. At 85px it still fits the
+ * 90px rail, so this costs nothing. */
 html[data-dfp] .topic-timeline .timeline-scroller,
 html[data-dfp] .topic-timeline .timeline-scroller-content,
-html[data-dfp] .topic-timeline .timeline-date-wrapper {
+html[data-dfp] .topic-timeline .timeline-date-wrapper,
+html[data-dfp] .topic-timeline .timeline-replies {
   overflow: visible;
 }
 
+html[data-dfp] .topic-timeline .timeline-replies {
+  min-inline-size: max-content;
+}
+
 html[data-dfp] .topic-timeline .timeline-footer-controls {
+  /* `display` is declared rather than inherited from Discourse. `gap`,
+   * `flex-wrap` and the children's `flex` below are all no-ops in a block
+   * container, so leaving it implicit meant the whole group silently depended
+   * on a value we do not own — and the visual harness, whose stub rail is a
+   * plain block, rendered the buttons at three different widths while the live
+   * forum rendered them correctly. A rule that only works where Discourse
+   * happens to agree is a rule that cannot be reviewed. */
+  display: flex;
   gap: var(--dfp-s-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* DFP's own toggles, which mount here rather than in the topic footer — that
+ * element does not exist until you reach the end of a long stream.
+ *
+ * The rail is 90px wide, measured. Discourse's controls there are 37×36 icon
+ * buttons and inherit a 15px font, which a two-word label does not survive:
+ * "Thread view" wrapped and came out 90×55, a ragged block beside the icons and
+ * a different height from "Pin post". These give the set one shape — a full
+ * width row each, one line, 30px tall.
+ *
+ * Labels have to stay short for a second reason. The rail is sized by its
+ * widest child, so a long label WIDENS the timeline and takes it out of the
+ * reply column: "Quiet replies (3)" pushed 90px to 105px, while "Quiet (3)"
+ * leaves it alone. Anything mounted here should be measured, not guessed. */
+html[data-dfp] .topic-timeline .timeline-footer-controls :is(
+  .dfp-thread-toggle,
+  .dfp-op-toggle,
+  .dfp-quiet-toggle
+) {
+  flex: 1 0 100%;
+  justify-content: center;
+  white-space: nowrap;
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.35;
 }
 
 html[data-dfp] .topic-timeline .btn {
@@ -1171,4 +1223,95 @@ html[data-dfp] .search-menu input[type="search"] {
 html[data-dfp] .search-menu .results .search-result-topic:hover,
 html[data-dfp] .search-menu .results li:hover {
   background: var(--dfp-surface-3);
+}
+
+/* ── Topic hover card ───────────────────────────────────────────────────────
+ *
+ * A link to another thread, answered before you click it. Third hover card in
+ * the product after docs-card and asset-preview, and it copies their resting
+ * shape on purpose — a surface, a hairline, one elevation step, no entry
+ * animation. polish.css owns the motion opt-out and this file cannot add to it,
+ * so an animation declared here would keep running for someone who asked for
+ * none.
+ *
+ * Sized for prose rather than an image: a title that can run to two lines and
+ * an excerpt that stops at four, because the card exists to let you skip the
+ * click, not to reproduce the thread. */
+html[data-dfp] .dfp-topic-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  inline-size: min(360px, calc(100vw - 32px));
+  padding: var(--dfp-s-3) var(--dfp-s-4);
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  box-shadow: var(--dfp-e-2);
+  /* Never eats the click meant for the link it describes, and cannot be hovered
+   * onto — which is what removes the close-delay bookkeeping a card you can move
+   * into would need. */
+  pointer-events: none;
+}
+
+html[data-dfp] .dfp-topic-card__title {
+  color: var(--dfp-text);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-semibold);
+  line-height: 1.35;
+  /* Two lines, then cut. Thread titles on this forum are frequently a whole
+   * sentence, and a card that grows to fit one covers the post it came from. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+html[data-dfp] .dfp-topic-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dfp-s-1);
+  margin-block-start: var(--dfp-s-2);
+}
+
+html[data-dfp] .dfp-topic-card__badge {
+  padding: 1px var(--dfp-s-2);
+  border-radius: var(--dfp-r-sm);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  white-space: nowrap;
+}
+
+html[data-dfp] .dfp-topic-card__badge--solved {
+  background: color-mix(in oklab, var(--dfp-solved) 16%, transparent);
+  color: var(--dfp-solved);
+}
+
+/* The one badge that changes whether the advice inside can be trusted, so it
+ * wears the same colour the deprecation marks do rather than a neutral grey. */
+html[data-dfp] .dfp-topic-card__badge--stale {
+  background: color-mix(in oklab, var(--dfp-deprecated) 15%, transparent);
+  color: var(--dfp-deprecated);
+}
+
+html[data-dfp] .dfp-topic-card__badge--closed {
+  background: var(--dfp-surface-3);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .dfp-topic-card__meta {
+  margin-block-start: var(--dfp-s-2);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-dfp] .dfp-topic-card__excerpt {
+  margin-block-start: var(--dfp-s-2);
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
 }

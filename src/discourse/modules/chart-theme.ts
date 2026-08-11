@@ -166,7 +166,7 @@ function install(Chart: ChartCtor): ChartCtor {
 export function chartTheme(): DfpModule {
   return {
     id: "chart-theme",
-    budgetMs: 3,
+    budgetMs: 60,
     install() {
       const existing = (window as { Chart?: ChartCtor }).Chart;
       if (typeof existing === "function") {

@@ -119,7 +119,7 @@ function resolveContainer(api: PluginApi): Container | null {
 export function profileInfo(api: PluginApi): DfpModule {
   return {
     id: "profile-info",
-    budgetMs: 3,
+    budgetMs: 150,
 
     isAvailable() {
       return resolveContainer(api) !== null;

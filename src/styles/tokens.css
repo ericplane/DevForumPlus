@@ -78,7 +78,13 @@ html[data-dfp] {
   );
 
   /* ── Layout ───────────────────────────────────────────────────────────── */
-  --dfp-content-max: 1100px;
+  /* `base` is the width the user asked for; `max` is what the page actually
+   * uses. They are the same until a feature needs to borrow horizontal space —
+   * the pinned OP panel adds its column to `base` rather than eating into the
+   * reply measure. Split so that widening never has to fight the width setting,
+   * and so there is exactly one place a feature can borrow from. */
+  --dfp-content-base: 1100px;
+  --dfp-content-max: var(--dfp-content-base);
   --dfp-measure: 72ch;
   --dfp-focus-ring: 2px;
 }
@@ -115,15 +121,17 @@ html[data-dfp][data-dfp-density="spacious"] {
   --dfp-lh-body: 1.7;
 }
 
-/* ── Content width ───────────────────────────────────────────────────────── */
+/* ── Content width ─────────────────────────────────────────────────────────
+ * These set `base`, never `max`. A feature that borrows width derives `max`
+ * from `base`, so the two never race and the user's choice always survives. */
 html[data-dfp][data-dfp-width="narrow"] {
-  --dfp-content-max: 860px;
+  --dfp-content-base: 860px;
 }
 html[data-dfp][data-dfp-width="wide"] {
-  --dfp-content-max: 1400px;
+  --dfp-content-base: 1400px;
 }
 html[data-dfp][data-dfp-width="full"] {
-  --dfp-content-max: none;
+  --dfp-content-base: none;
 }
 
 /* ── Motion preferences ──────────────────────────────────────────────────

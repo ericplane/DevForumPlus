@@ -1,6 +1,7 @@
 import type { DfpModule } from "../../core/registry";
 import { chipStrip, loadGroups, usernameFromPath } from "../group-chips";
 import type { PluginApi } from "../types";
+import { onDomChange } from "../dom-watch";
 
 /**
  * Group chips on the user card — the popover behind an avatar or a username.
@@ -130,13 +131,13 @@ function scan(root: ParentNode): void {
 export function cardGroups(_api: PluginApi): DfpModule {
   return {
     id: "card-groups",
-    budgetMs: 4,
+    budgetMs: 80,
 
     install() {
       // A card open at install time (rare, but a re-enable can do it).
       scan(document);
 
-      const observer = new MutationObserver((records) => {
+      onDomChange((records) => {
         for (const rec of records) {
           for (const node of rec.addedNodes) {
             if (!(node instanceof HTMLElement)) continue;
@@ -145,7 +146,6 @@ export function cardGroups(_api: PluginApi): DfpModule {
           }
         }
       });
-      observer.observe(document.documentElement, { childList: true, subtree: true });
     },
   };
 }

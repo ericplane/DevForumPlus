@@ -139,7 +139,7 @@ export async function clearWarmCache(): Promise<void> {
 export function warmCache(): DfpModule {
   return {
     id: "warm-cache",
-    budgetMs: 2,
+    budgetMs: 60,
 
     isAvailable() {
       return typeof indexedDB !== "undefined";

@@ -136,7 +136,7 @@ function apply(): void {
 export function categoryGate(api: PluginApi): DfpModule {
   return {
     id: "category-gate",
-    budgetMs: 4,
+    budgetMs: 40,
 
     install() {
       api.onPageChange(() => apply());

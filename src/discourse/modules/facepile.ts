@@ -1,5 +1,6 @@
 import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
+import { onDomChange } from "../dom-watch";
 
 /**
  * Fold the "who liked this" list down to a handful of faces.
@@ -89,7 +90,7 @@ function scan(root: ParentNode): void {
 export function facepile(_api: PluginApi): DfpModule {
   return {
     id: "facepile",
-    budgetMs: 4,
+    budgetMs: 60,
 
     install() {
       // Deferred: a topic can hold a hundred posts, and a synchronous sweep is
@@ -98,7 +99,7 @@ export function facepile(_api: PluginApi): DfpModule {
 
       /* The list is empty until someone opens it, so the interesting event is
        * always a mutation rather than a page change. */
-      const observer = new MutationObserver((records) => {
+      onDomChange((records) => {
         for (const rec of records) {
           for (const node of rec.addedNodes) {
             if (!(node instanceof HTMLElement)) continue;
@@ -122,7 +123,6 @@ export function facepile(_api: PluginApi): DfpModule {
           }
         }
       });
-      observer.observe(document.documentElement, { childList: true, subtree: true });
     },
   };
 }

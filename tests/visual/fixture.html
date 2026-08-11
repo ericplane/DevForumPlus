@@ -140,6 +140,23 @@
     <h1><a href="#" class="fancy-title">DataStore :GetAsync() throttling on high player counts</a></h1>
   </div>
 
+  <!-- The real wrapper chain, read off a live topic. It is here because rules
+       keyed on `.post-stream` or `#main-outlet` — the pinned-OP column, and the
+       `.topic-area > .post-stream` margin — were invisible to this harness while
+       it still reported success. Verified live:
+         #main-outlet > .ember-view > .container.posts > .row
+           > section#topic.topic-area > .posts-wrapper > .ember-view > .post-stream
+       Note the two levels between `.topic-area` and `.post-stream`; a direct-child
+       selector across them never matches. -->
+  <div id="main-outlet">
+  <div class="ember-view">
+  <div class="container posts">
+  <div class="row">
+  <section id="topic" class="topic-area">
+  <div class="posts-wrapper">
+  <div class="ember-view">
+  <div class="post-stream">
+
   <!-- Staff post -->
   <div class="topic-post clearfix topic-owner group-Roblox_Staff regular">
     <article id="post_1" class="boxed onscreen-post" data-post-id="1">
@@ -221,23 +238,59 @@ end</code></pre>
     </article>
   </div>
 
-  <!-- Luau code intelligence. Generated from the real `segment()` output for a
-       snippet taken off the forum, so the token classes here are exactly the
-       ones the extension emits — see .tmp/emit.ts in the commit that added it.
-       This is what makes the harness cover code colouring across themes. -->
+  <!-- Luau code intelligence. GENERATED, never hand-written: this is exactly what
+       `segment()` and `renderBlock()` emit for the snippet below, taken by running
+       the real decorator over it.
+
+       The previous version claimed to be real output and was not. It was typed by
+       hand, dropped .dfp-doc-link, faked href="#" on both anchors and used seven of
+       the eleven token classes — so `.dfp-doc-link` and `.dfp-dep` had never once
+       been rendered by this harness, in any theme, despite both being styled in
+       code.css. A fixture that flatters the CSS is worse than no fixture.
+
+       This one covers all eleven token classes, .dfp-dep at every severity, an
+       owner-level docs link with its real href, a member-level anchor shipping inert
+       (no href by design — the isolated world adds it after confirming against the
+       member index), token spans nested inside a multi-token mark, and the
+       .dfp-code-note summary. To regenerate after a renderer change, run this source
+       through `renderCodeBlock` in tests/unit/dom-stub.ts and paste the result. -->
   <div class="topic-post clearfix regular">
     <article class="boxed onscreen-post" data-post-id="9">
       <div class="row">
         <div class="topic-body clearfix">
           <div class="regular contents">
             <div class="cooked">
-              <pre><code class="dfp-luau lang-lua"><span class="dfp-tok-kw">local</span> killbrick <span class="dfp-tok-op">=</span> <a class="dfp-tok-builtin" href="#" data-dfp-api="Script">script</a>.<a class="dfp-tok-prop" href="#" data-dfp-api="Script.Parent">Parent</a>
-killbrick.<span class="dfp-tok-prop">Touched</span>:<span class="dfp-tok-method">Connect</span>(<span class="dfp-tok-kw">function</span>(otherpart)
-	<span class="dfp-tok-kw">local</span> humanoid <span class="dfp-tok-op">=</span> otherpart.<span class="dfp-tok-prop">Parent</span>:<span class="dfp-tok-method">FindFirstChild</span>(<span class="dfp-tok-str">"Humanoid"</span>)
-	<span class="dfp-tok-kw">if</span> humanoid <span class="dfp-tok-kw">then</span>
-		humanoid.<span class="dfp-tok-prop">Health</span> <span class="dfp-tok-op">=</span> <span class="dfp-tok-num">0</span>
+              <div class="dfp-code-note">wait · Instance.new(…, parent) · Hat · +2 more — hover for details</div>
+              <pre><code class="lang-lua dfp-luau"><span class="dfp-tok-com">-- Killbrick off the old wiki, with types bolted on. The forum runs this</span>
+<span class="dfp-tok-com">-- through highlight.js's *Lua* grammar, which has no idea what half of it is.</span>
+<span class="dfp-tok-kw">type</span> <span class="dfp-tok-type">Damage</span> <span class="dfp-tok-op">=</span> <span class="dfp-tok-op">{</span> amount<span class="dfp-tok-op">:</span> <span class="dfp-tok-type">number</span><span class="dfp-tok-op">,</span> fatal<span class="dfp-tok-op">:</span> <span class="dfp-tok-type">boolean</span> <span class="dfp-tok-op">}</span>
+
+<span class="dfp-tok-kw">local</span> Players <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/DataModel" target="_blank" rel="noopener noreferrer" title="DataModel — Creator Docs" data-dfp-api="DataModel">game</a><span class="dfp-tok-op">:</span><a class="dfp-tok-method" data-dfp-api="DataModel.GetService">GetService</a><span class="dfp-tok-op">(</span><a class="dfp-doc-link dfp-tok-str" href="https://create.roblox.com/docs/reference/engine/classes/Players" target="_blank" rel="noopener noreferrer" title="Players — Creator Docs" data-dfp-api="Players">"Players"</a><span class="dfp-tok-op">)</span>
+<span class="dfp-tok-kw">local</span> killbrick <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/Script" target="_blank" rel="noopener noreferrer" title="Script — Creator Docs" data-dfp-api="Script">script</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Script.Parent">Parent</a>
+
+<span class="dfp-tok-kw">local</span> <span class="dfp-tok-kw">function</span> <span class="dfp-tok-fn">hurt</span><span class="dfp-tok-op">(</span>hum<span class="dfp-tok-op">:</span> <a class="dfp-doc-link dfp-tok-type" href="https://create.roblox.com/docs/reference/engine/classes/Humanoid" target="_blank" rel="noopener noreferrer" title="Humanoid — Creator Docs" data-dfp-api="Humanoid">Humanoid</a><span class="dfp-tok-op">,</span> opts<span class="dfp-tok-op">:</span> <span class="dfp-tok-type">Damage</span><span class="dfp-tok-op">)</span><span class="dfp-tok-op">:</span> <span class="dfp-tok-type">boolean</span>
+	<span class="dfp-tok-kw">if</span> <a class="dfp-doc-link" href="https://create.roblox.com/docs/reference/engine/classes/Humanoid" target="_blank" rel="noopener noreferrer" title="Humanoid — Creator Docs" data-dfp-api="Humanoid">hum</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Humanoid.Health">Health</a> <span class="dfp-tok-op">&lt;=</span> opts<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">amount</span> <span class="dfp-tok-kw">then</span>
+		<a class="dfp-doc-link" href="https://create.roblox.com/docs/reference/engine/classes/Humanoid" target="_blank" rel="noopener noreferrer" title="Humanoid — Creator Docs" data-dfp-api="Humanoid">hum</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Humanoid.Health">Health</a> <span class="dfp-tok-op">=</span> <span class="dfp-tok-num">0</span>
+		<span class="dfp-tok-kw">return</span> <span class="dfp-tok-kw">true</span>
 	<span class="dfp-tok-kw">end</span>
-<span class="dfp-tok-kw">end</span>)</code></pre>
+	<a class="dfp-doc-link" href="https://create.roblox.com/docs/reference/engine/classes/Humanoid" target="_blank" rel="noopener noreferrer" title="Humanoid — Creator Docs" data-dfp-api="Humanoid">hum</a><span class="dfp-tok-op">:</span><a class="dfp-tok-method" data-dfp-api="Humanoid.TakeDamage">TakeDamage</a><span class="dfp-tok-op">(</span>opts<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">amount</span><span class="dfp-tok-op">)</span>
+	<span class="dfp-tok-kw">return</span> <span class="dfp-tok-kw">false</span>
+<span class="dfp-tok-kw">end</span>
+
+killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</span><span class="dfp-tok-op">:</span><span class="dfp-tok-method">Connect</span><span class="dfp-tok-op">(</span><span class="dfp-tok-kw">function</span><span class="dfp-tok-op">(</span>hit<span class="dfp-tok-op">)</span>
+	<span class="dfp-tok-kw">local</span> hum <span class="dfp-tok-op">=</span> hit<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Parent</span><span class="dfp-tok-op">:</span><span class="dfp-tok-method">FindFirstChildOfClass</span><span class="dfp-tok-op">(</span><a class="dfp-doc-link dfp-tok-str" href="https://create.roblox.com/docs/reference/engine/classes/Humanoid" target="_blank" rel="noopener noreferrer" title="Humanoid — Creator Docs" data-dfp-api="Humanoid">"Humanoid"</a><span class="dfp-tok-op">)</span>
+	<span class="dfp-tok-kw">if</span> <span class="dfp-tok-kw">not</span> hum <span class="dfp-tok-kw">then</span> <span class="dfp-tok-kw">return</span> <span class="dfp-tok-kw">end</span>
+	<span class="dfp-tok-kw">if</span> hurt<span class="dfp-tok-op">(</span>hum<span class="dfp-tok-op">,</span> <span class="dfp-tok-op">{</span> amount <span class="dfp-tok-op">=</span> <span class="dfp-tok-num">25</span><span class="dfp-tok-op">,</span> fatal <span class="dfp-tok-op">=</span> <span class="dfp-tok-kw">true</span> <span class="dfp-tok-op">}</span><span class="dfp-tok-op">)</span> <span class="dfp-tok-kw">then</span>
+		<a class="dfp-tok-builtin" data-dfp-api="globals.print">print</a><span class="dfp-tok-op">(</span><span class="dfp-tok-str">`</span><span class="dfp-tok-op">{</span><a class="dfp-doc-link" href="https://create.roblox.com/docs/reference/engine/classes/Players" target="_blank" rel="noopener noreferrer" title="Players — Creator Docs" data-dfp-api="Players">Players</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Players.LocalPlayer">LocalPlayer</a><span class="dfp-tok-op">}</span><span class="dfp-tok-str"> died at </span><span class="dfp-tok-op">{</span><a class="dfp-tok-legacy" data-dfp-api="globals.tick">tick</a><span class="dfp-tok-op">(</span><span class="dfp-tok-op">)</span><span class="dfp-tok-op">}</span><span class="dfp-tok-str">`</span><span class="dfp-tok-op">)</span>
+	<span class="dfp-tok-kw">end</span>
+	<span class="dfp-dep dfp-dep--warn dfp-tok-legacy" title="Deprecated — use task.wait(). Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it." data-dfp-replacement="task.wait()" data-dfp-why="Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it.">wait</span><span class="dfp-tok-op">(</span><span class="dfp-tok-num">0.5</span><span class="dfp-tok-op">)</span>      <span class="dfp-tok-com">-- dimmed and marked</span>
+	<a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/libraries/task" target="_blank" rel="noopener noreferrer" title="task — Creator Docs" data-dfp-api="task">task</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="task.wait">wait</a><span class="dfp-tok-op">(</span><span class="dfp-tok-num">0.5</span><span class="dfp-tok-op">)</span> <span class="dfp-tok-com">-- the replacement, and neither</span>
+<span class="dfp-tok-kw">end</span><span class="dfp-tok-op">)</span>
+
+<span class="dfp-tok-kw">local</span> gui <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/Instance" target="_blank" rel="noopener noreferrer" title="Instance — Creator Docs" data-dfp-api="Instance">Instance</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Instance.new">new</a><span class="dfp-tok-op">(</span><a class="dfp-doc-link dfp-tok-str" href="https://create.roblox.com/docs/reference/engine/classes/ScreenGui" target="_blank" rel="noopener noreferrer" title="ScreenGui — Creator Docs" data-dfp-api="ScreenGui">"ScreenGui"</a><span class="dfp-dep dfp-dep--warn" title="Deprecated — use set .Parent last. The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead." data-dfp-replacement="set .Parent last" data-dfp-why="The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead."><span class="dfp-tok-op">,</span> Players<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">LocalPlayer</span></span><span class="dfp-tok-op">)</span>
+<span class="dfp-tok-kw">local</span> old <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/Instance" target="_blank" rel="noopener noreferrer" title="Instance — Creator Docs" data-dfp-api="Instance">Instance</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Instance.new">new</a><span class="dfp-tok-op">(</span><span class="dfp-dep dfp-dep--info dfp-tok-str" title="Deprecated. Hat is marked deprecated in Roblox's API dump." data-dfp-replacement="" data-dfp-why="Hat is marked deprecated in Roblox's API dump.">"Hat"</span><span class="dfp-tok-op">)</span>
+<span class="dfp-tok-kw">local</span> util <span class="dfp-tok-op">=</span> <span class="dfp-dep dfp-dep--error" title="Deprecated. Removed from the engine. Calling it errors." data-dfp-replacement="" data-dfp-why="Removed from the engine. Calling it errors.">LoadLibrary</span><span class="dfp-tok-op">(</span><span class="dfp-tok-str">"RbxUtility"</span><span class="dfp-tok-op">)</span>
+<span class="dfp-dep dfp-dep--info dfp-tok-legacy" title="Deprecated. Debug-only global; not meaningful in shipped code." data-dfp-replacement="" data-dfp-why="Debug-only global; not meaningful in shipped code.">printidentity</span><span class="dfp-tok-op">(</span><span class="dfp-tok-op">)</span></code></pre>
             </div>
           </div>
         </div>
@@ -276,6 +329,76 @@ killbrick.<span class="dfp-tok-prop">Touched</span>:<span class="dfp-tok-method"
       </div>
     </article>
   </div>
+
+  <!-- Quiet replies. The module marks the ROW and inserts the fold line as a
+       sibling of the <article> it hides — never into `.post-stream` itself,
+       which is the list Ember diffs. Only the run's first row carries a line;
+       the rest are empty rows. Toggle `data-dfp-quiet` in the toolbar to see
+       the folded state; without it this renders expanded, which is correct. -->
+  <div class="topic-post clearfix regular dfp-quiet">
+    <button type="button" class="dfp-quiet-fold" aria-expanded="false">
+      <span class="dfp-quiet-fold__count">3 quiet replies</span>
+      <span class="dfp-quiet-fold__hint">show</span>
+    </button>
+    <article id="post_3" class="boxed onscreen-post" data-post-id="3">
+      <div class="row">
+        <div class="topic-body clearfix">
+          <div class="topic-meta-data"><div class="names"><span class="first full-name"><a href="#">plate_of_beans</a></span></div></div>
+          <div class="regular contents"><div class="cooked"><p>Thanks!</p></div></div>
+        </div>
+      </div>
+    </article>
+  </div>
+  <div class="topic-post clearfix regular dfp-quiet">
+    <article id="post_4" class="boxed onscreen-post" data-post-id="4">
+      <div class="row">
+        <div class="topic-body clearfix">
+          <div class="topic-meta-data"><div class="names"><span class="first full-name"><a href="#">quinn_builds</a></span></div></div>
+          <div class="regular contents"><div class="cooked"><p>+1</p></div></div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <!-- An expanded run: same markup, plus the open modifier. -->
+  <div class="topic-post clearfix regular dfp-quiet dfp-quiet--open">
+    <button type="button" class="dfp-quiet-fold" aria-expanded="true">
+      <span class="dfp-quiet-fold__count">1 quiet reply</span>
+      <span class="dfp-quiet-fold__hint">hide</span>
+    </button>
+    <article id="post_5" class="boxed onscreen-post" data-post-id="5">
+      <div class="row">
+        <div class="topic-body clearfix">
+          <div class="topic-meta-data"><div class="names"><span class="first full-name"><a href="#">nyx_scripts</a></span></div></div>
+          <div class="regular contents"><div class="cooked"><p>bump</p></div></div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <!-- Not a `.topic-post`. The stream really does contain these, which is why
+       the pinned-OP column places `> *` rather than `> .topic-post` — anything
+       missed here would land on top of the panel in column 1. -->
+  <article id="post_6" class="small-action onscreen-post" aria-label="post #6">
+    <div class="topic-avatar">
+      <svg class="fa d-icon d-icon-unlock-keyhole svg-icon svg-node" aria-hidden="true"><use href="#hx-dot"></use></svg>
+    </div>
+    <div class="small-action-desc">
+      <div class="small-action-contents">
+        <a class="trigger-user-card" href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23b7791f'/%3E%3C/svg%3E"></a>
+        <p>Opened <span class="relative-date">Jan 28</span></p>
+      </div>
+    </div>
+  </article>
+
+  </div><!-- .post-stream -->
+  </div><!-- .ember-view -->
+  </div><!-- .posts-wrapper -->
+  </section><!-- .topic-area -->
+  </div><!-- .row -->
+  </div><!-- .container.posts -->
+  </div><!-- .ember-view -->
+  </div><!-- #main-outlet -->
 </section>
 
 <section class="harness-block">
@@ -298,5 +421,85 @@ killbrick.<span class="dfp-tok-prop">Touched</span>:<span class="dfp-tok-method"
   </div>
   <div class="harness-row">
     <div class="alert alert-info">Feature Requests requires membership in <strong>AllowFeatureRequests</strong>.</div>
+  </div>
+</section>
+
+<section class="harness-block">
+  <h2 class="harness-label">Module affordances</h2>
+
+  <!-- Toggles the modules mount into the timeline rail. `.timeline-footer-controls`
+       is the real anchor: verified live that `.topic-footer-main-buttons` does not
+       exist until you reach the end of a long stream. -->
+  <div class="topic-timeline">
+    <div class="timeline-footer-controls">
+      <button type="button" class="btn btn-default dfp-thread-toggle" aria-pressed="false">Thread view</button>
+      <button type="button" class="btn btn-default dfp-op-toggle" aria-pressed="true">Pin post</button>
+      <button type="button" class="btn btn-default dfp-quiet-toggle" aria-pressed="false">Quiet (3)</button>
+      <!-- Disabled state: deep in a topic Discourse has unloaded post 1, so
+           there is nothing to pin. It dims rather than disappearing. -->
+      <button type="button" class="btn btn-default dfp-op-toggle" aria-pressed="false" disabled
+              title="The opening post is not loaded this far down the topic — scroll to the top to pin it">Pin post</button>
+    </div>
+  </div>
+
+  <!-- The code-block control cluster. Every button here is opacity:0 at rest and
+       revealed on `pre:hover` — so this reviews nothing until you hover it. That
+       is the shipped behaviour of the cluster, not an oversight. -->
+  <div class="cooked">
+    <pre><div class="codeblock-button-wrapper">
+      <span class="dfp-code-lang">luau</span>
+      <button class="btn btn-flat nohighlight dfp-code-btn dfp-code-fix" title="Replace 2 deprecated calls">copy with 2 fixes</button>
+      <button class="btn btn-flat nohighlight dfp-code-btn dfp-code-bare">copy without comments</button>
+      <button class="btn nohighlight copy-cmd btn-flat" title="copy code to clipboard"></button>
+    </div><code class="lang-lua dfp-luau"><span class="dfp-tok-legacy">wait</span><span class="dfp-tok-op">(</span><span class="dfp-tok-num">1</span><span class="dfp-tok-op">)</span></code></pre>
+
+    <!-- Asset references. Only links this module BUILDS carry `.dfp-asset`;
+         Discourse's own anchors are marked with a data attribute and left
+         visually untouched. -->
+    <p>
+      Set it to <a class="dfp-asset" href="https://www.roblox.com/library/21070012" rel="noopener noreferrer">rbxassetid://21070012</a>
+      and see <a href="https://www.roblox.com/library/1818" data-dfp-asset="1818">this catalog item</a>.
+    </p>
+  </div>
+
+  <!-- Topic hover card. Deliberately shown in its worst state — a long title
+       that has to clamp, every badge at once, and an excerpt long enough to hit
+       the four-line cut — because the tidy case would hide all three limits. -->
+  <div class="harness-row">
+    <div class="dfp-topic-preview" style="position: static">
+      <div class="dfp-topic-card">
+        <div class="dfp-topic-card__title">DataStore :GetAsync() throttling on high player counts — what is the correct retry pattern for a live game?</div>
+        <div class="dfp-topic-card__badges">
+          <span class="dfp-topic-card__badge dfp-topic-card__badge--solved">Solved by Abstler</span>
+          <span class="dfp-topic-card__badge dfp-topic-card__badge--stale">last active 3 years ago</span>
+          <span class="dfp-topic-card__badge dfp-topic-card__badge--closed">Closed</span>
+        </div>
+        <div class="dfp-topic-card__meta">19 replies · asked 6 years ago · active 3 years ago · post #12</div>
+        <div class="dfp-topic-card__excerpt">I have been getting throttled on GetAsync when more than about forty players join at once. The wiki says the budget is per-key but that does not match what I am seeing — the requests queue up and eventually time out entirely, and retrying immediately just makes it worse.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The hover card. One shared element on <body>, `position: fixed`,
+       `pointer-events: none`. Shown here inline so it can be reviewed at all;
+       in the product it is only ever mounted after its image has loaded. -->
+  <div class="harness-row">
+    <div class="dfp-asset-preview" style="position: static">
+      <img width="150" height="150" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Crect width='150' height='150' fill='%232b3a55'/%3E%3Ccircle cx='75' cy='62' r='30' fill='%234c8bf5'/%3E%3C/svg%3E">
+    </div>
+
+    <!-- A game gets the wide splash plus who made it and how big it is. Places
+         resolve through the game endpoints, not the asset one, because through
+         the asset endpoint a place comes back as a square icon. -->
+    <div class="dfp-asset-preview dfp-asset-preview--game" style="position: static">
+      <div class="dfp-asset-preview__game">
+        <img width="260" height="146" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180' viewBox='0 0 320 180'%3E%3Crect width='320' height='180' fill='%231f2b3d'/%3E%3Crect y='120' width='320' height='60' fill='%232f4a2f'/%3E%3Ccircle cx='240' cy='48' r='22' fill='%23e8c15a'/%3E%3C/svg%3E">
+        <!-- Deliberately a long studio name: it is the line allowed to
+             truncate, so the counts below it can never be the casualty. -->
+        <div class="dfp-asset-preview__title">Eurotunnel, Border Roleplay</div>
+        <div class="dfp-asset-preview__by">by Eurotunnel | Le Shuttle Community Team</div>
+        <div class="dfp-asset-preview__meta">337 playing · 45.2M visits</div>
+      </div>
+    </div>
   </div>
 </section>

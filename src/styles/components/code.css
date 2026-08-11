@@ -89,51 +89,84 @@ html[data-dfp] .codeblock-button-wrapper .btn:hover {
   border-color: var(--dfp-border-strong);
 }
 
-/* highlight.js token colours, retargeted at DFP tokens so code blocks belong
- * to the same palette as everything else.
+/* highlight.js token colours, for every block our own tokenizer does not claim.
  *
- * Worth knowing what this is actually colouring: the forum's
- * `highlighted_languages` setting lists `lua` and has no `luau` entry, and
- * fenced blocks render as `class="lang-lua hljs language-lua"`. So every Luau
- * snippet on this site is tokenised by the *Lua* grammar — type annotations,
- * `::` casts, `continue`, generics and string interpolation all come out
- * wrong. Recolouring cannot fix that; a real Luau grammar (M3) can. These
- * rules only stop code blocks from clashing with the rest of the palette. */
+ * Deliberately unscoped by language. A Luau block is re-tokenised and its hljs
+ * markup replaced outright (see `.dfp-luau` below), so what reaches these rules
+ * is everything else on the forum — JS, TS, Python, C#, JSON, shell — and each
+ * of those needs colouring just as much as Luau does.
+ *
+ * Painted from the --dfp-code-* ramp rather than from the seed colours, because
+ * the ramp is the only set in the repo whose members are asserted against *each
+ * other*: build-tokens.ts checks all 55 pairs and re-checks them under a
+ * deuteranopia simulation. The seeds are asserted against surfaces and body
+ * text and never against one another, and as syntax colours it showed:
+ *
+ *   .hljs-built_in vs .hljs-number   0.163-0.179Δ, both warm, against a 0.096 floor
+ *   .hljs-keyword  vs .hljs-title    0.006Δ dark, 0.000Δ dim, to a deuteranope
+ *
+ * The second is the one that mattered. --dfp-staff and --dfp-accent are not
+ * merely close but *identical* on dim for the ~1 in 12 men who cannot use the
+ * red-green axis, so `function foo` carried no colour boundary at all. On the
+ * ramp the worst pair across the four themes is 0.097Δ and the worst
+ * deuteranope pair 0.045Δ, against 0.097 / 0.066 on the eleven-role Luau ramp
+ * beside it. Both residuals involve one of the three roles below that stay on
+ * the text ramp, which the pairwise assertions do not reach.
+ *
+ * `.hljs-built_in` had a second reason to move: it was the last thing outside
+ * the deprecation system painting itself --dfp-deprecated, which now means
+ * exactly one thing. (That collision measured 1.03:1 / 0.077Δ when it was
+ * found; --dfp-deprecated has since been pulled off the shared seed lightness,
+ * so as shipped it was 1.58:1 / 0.174Δ — still half the floor.)
+ *
+ * Params, variables and names stay on the text ramp on purpose: they are
+ * ordinary identifiers, and an unclassed identifier inside a Luau block renders
+ * as --dfp-text too. The two kinds of block agree about what "just a name" is. */
 html[data-dfp] .hljs-keyword,
 html[data-dfp] .hljs-selector-tag,
 html[data-dfp] .hljs-literal {
-  color: var(--dfp-staff);
+  color: var(--dfp-code-kw);
 }
 
 html[data-dfp] .hljs-string,
 html[data-dfp] .hljs-attr {
-  color: var(--dfp-success);
+  color: var(--dfp-code-str);
 }
 
 html[data-dfp] .hljs-number,
 html[data-dfp] .hljs-symbol {
-  color: var(--dfp-warning);
+  color: var(--dfp-code-num);
 }
 
+/* Stays on --dfp-text-3 rather than --dfp-code-com: text-3 now clears 4.5:1 on
+ * --dfp-surface-2 in all four themes, and a comment in someone else's Python is
+ * the same "aside" that every other muted body text on the page is. */
 html[data-dfp] .hljs-comment,
 html[data-dfp] .hljs-quote {
   color: var(--dfp-text-3);
   font-style: italic;
 }
 
+/* `title` is a declaration site — the name in `function foo` or `class Foo` —
+ * which is exactly the role --dfp-code-fn names on the Luau side. */
 html[data-dfp] .hljs-title,
 html[data-dfp] .hljs-function .hljs-title,
 html[data-dfp] .hljs-section {
-  color: var(--dfp-accent);
+  color: var(--dfp-code-fn);
 }
 
 html[data-dfp] .hljs-params {
   color: var(--dfp-text-2);
 }
 
-html[data-dfp] .hljs-built_in,
+html[data-dfp] .hljs-built_in {
+  color: var(--dfp-code-builtin);
+}
+
+/* Split from built_in: there is a real type role now, and `int`/`string` in a
+ * C# signature is the same idea as `: number` in a Luau one. */
 html[data-dfp] .hljs-type {
-  color: var(--dfp-deprecated);
+  color: var(--dfp-code-type);
 }
 
 html[data-dfp] .hljs-variable,
@@ -146,29 +179,89 @@ html[data-dfp] .hljs-name {
  * tokenizer and the highlight.js Lua markup is gone. The hljs rules above
  * still apply to every other language on the forum. */
 
+/* All eleven classes are painted from --dfp-code-*, a ramp lit for this job and
+ * nothing else. build-tokens.ts asserts every one of them >= 4.5:1 against
+ * --dfp-surface-2 (the block background, line 20) and >= 0.10Δ from --dfp-text
+ * (untokenised code, line 36, so no class is invisible work), then asserts all
+ * 55 pairs against each other and again under a deuteranopia simulation.
+ *
+ * That last family is why these are not seed colours. Syntax highlighting is
+ * the one place in the product where colour is the *only* channel carrying
+ * meaning — no icon, no label, no position to fall back on. */
+
 html[data-dfp] code.dfp-luau .dfp-tok-kw {
-  color: var(--dfp-staff);
+  color: var(--dfp-code-kw);
 }
 
 html[data-dfp] code.dfp-luau .dfp-tok-builtin {
-  color: var(--dfp-accent);
+  color: var(--dfp-code-builtin);
 }
 
 html[data-dfp] code.dfp-luau .dfp-tok-str {
-  color: var(--dfp-success);
+  color: var(--dfp-code-str);
 }
 
 html[data-dfp] code.dfp-luau .dfp-tok-num {
-  color: var(--dfp-warning);
+  color: var(--dfp-code-num);
 }
 
 html[data-dfp] code.dfp-luau .dfp-tok-com {
-  color: var(--dfp-text-3);
+  color: var(--dfp-code-com);
   font-style: italic;
 }
 
+/* Operators *and* punctuation — code-intel maps both `operator` and `punct`
+ * here, because `.` and `:` are the same syntactic category as `=` and `..`.
+ *
+ * Punctuation used to be unmapped, so `.` `:` `,` `;` and every bracket
+ * inherited --dfp-text at OKLab L 0.966 while the `=` beside them sat at
+ * --dfp-text-2's 0.782 — 1.801:1 apart on dark, one category rendered two ways,
+ * decided only by which characters happened to be listed in the tokenizer's
+ * operator string. In `a.b:c(d, e)` the glue was the brightest thing on the line.
+ *
+ * Colour only, deliberately. This selector now matches a large share of the
+ * glyphs in a block, so letter-spacing, font-weight or opacity here would
+ * re-space or re-weight the code rather than tint it. */
 html[data-dfp] code.dfp-luau .dfp-tok-op {
-  color: var(--dfp-text-2);
+  color: var(--dfp-code-op);
+}
+
+/* Type annotations, assigned by position rather than by lexeme — type-ness is
+ * where a name sits, not how it is spelled. Covers `::` casts, `->` returns,
+ * `type X =` aliases, union arms and generic lists, so
+ * `local function f(a: number, b: string): boolean` renders all three
+ * annotations identically. They used to come out plain, builtin-blue and
+ * method-gold respectively: three colours for one idea. */
+html[data-dfp] code.dfp-luau .dfp-tok-type {
+  color: var(--dfp-code-type);
+}
+
+/* Function declaration sites only, all four syntactic forms in one colour, so a
+ * long block can be scanned for the places things are *defined*. Every later
+ * mention stays an ordinary reference — `function M.init()` colours `init` and
+ * leaves `M` as the table it is at every other mention. */
+html[data-dfp] code.dfp-luau .dfp-tok-fn {
+  color: var(--dfp-code-fn);
+}
+
+/* Deprecated globals — `wait`, `spawn`, `delay`, `tick`, `loadstring`.
+ *
+ * Dimmed, and never promoted. These arrived as `builtin` and took the same
+ * confident blue as `task`, so the colour said "blessed stdlib" while the 1px
+ * wavy underline three pixels below said the opposite. Only one of them can be
+ * right, and it is not the colour.
+ *
+ * The ramp places this below plain identifier text in every theme — OKLab L
+ * 0.663 against --dfp-text's 0.966 on dark, and the polarity flips with the
+ * theme (0.556 against 0.256 on light), so it recedes on both. It is also never
+ * brighter than --dfp-code-builtin, the blue it was carved out of: 0.663 vs
+ * 0.727 on dark. Still >= 4.73:1 on --dfp-surface-2 everywhere — recessive is
+ * not the same as unreadable, and this is somebody's working code.
+ *
+ * Only the bare word dims. `task.wait` keeps the member colour, because the
+ * entire point is that the replacement is fine. */
+html[data-dfp] code.dfp-luau .dfp-tok-legacy {
+  color: var(--dfp-code-legacy);
 }
 
 /* Fields and methods — everything after a `.` or a `:`.
@@ -176,27 +269,34 @@ html[data-dfp] code.dfp-luau .dfp-tok-op {
  * These were plain `ident` and rendered the same white as a local, so
  * `killbrick.Touched:Connect(…)` gave no clue which name was the variable and
  * which two were the API. In a language written almost entirely as `a.b:c()`,
- * that is the colour that carries the most meaning per pixel.
+ * that is the colour that carries the most meaning per pixel. `:` is behaviour
+ * and `.` is data, which is what Luau's own syntax means, so they stay two
+ * colours rather than one.
  *
- * Mixed from existing tokens rather than declared as new hex, so both stay
- * theme-aware and inherit the ramp's contrast behaviour: mixing toward
- * `--dfp-text` lightens on the dark themes and darkens on light, which is the
- * right direction in both. Pale blue for data and pale gold for behaviour is
- * the convention most editors settled on, and it keeps them clear of the
- * saturated accent (builtins) and warning (numbers) they are derived from. */
-
-/* Mixed at 80/20 rather than the 55/45 this started at. The first attempt
- * measured 1.47:1 against plain identifier text — technically a different hue,
- * but at 13px on a dark background a pale blue that close to #eff4fc simply
- * reads as white, and the colour that was supposed to name every member of
- * every expression did nothing. Keeping most of the source hue is what makes
- * `killbrick.Touched` legible as variable-then-member at a glance. */
+ * They used to be mixed from the tokens beside them —
+ * `color-mix(in oklab, var(--dfp-accent) 80%, var(--dfp-text))`, and the same
+ * against --dfp-warning — on the stated theory that this kept them "clear of
+ * the saturated accent (builtins) and warning (numbers) they are derived from".
+ * It did the exact opposite. color-mix toward --dfp-text moves along LIGHTNESS,
+ * and the source colour is each member's nearest neighbour on precisely that
+ * axis, so the mix walked both colours straight at the token they most needed
+ * to be told apart from:
+ *
+ *   prop   vs builtin   1.177:1   0.055Δ
+ *   method vs num       1.184:1   0.057Δ
+ *
+ * against a 0.096 floor. Every `math.floor`, `Instance.new` and `Vector3.new`
+ * set a builtin directly against a near-identical member. The 80/20 direction
+ * was right and 55/45 was measurably worse, but no ratio could have fixed this:
+ * the axis was wrong. The ramp rotates HUE instead, and prop and method now sit
+ * 0.187Δ and 0.210Δ from those neighbours and 0.198Δ from each other (worst
+ * theme in each case). */
 html[data-dfp] code.dfp-luau .dfp-tok-prop {
-  color: color-mix(in oklab, var(--dfp-accent) 80%, var(--dfp-text));
+  color: var(--dfp-code-prop);
 }
 
 html[data-dfp] code.dfp-luau .dfp-tok-method {
-  color: color-mix(in oklab, var(--dfp-warning) 80%, var(--dfp-text));
+  color: var(--dfp-code-method);
 }
 
 /* ── Deprecation marks ───────────────────────────────────────────────────
@@ -213,8 +313,19 @@ html[data-dfp] .dfp-dep {
   transition: background-color var(--dfp-dur-1) var(--dfp-ease);
 }
 
+/* --dfp-deprecated explicitly, never currentColor.
+ *
+ * currentColor inside a mark is the *token* colour: builtin blue on `wait`,
+ * string green on the parent argument in `Instance.new(…, p)`, and since a
+ * multi-token finding now nests its own token spans, whatever the first child
+ * happens to be. So the old mix tinted a deprecation warning with whatever the
+ * syntax highlighter had just painted there, and never once with a colour from
+ * the deprecation family.
+ *
+ * 14% lands 0.079-0.103Δ off --dfp-surface-2 — a wash that answers the pointer
+ * without becoming the highlight these marks deliberately are not. */
 html[data-dfp] .dfp-dep:hover {
-  background: color-mix(in oklab, currentColor 14%, transparent);
+  background: color-mix(in oklab, var(--dfp-deprecated) 14%, transparent);
 }
 
 html[data-dfp] .dfp-dep--error {
@@ -240,7 +351,22 @@ html[data-dfp] .dfp-doc-link {
   text-underline-offset: 3px;
 }
 
-html[data-dfp] .dfp-doc-link:hover {
+/* The second selector exists purely to outrank the token rules above.
+ *
+ * `html[data-dfp] .dfp-doc-link:hover` is (0,3,1) and every `.dfp-tok-*` rule is
+ * (0,3,2), so on any anchor carrying a token class — which is most of them;
+ * code-intel.ts:537 and docs-card.ts:530 both stack `dfp-doc-link` onto
+ * `dfp-tok-*` — the hover colour lost and never applied. The visible casualty
+ * was `.dfp-tok-method`, gold at rest and 0.28-0.30Δ from the accent hover
+ * wants, so :GetService, :Connect and :Create simply never lit up. Adding the
+ * `code.dfp-luau` hop makes it (0,4,2).
+ *
+ * The unscoped copy is kept for any doc link that ends up outside a `.dfp-luau`
+ * block. Only :hover is raised: `color: inherit` above losing to the token rules
+ * is the intended behaviour, since the token colour should survive underneath
+ * the dotted underline. The underline itself was never contested. */
+html[data-dfp] .dfp-doc-link:hover,
+html[data-dfp] code.dfp-luau .dfp-doc-link:hover {
   color: var(--dfp-accent);
   text-decoration-color: var(--dfp-accent);
 }
@@ -259,7 +385,23 @@ html[data-dfp] .dfp-code-note {
   gap: 6px;
   margin-block: var(--dfp-s-4) 0;
   padding: 6px var(--dfp-s-4);
-  background: color-mix(in oklab, var(--dfp-deprecated) 12%, var(--dfp-surface-2));
+  /* Solid --dfp-surface-2, not a 12% wash of --dfp-deprecated over it.
+   *
+   * The build guard measures --dfp-deprecated against the *untinted* surface,
+   * so for as long as the stylesheet painted a wash underneath, the assertion
+   * was modelling a background that never shipped. That gap is how this pair
+   * reached 4.481:1 (dim) and 4.465:1 (light) at 12px — both under the 4.5 the
+   * guard believed it was enforcing. --dfp-deprecated has since been pulled off
+   * the shared seed lightness, which lifts even the tinted version to
+   * 6.87-11.32:1, so this is no longer a live failure; it is removed because a
+   * stylesheet should not depend on a margin nothing measures. On the solid
+   * surface it is 8.85-13.54:1 and the guard is checking what is on screen.
+   *
+   * Losing the fill costs nothing. The tinted border and the shared radius
+   * already carry the identity, and with the same background as the block the
+   * note reads as its cap rather than a band stacked above it — which is what
+   * the join below is for. */
+  background: var(--dfp-surface-2);
   border: 1px solid color-mix(in oklab, var(--dfp-deprecated) 26%, var(--dfp-border));
   border-block-end: 0;
   border-start-start-radius: var(--dfp-r-md);
@@ -355,4 +497,45 @@ html[data-dfp] .dfp-code-expand:hover {
   background: var(--dfp-surface-3);
   border-color: var(--dfp-border-strong);
   color: var(--dfp-text);
+}
+
+/* ── Copy with fixes ─────────────────────────────────────────────────────
+ * The one control in the cluster that does not hand back what is on screen.
+ * `wrap`, `copy without comments` and Discourse's own copy all return the
+ * author's characters; this one returns characters the author never wrote, so
+ * it should not be the third identical grey button in the row.
+ *
+ * It takes --dfp-deprecated, which already means exactly one thing in this
+ * stylesheet — it draws the wavy marks 250 lines above and labels the findings
+ * note — so the button reads as the actionable end of those marks rather than
+ * as another copy. That is the whole reason it is not --dfp-accent: accent is
+ * "this is interactive", which every button here already is, and it would tie
+ * the control to nothing in the block.
+ *
+ * Measured against --dfp-surface-3, the background `.codeblock-button-wrapper
+ * .btn` gives it at rest: 9.72:1 dark, 7.90:1 dim, 12.66:1 black, 8.80:1 light.
+ * On hover that rule swaps in --dfp-surface-2, where build-tokens.ts already
+ * asserts --dfp-deprecated >= 4.5:1 as body text. (Neither number is inherited
+ * from the neighbours: --dfp-text-3 measures 4.15-5.35:1 on surface-3, and the
+ * only assertion covering it is `text-3 on surface-2` — the buttons do not sit
+ * on surface-2.)
+ *
+ * Colour only, and the `.codeblock-button-wrapper` hop is load-bearing rather
+ * than decorative: `html[data-dfp] .codeblock-button-wrapper .btn` is (0,3,1)
+ * and sets the grey, so `html[data-dfp] .dfp-code-fix` at (0,2,1) would lose
+ * outright — the same specificity trap `.dfp-doc-link:hover` fell into above.
+ * Background, radius, padding and the hidden-at-rest opacity are deliberately
+ * left to the shared rules; re-declaring any of them would make one button in
+ * the row a different shape. */
+html[data-dfp] .codeblock-button-wrapper .dfp-code-fix {
+  color: var(--dfp-deprecated);
+}
+
+/* Without this the shared `.btn:hover` — (0,3,2), same as here, so this rule
+ * wins on order — would repaint the button --dfp-text under the pointer, and
+ * the one thing the colour is carrying would vanish exactly when it is being
+ * used. */
+html[data-dfp] .codeblock-button-wrapper .dfp-code-fix:hover {
+  color: var(--dfp-deprecated);
+  border-color: color-mix(in oklab, var(--dfp-deprecated) 45%, var(--dfp-border));
 }

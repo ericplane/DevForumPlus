@@ -1,6 +1,7 @@
 import type { DfpModule } from "../../core/registry";
 import { chipStrip, loadGroups, usernameFromPath } from "../group-chips";
 import type { PluginApi } from "../types";
+import { onDomChange } from "../dom-watch";
 
 /**
  * Show every group on a profile, as flair chips.
@@ -52,7 +53,7 @@ function enhance(): void {
 export function profileGroups(api: PluginApi): DfpModule {
   return {
     id: "profile-groups",
-    budgetMs: 4,
+    budgetMs: 60,
 
     install() {
       const run = () => {
@@ -75,8 +76,7 @@ export function profileGroups(api: PluginApi): DfpModule {
 
       /* Expanding the header mounts `.secondary` long after page change, and
        * that is the only place these chips live. */
-      const observer = new MutationObserver(() => run());
-      observer.observe(document.documentElement, { childList: true, subtree: true });
+      onDomChange(() => run());
     },
   };
 }

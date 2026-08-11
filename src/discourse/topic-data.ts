@@ -19,6 +19,8 @@ export interface TopicPost {
   post_number: number;
   reply_to_post_number: number | null;
   reply_count?: number;
+  /** The post's rendered HTML. Only ever read as text — see topic-preview.ts. */
+  cooked?: string;
   username?: string;
   name?: string;
   created_at?: string;
@@ -41,7 +43,11 @@ export interface TopicPayload {
   id: number;
   title?: string;
   created_at?: string;
+  /** Verified present on the live payload; drives the staleness mark. */
+  last_posted_at?: string;
   posts_count?: number;
+  closed?: boolean;
+  archived?: boolean;
   accepted_answer?: AcceptedAnswer;
   post_stream: {
     posts: TopicPost[];

@@ -5,6 +5,9 @@ import {
   detect,
   inferLocalTypes,
   isTypePosition,
+  isAnnotationColon,
+  isFunctionNameSite,
+  declaredNames,
   exprTypeBefore,
   GLOBAL_TYPES,
   type Finding,
@@ -45,6 +48,46 @@ const DOCS_ROOT = "https://create.roblox.com/docs/reference/engine/";
 
 const PROCESSED = "data-dfp-code";
 
+/**
+ * Structure only Luau has. Any one of these is enough on its own.
+ *
+ * A local declaration that assigns or annotates, a `:GetService(` call, or a
+ * long comment — none of which survive being read as any other language in a
+ * `<pre>`.
+ */
+const LUAU_SIGNALS = [
+  /\blocal\s+(?:function\b|[A-Za-z_]\w*\s*[:=,])/,
+  /[.:]GetService\s*\(/,
+  /--\[=*\[/,
+];
+
+/**
+ * An opener that Luau closes with `end`.
+ *
+ * `do` is not one of them on its own — it is a common English word, and this
+ * runs on classless blocks that sometimes hold prose. The loop header is matched
+ * whole instead (`for i = `, `for k, v in `), which is a shape neither prose nor
+ * JavaScript produces; Python's `for x in y:` produces it but has no `end`.
+ */
+const BLOCK_OPENER =
+  /\b(?:function|then)\b|\bfor\s+[A-Za-z_]\w*\s*(?:,\s*[A-Za-z_]\w*\s*)*(?:=|\bin\b)/;
+
+/**
+ * `end` closing a block, rather than somebody's variable called `end`.
+ *
+ * A terminator ends a statement: nothing hands it to anything, and it takes no
+ * arguments. So it is never preceded by `,` `(` `[` `=` `:` or a quote — which
+ * covers `line[start:end]`, `slice(start, end)`, `{"end": 2}` and the JS shape
+ * that survives every looser test,
+ * `function trim(s, start, end) { return s.slice(start, end); }` — and it is
+ * never followed by an assignment, call, index or member access.
+ *
+ * Anchoring to the start of a line would have been simpler and was tried; it
+ * rejects the one-line paste this forum is full of,
+ * `part.Touched:Connect(function(hit) hit:Destroy() end)`.
+ */
+const END_KEYWORD = /(?<![,([=:"'][ \t]{0,8})\bend\b(?![ \t]*[=({[.:])/;
+
 /** Discourse tags fenced blocks `lang-lua`; unfenced blocks have no class. */
 function isLuauBlock(code: HTMLElement): boolean {
   const cls = code.className;
@@ -55,16 +98,37 @@ function isLuauBlock(code: HTMLElement): boolean {
   if (cls.trim() !== "") return false;
   const text = code.textContent ?? "";
   if (text.length < 12) return false;
-  return /\b(local|function|end|then|elseif)\b/.test(text) && /\bend\b/.test(text);
+
+  /* The two halves of this test used to share an alternation —
+   * `/\b(local|function|end|then|elseif)\b/ && /\bend\b/` — and because `end`
+   * appeared in both, the whole expression reduced to `/\bend\b/`. It claimed
+   * `return line[start:end]`, `str.slice(start, end)`,
+   * `WHERE id BETWEEN start AND end;` and the English sentence "read the thread
+   * to the end please", painting each as Luau and hanging fake deprecation marks
+   * on any `spawn` or `wait` in them — while rejecting
+   * `local Players = game:GetService("Players")` for not containing `end`.
+   * Keep the signals disjoint: a bare `end` proves nothing by itself. */
+  if (LUAU_SIGNALS.some((re) => re.test(text))) return true;
+  return BLOCK_OPENER.test(text) && END_KEYWORD.test(text);
 }
 
 const KIND_CLASS: Partial<Record<TokenKind, string>> = {
   keyword: "dfp-tok-kw",
   builtin: "dfp-tok-builtin",
+  legacy: "dfp-tok-legacy",
   string: "dfp-tok-str",
   number: "dfp-tok-num",
   comment: "dfp-tok-com",
   operator: "dfp-tok-op",
+  /* Punctuation is the same syntactic category as `=` and `..`, and it used to
+   * be the brightest thing in the block: unmapped, `.`/`:`/`,`/parens/braces
+   * inherited `--dfp-text` at OKLab L 0.966 against the operators' 0.782 beside
+   * them — 1.80:1, decided only by which characters happened to be listed in the
+   * tokenizer's operator string. */
+  punct: "dfp-tok-op",
+  /* Never emitted by the tokenizer — see TokenKind. Mapped so the two
+   * vocabularies stay one list; the class is assigned by position below. */
+  type: "dfp-tok-type",
 };
 
 /**
@@ -91,15 +155,26 @@ function memberClass(prevValue: string | undefined, kind: TokenKind): string | u
   return undefined;
 }
 
+export interface SegmentPart {
+  text: string;
+  cls?: string;
+}
+
 export interface Segment {
   text: string;
   cls?: string;
   finding?: Finding;
   /** `"TweenService"` or `"TweenService.Create"` — resolved against the docs. */
   api?: string;
+  /**
+   * Set only when a finding swallowed more than one token: the pieces, each
+   * keeping its own colour. See the mark branch in `renderBlock`.
+   */
+  parts?: SegmentPart[];
 }
 
-type Look = (i: number) => Token | null;
+/** Index of the next/previous significant token, or -1. Never a Token — see `segment`. */
+type Look = (i: number) => number;
 
 /**
  * Does the token at `i` name something with a Creator Docs page?
@@ -115,6 +190,7 @@ function apiRefAt(
   tokens: Token[],
   i: number,
   localTypes: Map<string, string>,
+  declared: Set<string>,
   after: Look,
   before: Look,
 ): string | undefined {
@@ -124,21 +200,30 @@ function apiRefAt(
   // `Instance.new("Part")`, `:GetService("Players")`, `:IsA("Humanoid")`,
   // `:FindFirstChildOfClass("Humanoid")`. Unambiguous by position.
   if (t.kind === "string") {
-    const open = before(i);
-    const fn = open?.value === "(" ? before(tokens.indexOf(open)) : null;
-    if (fn && CLASS_STRING_FNS.has(fn.value)) {
+    const openIdx = before(i);
+    const fnIdx = openIdx >= 0 && tokens[openIdx]!.value === "(" ? before(openIdx) : -1;
+    if (fnIdx >= 0 && CLASS_STRING_FNS.has(tokens[fnIdx]!.value)) {
       const name = t.value.slice(1, -1);
       if (DOC_CLASSES.has(name)) return name;
     }
     return undefined;
   }
 
-  if (t.kind !== "ident" && t.kind !== "builtin") return undefined;
+  if (t.kind !== "ident" && t.kind !== "builtin" && t.kind !== "legacy") return undefined;
 
-  const prev = before(i);
-  const next = after(i);
+  const prevIdx = before(i);
+  const nextIdx = after(i);
+  const prev = prevIdx >= 0 ? tokens[prevIdx]! : null;
+  const next = nextIdx >= 0 ? tokens[nextIdx]! : null;
   const afterDot = prev?.value === "." || prev?.value === ":";
-  const isReceiver = next?.value === "." || next?.value === ":";
+  /* `local hum: Humanoid` puts a `:` after `hum` in exactly the place a method
+   * call puts one, so `hum` entered the receiver branch and resolved through
+   * `localTypes` — which was filled in from that very annotation. The dotted
+   * docs underline ended up on the one token that is definitionally not an API
+   * name, while the class name three characters away stayed bare. An annotation
+   * colon is not a receiver. */
+  const isReceiver =
+    next?.value === "." || (next?.value === ":" && !isAnnotationColon(tokens, nextIdx));
 
   // ── Member of something whose owner is known ─────────────────────────────
   if (afterDot) {
@@ -146,9 +231,10 @@ function apiRefAt(
      * rather than a name — `game:GetService("UserInputService").InputBegan`, the
      * form people paste when they quote a single statement. `ownerOf` still
      * handles the cases it knows: a class or namespace used directly. */
-    const sepIdx = tokens.indexOf(prev!);
-    const recv = before(sepIdx);
-    const owner = exprTypeBefore(tokens, sepIdx, localTypes) ?? (recv ? ownerOf(recv, localTypes) : undefined);
+    const recvIdx = before(prevIdx);
+    const owner =
+      exprTypeBefore(tokens, prevIdx, localTypes) ??
+      (recvIdx >= 0 ? ownerOf(tokens[recvIdx]!, localTypes, declared) : undefined);
     if (!owner) return undefined;
 
     // `Enum.KeyCode.Space` — the middle segment is the enum, the last its item.
@@ -168,6 +254,16 @@ function apiRefAt(
   // ── A namespace or class used as a receiver ──────────────────────────────
   // `TweenService:Create`, `task.wait`, `Vector3.new`, `Enum.KeyCode`.
   if (isReceiver) {
+    // A local whose class we inferred: `part.Anchored` links `part` to Part.
+    // First, because what a name was *proved* to be outranks how it is spelled.
+    const local = localTypes.get(t.value);
+    if (local) return DOC_CLASSES.has(local) ? local : undefined;
+    /* And nothing is resolved by spelling once the snippet has declared the
+     * name itself. `local Skin = {}` linked `Skin` to classes/Skin, and
+     * `local Model: number = 5` linked `Model` to classes/Model — from the
+     * spelling alone, which is the one thing this function's own contract says
+     * it never does. */
+    if (declared.has(t.value)) return undefined;
     if (DOC_CLASSES.has(t.value) || DOC_DATATYPES.has(t.value) || DOC_NAMESPACES.has(t.value)) {
       return t.value;
     }
@@ -175,9 +271,6 @@ function apiRefAt(
     // they actually are.
     const g = GLOBAL_TYPES[t.value];
     if (g && DOC_CLASSES.has(g)) return g;
-    // A local whose class we inferred: `part.Anchored` links `part` to Part.
-    const local = localTypes.get(t.value);
-    if (local && DOC_CLASSES.has(local)) return local;
     return undefined;
   }
 
@@ -225,18 +318,25 @@ const CLASS_STRING_FNS = new Set([
 ]);
 
 /** What class, datatype, namespace or enum does this receiver denote? */
-function ownerOf(recv: Token, localTypes: Map<string, string>): string | undefined {
-  if (recv.kind !== "ident" && recv.kind !== "builtin") return undefined;
+function ownerOf(
+  recv: Token,
+  localTypes: Map<string, string>,
+  declared: Set<string>,
+): string | undefined {
+  if (recv.kind !== "ident" && recv.kind !== "builtin" && recv.kind !== "legacy") return undefined;
   const v = recv.value;
   // `Enum` is a marker, not a page — the caller uses it to read the next hop.
   if (v === "Enum") return "Enum";
+  const local = localTypes.get(v);
+  if (local && DOC_CLASSES.has(local)) return local;
+  // Same veto as the receiver branch above: a name the snippet declared for
+  // itself is not the engine class that happens to share its spelling.
+  if (declared.has(v)) return undefined;
   if (DOC_NAMESPACES.has(v) || DOC_DATATYPES.has(v) || DOC_CLASSES.has(v)) return v;
   // `Enum.KeyCode.Space` — reached here as the receiver `KeyCode`.
   if (DOC_ENUMS.has(v)) return v;
   const g = GLOBAL_TYPES[v];
   if (g && DOC_CLASSES.has(g)) return g;
-  const local = localTypes.get(v);
-  if (local && DOC_CLASSES.has(local)) return local;
   return undefined;
 }
 
@@ -252,23 +352,66 @@ export function segment(source: string): Segment[] {
   const tokens = tokenize(source);
   const findings = detect(source);
   const localTypes = inferLocalTypes(tokens);
+  const declared = declaredNames(tokens);
   const findingAt = new Map<number, Finding>();
   for (const f of findings) findingAt.set(f.start, f);
 
-  /** Next token that is not whitespace or a comment. */
-  const after = (i: number) => {
+  /* Indices, not tokens. Everything downstream needs to keep walking from
+   * whatever it was handed, and handing it a Token meant finding the way back
+   * with `tokens.indexOf(…)`: eighteen of those on this path, 7.44M comparisons
+   * on a 3,263-token block, 70% of them inside `isDefinitionSite`. A 1,247-line
+   * block went from 30.4ms to 6.7ms. Do not put an `indexOf` back. */
+  const after: Look = (i) => {
     for (let j = i + 1; j < tokens.length; j++) {
-      const t = tokens[j]!;
-      if (t.kind !== "whitespace" && t.kind !== "comment") return t;
+      const k = tokens[j]!.kind;
+      if (k !== "whitespace" && k !== "comment") return j;
     }
-    return null;
+    return -1;
   };
-  const before = (i: number) => {
+  const before: Look = (i) => {
     for (let j = i - 1; j >= 0; j--) {
-      const t = tokens[j]!;
-      if (t.kind !== "whitespace" && t.kind !== "comment") return t;
+      const k = tokens[j]!.kind;
+      if (k !== "whitespace" && k !== "comment") return j;
     }
-    return null;
+    return -1;
+  };
+
+  /**
+   * What a token looks like on its own, and whether a docs link may hang on it.
+   *
+   * Both answers come from the same two questions, so they are asked once.
+   */
+  const styleAt = (i: number): { cls?: string; ref?: string } => {
+    const t = tokens[i]!;
+    const prevIdx = before(i);
+
+    /* A declaration outranks everything: `local function step()`,
+     * `function foo()`, `function M.init()` and `function M:update()` are one
+     * thing wearing four spellings, and they used to come out with no class, no
+     * class, a field colour and a method colour — a definition byte-identical to
+     * every call site. And no link may be built here at all: `local Sound = {}`
+     * plus `function Sound:Play()` produced `Sound.Play`, which the isolated
+     * world confirms against the real member index and turns into a live link to
+     * the engine's Sound.Play. The rule this file states is a missing link, not
+     * a lying one. */
+    if (isFunctionNameSite(tokens, i)) return { cls: "dfp-tok-fn" };
+
+    /* `local h: Humanoid`, `f(a: number): boolean`, `type P = { x: number }`.
+     * The annotation is the class, so the link belongs on it rather than on the
+     * variable in front of it — and it is a type, so it is not a method call,
+     * whatever the colon in front of it suggests.
+     *
+     * Names only: a type expression also contains braces, arrows and parens, and
+     * those are punctuation wherever they appear. */
+    const isNameKind = t.kind === "ident" || t.kind === "builtin" || t.kind === "legacy";
+    if (isNameKind && isTypePosition(tokens, i, prevIdx)) {
+      return { cls: "dfp-tok-type", ref: typeRef(t, declared) };
+    }
+
+    return {
+      cls: memberClass(prevIdx >= 0 ? tokens[prevIdx]!.value : undefined, t.kind) ?? KIND_CLASS[t.kind],
+      ref: apiRefAt(tokens, i, localTypes, declared, after, before),
+    };
   };
 
   const out: Segment[] = [];
@@ -276,30 +419,48 @@ export function segment(source: string): Segment[] {
     const t = tokens[i]!;
     const finding = findingAt.get(t.start);
     if (finding && finding.end >= t.end) {
-      // A finding may span several tokens — `Instance.new("Part", workspace)`
-      // marks the whole `, workspace` argument, since that is what has to go.
-      // Swallow them into one segment so the mark is one continuous underline.
+      /* A finding may span several tokens — `Instance.new("Part", workspace)`
+       * marks the whole `, workspace` argument, since that is what has to go.
+       * Swallow them into one segment so the mark is one continuous underline,
+       * but keep each token's own class: the old ternary dropped the class the
+       * moment a second token joined, so
+       * `Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))`
+       * flattened a builtin, two properties, a method and a string to plain
+       * white under the underline. */
+      const parts: SegmentPart[] = [{ text: t.value, cls: styleAt(i).cls }];
       let text = t.value;
       while (i + 1 < tokens.length && tokens[i + 1]!.end <= finding.end) {
-        text += tokens[++i]!.value;
+        i++;
+        text += tokens[i]!.value;
+        parts.push({ text: tokens[i]!.value, cls: styleAt(i).cls });
       }
-      const cls = text === t.value ? KIND_CLASS[t.kind] : undefined;
-      out.push({ text, cls, finding });
+      out.push(
+        parts.length === 1
+          ? { text, cls: parts[0]!.cls, finding }
+          : { text, finding, parts },
+      );
       continue;
     }
 
-    /* `local hum: Humanoid = …` puts an identifier after a `:` without it being
-     * a method call at all. Without this the annotation was coloured as a
-     * method and linked as `Humanoid.Humanoid` — a member of itself. */
-    const prev = before(i);
-    const inTypePosition = !!prev && isTypePosition(tokens, i, prev);
-
-    const api = inTypePosition ? undefined : apiRefAt(tokens, i, localTypes, after, before);
-    const cls = (inTypePosition ? undefined : memberClass(prev?.value, t.kind)) ?? KIND_CLASS[t.kind];
-    out.push({ text: t.value, cls, api });
+    const { cls, ref } = styleAt(i);
+    out.push({ text: t.value, cls, api: ref });
   }
 
   return out;
+}
+
+/**
+ * The docs page for a name used as a type: `local hum: Humanoid`.
+ *
+ * Owner-level, so it ships as a real link. Vetoed for anything the snippet
+ * declared itself, which is what keeps a hand-written `type Tool = { … }` from
+ * pointing at the engine's Tool.
+ */
+function typeRef(t: Token, declared: Set<string>): string | undefined {
+  const v = t.value;
+  if (declared.has(v)) return undefined;
+  if (DOC_CLASSES.has(v) || DOC_DATATYPES.has(v) || DOC_ENUMS.has(v)) return v;
+  return undefined;
 }
 
 function renderBlock(code: HTMLElement): Finding[] {
@@ -319,7 +480,24 @@ function renderBlock(code: HTMLElement): Finding[] {
       const mark = document.createElement("span");
       mark.className = `dfp-dep dfp-dep--${seg.finding.entry.severity}`;
       if (seg.cls) mark.classList.add(seg.cls);
-      mark.textContent = seg.text;
+      if (seg.parts) {
+        /* Nested spans, because the mark is an underline rather than a recolour:
+         * a finding that spans `, game.Workspace` has to keep the builtin and
+         * the property underneath it looking like a builtin and a property.
+         * Elements and text nodes, never innerHTML — this is post content. */
+        for (const part of seg.parts) {
+          if (!part.cls) {
+            mark.appendChild(document.createTextNode(part.text));
+            continue;
+          }
+          const piece = document.createElement("span");
+          piece.className = part.cls;
+          piece.textContent = part.text;
+          mark.appendChild(piece);
+        }
+      } else {
+        mark.textContent = seg.text;
+      }
       const { replacement, why } = seg.finding.entry;
       mark.setAttribute(
         "title",
@@ -430,8 +608,15 @@ function enhance(root: HTMLElement): void {
 export function codeIntel(api: PluginApi): DfpModule {
   return {
     id: "code-intel",
-    // Tokenizing every block on a long thread is the most expensive thing DFP
-    // does; the registry disables it if this proves optimistic.
+    /* This number measures nothing, and the claim it used to carry — that the
+     * registry disables the module if the tokenizing proves too expensive — was
+     * false. registry.ts wraps `install()` only, and install here is a single
+     * `decorateCooked` call that registers a hook and queues deferred sweeps, so
+     * it reads about 0ms however much code the page contains. Every block this
+     * module actually tokenizes is processed later, in passes nothing measures
+     * (see discourse/decorate.ts, which documents the same thing from the other
+     * side). Kept because the registry requires a number; read it as a
+     * placeholder, not as a budget. */
     budgetMs: 12,
 
     install() {

@@ -73,8 +73,11 @@ jobs:
       - name: Build and zip
         run: |
           rm -rf .output
+          # `npm run zip` produces BOTH targets. It used to build Chrome only,
+          # with Firefox bolted on by the line that used to sit here — which
+          # meant the two could be built with different preamble steps, and
+          # meant nothing but this workflow ever built Firefox at all.
           npm run zip
-          npx wxt zip -b firefox
 
       # The zip filenames carry the manifest version, which lives in
       # wxt.config.ts and has no connection to the git tag. Tagging v0.2.0 with

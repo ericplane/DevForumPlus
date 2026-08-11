@@ -32,6 +32,14 @@ const THEMES = ["dark", "dim", "black", "light", "off"];
 const DENSITIES = ["comfortable", "compact", "spacious"];
 const RADII = ["sharp", "soft", "round"];
 
+/* Attributes a JS module stamps at runtime. The harness has no modules, so
+ * anything gated on one of these is otherwise unreachable here. */
+const FLAGS = [
+  { attr: "data-dfp-threaded", label: "thread view" },
+  { attr: "data-dfp-op-pin", label: "pinned OP" },
+  { attr: "data-dfp-quiet", label: "quiet replies" },
+];
+
 const page = `<!doctype html>
 <html lang="en" data-dfp="1" data-dfp-theme="dark" data-dfp-density="comfortable" data-dfp-motion="full" data-dfp-radius="soft" data-dfp-width="default">
 <head>
@@ -90,6 +98,10 @@ ${css}
   <div class="grp"><b>Theme</b>${THEMES.map((t) => `<button data-attr="data-dfp-theme" data-val="${t}">${t}</button>`).join("")}</div>
   <div class="grp"><b>Density</b>${DENSITIES.map((d) => `<button data-attr="data-dfp-density" data-val="${d}">${d}</button>`).join("")}</div>
   <div class="grp"><b>Corners</b>${RADII.map((r) => `<button data-attr="data-dfp-radius" data-val="${r}">${r}</button>`).join("")}</div>
+  <!-- Boolean root flags a module would normally stamp. Without these the
+       harness renders the default state only, and a feature gated on an
+       attribute is reviewed by nobody. -->
+  <div class="grp"><b>Flags</b>${FLAGS.map((f) => `<button data-flag="${f.attr}">${f.label}</button>`).join("")}</div>
 </div>
 
 <div class="page">
@@ -100,13 +112,18 @@ ${fixture}
 const root = document.documentElement;
 function sync() {
   for (const b of document.querySelectorAll(".toolbar button")) {
-    b.setAttribute("aria-pressed", String(root.getAttribute(b.dataset.attr) === b.dataset.val));
+    b.setAttribute("aria-pressed", String(
+      b.dataset.flag
+        ? root.hasAttribute(b.dataset.flag)
+        : root.getAttribute(b.dataset.attr) === b.dataset.val,
+    ));
   }
 }
 document.querySelector(".toolbar").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
-  root.setAttribute(b.dataset.attr, b.dataset.val);
+  if (b.dataset.flag) root.toggleAttribute(b.dataset.flag);
+  else root.setAttribute(b.dataset.attr, b.dataset.val);
   sync();
 });
 sync();

@@ -43,8 +43,26 @@ export default defineConfig({
      * release: wxt.config.ts said 1.1.0 while package.json still said 0.1.0.
      * Two places to edit is one place to forget. */
 
-    // Exactly one origin. No <all_urls>, no tabs, no cookies, no webRequest.
-    host_permissions: ["https://devforum.roblox.com/*"],
+    /* Two origins. No <all_urls>, no tabs, no cookies, no webRequest.
+     *
+     * This said "exactly one origin" for most of the project's life and the
+     * second one was added deliberately, not drifted into. What it buys: a
+     * Creator Docs link in a post gets a hover card naming the page, including
+     * the guide pages that are not in the packaged API index.
+     *
+     * Why it cannot be avoided. The Roblox thumbnail and game cards make their
+     * requests from the MAIN world, so they are page-origin, governed by CORS,
+     * and need no permission at all — that is why they are not listed here.
+     * create.roblox.com sends no CORS headers: fetching it from the page fails
+     * with `TypeError: Failed to fetch`, measured. The only way to read it is
+     * from the service worker, and the worker needs the origin declared.
+     *
+     * What it is scoped to. The worker will only ever fetch `/docs/...` on this
+     * origin — background.ts validates the path against a fixed pattern and
+     * rebuilds the URL itself, so a crafted link in someone's post cannot point
+     * the fetch anywhere else. No cookies are sent (`credentials: "omit"`), and
+     * the request only happens when a reader hovers a link. */
+    host_permissions: ["https://devforum.roblox.com/*", "https://create.roblox.com/*"],
 
     /* `declarativeNetRequest` is Chromium-only here.
      *

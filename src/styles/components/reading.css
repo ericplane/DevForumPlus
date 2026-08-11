@@ -270,11 +270,30 @@ html[data-dfp] .d-editor-button-bar .dfp-luau-btn:hover {
  * single attribute and turning it off leaves no residue — the inline
  * `--dfp-depth` values stay harmless because nothing reads them. */
 
+/* ── The one inline-start margin, contributed to by both features ───────────
+ *
+ * Thread view and the pinned OP both want to push replies inward, and both used
+ * to say so by setting `margin-inline-start` directly. Their selectors work out
+ * to the SAME specificity — (0,3,1) each — so the winner was decided by which
+ * one happened to appear later in this file, and the pinned column, written
+ * second, silently flattened the reply tree. Measured with both on: every post
+ * computed 1064px whatever its depth, while `--dfp-depth` was correctly set to
+ * 1, 2, 3, 4, 5 on fifteen of them. Thread view looked switched off.
+ *
+ * So neither feature sets the margin now. Each contributes a named term and
+ * this rule adds them, which makes composing the default instead of a thing
+ * that has to be noticed. A third feature that wants to indent should add a
+ * term here rather than another competing declaration. */
+html[data-dfp][data-dfp-threaded] .post-stream > *,
+html[data-dfp][data-dfp-op-pin] .post-stream > * {
+  margin-inline-start: calc(var(--dfp-op-indent, 0px) + var(--dfp-thread-indent, 0px));
+  transition: margin-inline-start var(--dfp-dur-2) var(--dfp-ease);
+}
+
 html[data-dfp][data-dfp-threaded] .topic-post {
   /* Each level steps in by a fixed amount rather than a percentage, so depth 4
    * on a narrow window still leaves a readable measure. */
-  margin-inline-start: calc(var(--dfp-depth, 0) * clamp(10px, 2.2vw, 26px));
-  transition: margin-inline-start var(--dfp-dur-2) var(--dfp-ease);
+  --dfp-thread-indent: calc(var(--dfp-depth, 0) * clamp(10px, 2.2vw, 26px));
 }
 
 /* A rail on the indented posts, so the eye can follow a chain rather than
@@ -285,7 +304,8 @@ html[data-dfp][data-dfp-threaded] .topic-post[style*="--dfp-depth"] > article {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html[data-dfp][data-dfp-threaded] .topic-post {
+  html[data-dfp][data-dfp-threaded] .post-stream > *,
+  html[data-dfp][data-dfp-op-pin] .post-stream > * {
     transition: none;
   }
 }
@@ -293,7 +313,7 @@ html[data-dfp][data-dfp-threaded] .topic-post[style*="--dfp-depth"] > article {
 /* Below this the indent costs more measure than the structure is worth. */
 @media (max-width: 720px) {
   html[data-dfp][data-dfp-threaded] .topic-post {
-    margin-inline-start: calc(min(var(--dfp-depth, 0), 2) * 8px);
+    --dfp-thread-indent: calc(min(var(--dfp-depth, 0), 2) * 8px);
   }
 }
 
@@ -301,4 +321,239 @@ html[data-dfp] .dfp-thread-toggle[aria-pressed="true"] {
   background: var(--dfp-accent-soft);
   border-color: color-mix(in oklab, var(--dfp-accent) 40%, transparent);
   color: var(--dfp-accent);
+}
+
+/* ── Pinned original post ────────────────────────────────────────────────────
+ * The OP becomes a sticky left column and the replies scroll past it.
+ *
+ * This is the accepted-answer trick at the top of this file, one level up: the
+ * post is repositioned, never moved. Ember has nothing to undo on re-render,
+ * there is nothing to re-apply on a route change, and the post keeps every
+ * control Discourse bound to it, every decoration code-intel wrote into it, its
+ * permalink, and its identity to find-in-page. There is one copy of the OP on
+ * the page, which is what makes the whole feature affordable. See op-pin.ts.
+ *
+ * Left, because this forum runs `navigation_menu: "header dropdown"` and has no
+ * sidebar (chrome.css) while the right side is Discourse's timeline rail.
+ * ───────────────────────────────────────────────────────────────────────────*/
+
+/* 1280, and the number is measured rather than reasoned.
+ *
+ * The limit that matters is the REPLY text, not the column: the timeline rail
+ * and the post's own chrome come out of the stream before a character is drawn,
+ * so the column width is not the measure anyone reads. Swept on a live topic
+ * with the panel forced on at its 360px floor:
+ *
+ *     1200 → 65.2ch    1280 → 74.2ch    1440 → 79.8ch    1536 and up → 79.8ch
+ *
+ * 1280 is the first width that clears the 72ch target in tokens.css, and it
+ * keeps the common 1280 and 1366 laptops. 1200 still reads (65ch is inside the
+ * comfortable band) but it is under target, and code blocks — which scroll
+ * rather than wrap — punish a narrow column more than prose does.
+ *
+ * Two earlier drafts of this comment carried arithmetic instead of
+ * measurements and were wrong in both directions: first by treating the reply
+ * column as the measure, then by modelling the chrome as a constant. The
+ * numbers above came off `getBoundingClientRect` at each width. */
+@media (min-width: 1280px) {
+  html[data-dfp][data-dfp-op-pin] {
+    /* The panel takes whatever width is left once the reply column has the
+     * measure the reader asked for, so the page fills the screen instead of
+     * leaving a wide empty margin beside a thin strip. The floor keeps it
+     * useful on a small desktop; the ceiling stops it becoming the larger half
+     * of the page on an ultrawide.
+     *
+     * Reply text holds at 79.8ch from ~1440 upward — the panel absorbs every
+     * extra pixel, so widening the window widens the OP and never the prose.
+     * Measured on a 2560 window: panel 1040, reply unchanged at 96.5ch with the
+     * full stylesheet loaded. Past ~2050 the ceiling binds and the page centres
+     * with a margin, which is deliberate: beyond that, growing either column
+     * costs readability rather than buying it. */
+    --dfp-op-w: clamp(
+      360px,
+      calc(100vw - var(--dfp-content-base) - var(--dfp-op-gap) - 2 * var(--dfp-s-5)),
+      min(1040px, 42vw)
+    );
+    --dfp-op-gap: var(--dfp-s-5);
+    /* The header is 121px at rest and shrinks to 60px once scrolled — measured.
+     * Sticky only engages after scrolling, so 60px is the height to clear and
+     * the rest is breathing room. Discourse's own `--header-offset` is a static
+     * 121px that never tracks the shrink, so using it would cost 60px of panel
+     * for a collision that cannot happen. */
+    --dfp-op-top: 90px;
+  }
+
+  /* Buy the column back from the page margin instead of the reply measure.
+   * Measured: `.post-stream` is 985px at BOTH 1350px and 1920px viewport, so
+   * Discourse never spends the extra width itself and without this the panel
+   * comes straight out of reading width — 66.6ch, below the 72ch target in
+   * tokens.css. With it the reply column measured 79.8ch at 1350 whether the
+   * panel was on or off: the column is genuinely free.
+   *
+   * This has to beat Discourse's own `--d-max-width`, which it sets on `:root`.
+   * base.css carries ours on `html[data-dfp]`, which outranks it. A first draft
+   * set it on `:root` here, lost the cascade, and silently paid for the panel
+   * out of measure — the failure looked like a design problem, not a bug.
+   *
+   * `full` is excluded deliberately: --dfp-content-base is `none` there, and
+   * `min(none, …)` is not a length, so the declaration would be dropped and the
+   * panel would silently get nothing. At `full` there is no margin to borrow
+   * anyway — the stream is already viewport-wide. */
+  html[data-dfp][data-dfp-op-pin]:not([data-dfp-width="full"]) {
+    --dfp-content-max: min(
+      calc(100vw - 2 * var(--dfp-s-5)),
+      calc(var(--dfp-content-base) + var(--dfp-op-w) + var(--dfp-op-gap))
+    );
+  }
+
+  /* A float, not a grid column.
+   *
+   * Grid was the obvious shape and it is wrong here, for a reason that only
+   * shows up on a real thread: the OP is one grid item in row 1, so row 1 grows
+   * to the panel's full height and a short first reply leaves the rest of that
+   * row empty. Measured on a live topic — a 426px hole between the first and
+   * second reply, and none between any later pair.
+   *
+   * `grid-row: 1 / -1` is the usual answer and cannot work: with no
+   * `grid-template-rows` the explicit grid has a single line, so `-1` resolves
+   * to line 1 and the item spans exactly one row. Measured directly — 200px
+   * tall inside a 1000px grid, identical with and without the declaration.
+   *
+   * A float has no such problem: it is out of flow, so it contributes nothing
+   * to the layout of its siblings and cannot inflate a row. It is also the
+   * better sticky container — a float's containing block is `.post-stream`
+   * itself, which is exactly the travel this needs and is defined behaviour,
+   * where the grid version only worked because Chrome happens to constrain
+   * sticky to the grid container rather than the grid area. */
+
+  /* Universal child, not `.topic-post`: the stream also contains
+   * `article.small-action` rows (verified live) and gap markers, and the
+   * Glimmer post-stream migration is free to add more. Anything missed here
+   * would run underneath the panel instead of beside it. */
+  html[data-dfp][data-dfp-op-pin] .post-stream > * {
+    --dfp-op-indent: calc(var(--dfp-op-w) + var(--dfp-op-gap));
+  }
+
+  /* Every post carries Discourse's `.clearfix`, whose `::after` is
+   * `content: " "; display: table; clear: both` — read off the live forum. That
+   * pseudo does not know the difference between the post's own floats and ours,
+   * so it cleared the panel: the first reply's box stretched down past the
+   * panel's bottom edge, measured at 1153px of box around 373px of article.
+   * 780px of dead space, which reads as a hole between the first and second
+   * reply — and it hides from a box-to-box gap measurement, because the boxes
+   * really are adjacent. The hole is inside the first one.
+   *
+   * `flow-root` gives each post its own formatting context, which contains the
+   * post's own floats exactly as the clearfix intends while ignoring ours.
+   * Setting `clear: none` on the pseudo also closes the gap and was rejected:
+   * it would stop a post containing a floated image in someone's own content.
+   *
+   * Scoped to `.topic-post` so `article.small-action` keeps the `display: flex`
+   * Discourse gives it. Flex containers do not clear floats either, so they
+   * never had the problem. Measured after: worst dead space across 21 rows is
+   * 4px. */
+  html[data-dfp][data-dfp-op-pin] .post-stream > .topic-post {
+    display: flow-root;
+  }
+
+  /* ── Pin the post's CONTENTS. Leave the post itself where it is. ──────────
+   *
+   * Discourse decides which post you are looking at — and when to page more in
+   * — from the rendered position of `article#post_1` itself. That one fact
+   * rules out every simpler shape, and each was built and measured before this
+   * one was found:
+   *
+   *   - `sticky` on the row: counter frozen at "1 / N" AND the topic stops
+   *     paging (19 posts, no growth on a 9,163-post topic, against 19 → 79).
+   *   - Removing Discourse's `onscreen-post` class from the OP: counter fixed,
+   *     paging broken harder. `offscreen-post` instead behaves identically.
+   *   - Row in flow at full stream height so a sticky article has travel:
+   *     paging works, but the counter reads "1" for as long as the row covers
+   *     the viewport — and this thread's OP row measured 12,940px, which is
+   *     precisely the "stuck on 1/N for the first twenty posts" report.
+   *   - `position: fixed` on the article: pinned and paging, counter still
+   *     frozen — because the article is the thing being measured.
+   *
+   * So the article stays in flow and is allowed to collapse (measured: 34px),
+   * which is a truthful, tiny box at its real scroll position. Its `.row` — the
+   * avatar column plus the body — is what leaves the flow and pins. Verified
+   * all together from the first scroll: counter 3 → 4 → 6 → 8 → 71, panel at
+   * exactly 90px throughout, posts paging in, `onscreen-post` never touched.
+   *
+   * Do NOT pin the row or the article. Re-run BOTH the counter check and the
+   * scroll-to-bottom check on any change here; each failure is invisible to the
+   * other's test. */
+  html[data-dfp][data-dfp-op-pin] .post-stream > .topic-post:has(> article#post_1) {
+    float: inline-start;
+    inline-size: var(--dfp-op-w);
+    /* The panel is the thing everything else is indented PAST, so it withdraws
+     * its own term rather than overriding the shared margin — one source of
+     * truth for that edge. */
+    --dfp-op-indent: 0px;
+    /* Takes no vertical space: the column is reserved by the siblings' margin,
+     * not by this box, and every pixel of height here is a pixel of scrolling
+     * during which Discourse would report post 1. */
+    block-size: 0;
+    /* perf.css gives every `.topic-post` `content-visibility: auto`. On a
+     * zero-height row that would skip the subtree entirely and take the panel
+     * with it. */
+    content-visibility: visible;
+  }
+
+  html[data-dfp][data-dfp-op-pin]
+    .post-stream
+    > .topic-post:has(> article#post_1)
+    > article#post_1
+    > .row {
+    position: fixed;
+    inset-block-start: var(--dfp-op-top);
+    /* Physical `left`, set from op-pin.ts, because the value is a measured
+     * viewport coordinate — a logical origin would flip out from under it. */
+    left: var(--dfp-op-left, 0px);
+    inline-size: var(--dfp-op-w);
+    /* "Posts can be quite big" is the actual request, and a side panel does not
+     * make a big post small — it has to be allowed to scroll on its own. A
+     * 12,940px OP becomes a viewport-tall column with its own scrollbar. */
+    max-block-size: calc(100dvh - var(--dfp-op-top) - var(--dfp-s-5));
+    overflow-y: auto;
+    /* Two scrollers side by side: a wheel that bottoms out inside the panel
+     * must not hand off to the page, which reads as the panel losing your
+     * place. */
+    overscroll-behavior: contain;
+    /* The article it came out of has collapsed, so `.boxed`'s card treatment no
+     * longer draws around this content. The panel carries it instead. */
+    background: var(--dfp-surface-1);
+    border: 1px solid var(--dfp-border);
+    border-radius: var(--dfp-r-md);
+    padding: var(--dfp-s-4);
+  }
+
+  /* The avatar rail and the action row are noise in a column kept open for the
+   * body. The byline stays: knowing who is asking is most of why you pinned it. */
+  html[data-dfp][data-dfp-op-pin]
+    .post-stream
+    > .topic-post:has(> article#post_1)
+    :is(.topic-avatar, .post-menu-area, nav.post-controls, .topic-map) {
+    display: none;
+  }
+}
+
+html[data-dfp] .dfp-op-toggle[aria-pressed="true"] {
+  background: var(--dfp-accent-soft);
+  border-color: color-mix(in oklab, var(--dfp-accent) 40%, transparent);
+  color: var(--dfp-accent);
+}
+
+/* Deep in a topic Discourse has unloaded post 1, so there is nothing to pin.
+ * The control dims rather than disappearing — a button that comes and goes as
+ * you scroll reads as a bug, and one that stays bright and does nothing reads
+ * as a broken one. `title` carries the reason and the way out. Written last so
+ * it also covers the pressed colours above, which would otherwise keep an
+ * unusable control looking active. */
+html[data-dfp] .dfp-op-toggle:disabled {
+  background: transparent;
+  border-color: var(--dfp-border);
+  color: var(--dfp-text-3);
+  opacity: 0.55;
+  cursor: not-allowed;
 }

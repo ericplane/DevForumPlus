@@ -31,6 +31,48 @@ import {
  */
 
 const ATTR = "data-dfp-api";
+
+/**
+ * The other kind of target: a Creator Docs page with no entry in the packaged
+ * index — a guide, a tutorial, an art doc. MAIN marks these with a PATH rather
+ * than an api string (see docs-links.ts), and the title comes from the page
+ * itself via the service worker, because create.roblox.com sends no CORS
+ * headers and the content script cannot read it.
+ */
+const PAGE_ATTR = "data-dfp-docs";
+
+/** path → its metadata, or null once known unavailable. */
+const pageMeta = new Map<string, { title: string; description: string } | null>();
+
+async function loadPageMeta(path: string) {
+  const hit = pageMeta.get(path);
+  if (hit !== undefined) return hit;
+  let meta: { title: string; description: string } | null = null;
+  try {
+    meta = (await chrome.runtime.sendMessage({ type: "dfp:docs-page", path })) ?? null;
+  } catch {
+    // Worker asleep mid-flight, or the extension was reloaded under us.
+  }
+  pageMeta.set(path, meta);
+  return meta;
+}
+
+/** Same shape as the API card, so the two read as one affordance. */
+function buildPageCard(meta: { title: string; description: string }, path: string): HTMLElement {
+  const wrap = el("div", "dfp-doc-page");
+  wrap.appendChild(el("div", "dfp-doc-page__title", meta.title));
+  /* The section, from the path — "art / characters". It is the one thing the
+   * page's own metadata does not say and the reader most wants: whether this is
+   * a guide or a reference page. */
+  const section = path
+    .replace(/^\/(?:[a-z]{2}-[a-z]{2}\/)?docs\/?/, "")
+    .split("/")
+    .slice(0, -1)
+    .join(" / ");
+  if (section) wrap.appendChild(el("div", "dfp-doc-page__section", section));
+  if (meta.description) wrap.appendChild(el("div", "dfp-doc-page__desc", meta.description));
+  return wrap;
+}
 const OPEN_DELAY = 220;
 const CLOSE_DELAY = 140;
 
@@ -237,6 +279,35 @@ a.more {
   white-space: nowrap;
 }
 a.more:hover { text-decoration: underline; }
+
+/* A docs page that is not an API reference. Same card, different body: there is
+   no signature to show, so the title carries it and the section says what kind
+   of page it is — which is the thing a reader most wants to know before
+   clicking a /docs/ link that could be a guide, a tutorial or a reference. */
+.dfp-doc-page__title {
+  color: var(--dfp-text, #eff4fc);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.dfp-doc-page__section {
+  margin-top: 3px;
+  color: var(--dfp-text-3, #868a91);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.dfp-doc-page__desc {
+  margin-top: 7px;
+  color: var(--dfp-text-2, #b4b8c0);
+  line-height: 1.5;
+  /* Roblox descriptions run long; four lines is enough to know what the page is
+     without the card covering the sentence it came from. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }
 }
@@ -422,6 +493,21 @@ function scheduleClose(): void {
 }
 
 async function open(target: HTMLElement): Promise<void> {
+  const path = target.getAttribute(PAGE_ATTR);
+  if (path) {
+    const gen = ++generation;
+    const meta = await loadPageMeta(path);
+    // Nothing to say is the designed floor: the link still works.
+    if (!meta || gen !== generation || openFor !== target) return;
+    ensureHost();
+    if (!card || !host) return;
+    host.style.display = "";
+    card.replaceChildren(buildPageCard(meta, path));
+    place(target);
+    card.dataset["shown"] = "1";
+    return;
+  }
+
   const api = target.getAttribute(ATTR);
   if (!api) return;
 
@@ -595,7 +681,7 @@ function mountHoverCards(): void {
   document.addEventListener(
     "mouseover",
     (e) => {
-      const el = (e.target as Element | null)?.closest?.(`[${ATTR}]`) as HTMLElement | null;
+      const el = (e.target as Element | null)?.closest?.(`[${ATTR}], [${PAGE_ATTR}]`) as HTMLElement | null;
       if (!el) return;
       clearTimeout(closeTimer);
       if (openFor === el) return;
@@ -609,7 +695,7 @@ function mountHoverCards(): void {
   document.addEventListener(
     "mouseout",
     (e) => {
-      const el = (e.target as Element | null)?.closest?.(`[${ATTR}]`);
+      const el = (e.target as Element | null)?.closest?.(`[${ATTR}], [${PAGE_ATTR}]`);
       if (!el) return;
       clearTimeout(openTimer);
       scheduleClose();

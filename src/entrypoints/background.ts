@@ -38,6 +38,82 @@ async function syncTrimRulesets(settings: DfpSettings): Promise<void> {
   }
 }
 
+
+/**
+ * Creator Docs page metadata, fetched here because nowhere else can.
+ *
+ * create.roblox.com sends no CORS headers — a fetch from the page fails with
+ * `TypeError: Failed to fetch`, measured — so the content script cannot read
+ * it. The service worker can, because host_permissions declares the origin.
+ *
+ * ── The path is never trusted ───────────────────────────────────────────────
+ * The caller passes a PATH, not a URL, and it is matched against a fixed
+ * pattern before the URL is rebuilt here from a hardcoded origin. That matters:
+ * the path originates in someone else's forum post, and a worker that fetched
+ * whatever it was handed would be a request forwarder for any page that could
+ * reach the content script. `credentials: "omit"` for the same reason.
+ *
+ * Extraction is by regex rather than DOM: a service worker has no DOMParser,
+ * and only text is ever taken — nothing parsed here is inserted anywhere.
+ */
+const DOCS_PATH = /^\/(?:[a-z]{2}-[a-z]{2}\/)?docs\/[\w/-]{1,200}$/;
+
+/** Session-lived. The worker is torn down constantly, which bounds it for us. */
+const docsMeta = new Map<string, { title: string; description: string } | null>();
+
+async function fetchDocsMeta(path: string) {
+  if (!DOCS_PATH.test(path)) return null;
+  const hit = docsMeta.get(path);
+  if (hit !== undefined) return hit;
+
+  let meta: { title: string; description: string } | null = null;
+  try {
+    const res = await fetch(`https://create.roblox.com${path}`, { credentials: "omit" });
+    if (res.ok) {
+      /* Only the head is needed and these pages are large, so the body is read
+       * in chunks and abandoned once both tags are in hand. */
+      const html = (await res.text()).slice(0, 60_000);
+      const pick = (prop: string) =>
+        new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']*)["']`, "i")
+          .exec(html)?.[1] ??
+        new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${prop}["']`, "i")
+          .exec(html)?.[1] ??
+        "";
+      const title = pick("og:title") || /<title[^>]*>([^<]{1,300})</i.exec(html)?.[1] || "";
+      const description = pick("og:description") || pick("description");
+      if (title) {
+        meta = { title: cleanTitle(decodeEntities(title)), description: decodeEntities(description) };
+      }
+    }
+  } catch {
+    // Offline, blocked, or Roblox changed shape. A missing card is the floor.
+  }
+
+  if (docsMeta.size > 64) docsMeta.delete(docsMeta.keys().next().value as string);
+  docsMeta.set(path, meta);
+  return meta;
+}
+
+/**
+ * Roblox suffixes every docs title with its own branding — measured:
+ * "Classic and Dynamic head comparison | Documentation - Roblox Creator Hub".
+ * In a 360px card that boilerplate is most of the line and none of the meaning.
+ */
+function cleanTitle(t: string): string {
+  return t.replace(/\s*[|–-]\s*(Documentation\s*[|–-]\s*)?Roblox Creator Hub\s*$/i, "").trim() || t;
+}
+
+/** The five XML entities, which is all a meta attribute can legally carry. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+    .trim();
+}
+
 export default defineBackground(() => {
   /* Must be called on every worker start, not just on install: access level is
    * per-session, and the worker is torn down and restarted constantly.
@@ -49,6 +125,16 @@ export default defineBackground(() => {
    * equivalent because its content scripts cannot read `storage.session` at
    * all; diagnostics simply report unavailable there, which they already
    * handle. */
+
+  /* Docs page metadata for the isolated world's hover card. Returns `true` to
+   * keep the message channel open for the async reply — omitting that is the
+   * classic way this silently answers `undefined`. */
+  chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
+    if (!msg || msg.type !== "dfp:docs-page" || typeof msg.path !== "string") return undefined;
+    void fetchDocsMeta(msg.path).then(respond);
+    return true;
+  });
+
   chrome.storage.session
     .setAccessLevel?.({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" })
     ?.catch(() => {
