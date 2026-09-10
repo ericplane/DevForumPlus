@@ -1,4 +1,10 @@
-import { ModuleRegistry, charge, installingModule, moduleWork } from "../../src/core/registry";
+import {
+  ModuleRegistry,
+  charge,
+  installingModule,
+  moduleWork,
+  resetRouteWork,
+} from "../../src/core/registry";
 import type { ModuleId } from "../../src/core/settings-schema";
 
 /**
@@ -21,11 +27,11 @@ const check = (ok: boolean, label: string) => {
   console.log(`${ok ? "  ok  " : "  FAIL"} ${label}`);
 };
 
-const build = () => {
+const build = (persisted: Partial<Record<ModuleId, number>> = {}) => {
   const strikes: { id: ModuleId; ms: number }[] = [];
   const cleared: ModuleId[] = [];
   const registry = new ModuleRegistry({
-    strikes: {},
+    strikes: persisted,
     isEnabled: () => true,
     onStrike: (id, ms) => strikes.push({ id, ms }),
     onClearStrike: (id) => cleared.push(id),
@@ -119,6 +125,146 @@ console.log("\n── a module that throws is still recorded, and stops installi
       + "module's helpers would charge their work to this one",
   );
   void registry;
+}
+
+console.log("\n── the counter can reach 3: install no longer clears it ────────────────");
+
+/* Two sessions, with the persisted store played by `store`, exactly as the
+ * isolated side keeps it: bump adds one, clear deletes the key. The old
+ * install() cleared the key before a single ms had been charged, so this
+ * sequence went 0 → 1 → (clear) → 1 forever and STRIKES_TO_DISABLE was
+ * unreachable. */
+{
+  resetRouteWork();
+  const store: Partial<Record<ModuleId, number>> = {};
+  const session = () => {
+    const cleared: ModuleId[] = [];
+    const order: string[] = [];
+    const registry = new ModuleRegistry({
+      strikes: { ...store },
+      isEnabled: () => true,
+      onStrike: (id) => {
+        store[id] = (store[id] ?? 0) + 1;
+        order.push(`bump:${id}`);
+      },
+      onClearStrike: (id) => {
+        delete store[id];
+        cleared.push(id);
+        order.push(`clear:${id}`);
+      },
+    });
+    registry.install({ id: "code-intel", budgetMs: 50, install: () => {} });
+    return { registry, cleared, order };
+  };
+  const strikesOf = (registry: ModuleRegistry) =>
+    registry.snapshot().find((r) => r.id === "code-intel")?.strikes;
+
+  // Session 1: nothing on record; the module goes over budget once.
+  const s1 = session();
+  charge("code-intel", 60);
+  check(store["code-intel"] === 1, "session 1: the strike is persisted");
+  check(strikesOf(s1.registry) === 1, "the record mirrors the bump before diagnostics are re-pushed");
+  resetRouteWork();
+  check(s1.cleared.length === 0, "a route the module struck in does not clear its strike");
+  check(store["code-intel"] === 1, "…so the count survives to the next session");
+
+  // Session 2: boots with one strike on record.
+  const s2 = session();
+  check(s2.cleared.length === 0, "session 2: install does not clear the carried strike");
+  check(strikesOf(s2.registry) === 1, "the record carries the persisted count in, not 0");
+  charge("code-intel", 60);
+  check(store["code-intel"] === 2, "session 2: the count reaches 2");
+  check(
+    s2.order[0] === "bump:code-intel" && !s2.order.includes("clear:code-intel"),
+    "the bump fired and no clear preceded it",
+  );
+  check(strikesOf(s2.registry) === 2, "the record reads 2");
+
+  // A clean route in the same session earns the clear.
+  resetRouteWork();
+  check(store["code-intel"] === 2, "still 2 after the struck route ends");
+  charge("code-intel", 10);
+  resetRouteWork();
+  check(s2.cleared.length === 1 && store["code-intel"] === undefined, "a route under budget clears the record");
+  check(strikesOf(s2.registry) === 0, "the record reads 0 after the clear");
+  check((moduleWork()["code-intel"] ?? 0) === 0, "the meter starts the next route at zero");
+  check(
+    s2.registry.snapshot().find((r) => r.id === "code-intel")?.workMs === 0,
+    "snapshot() reports workMs from the meter, not from install",
+  );
+
+  // The `rec.strikes === 0` guard in endRoute(): a clean route with nothing on
+  // record must not send a clear the isolated side would only have to ignore.
+  charge("code-intel", 10);
+  resetRouteWork();
+  check(s2.cleared.length === 1, "a module with no strike on record never sends a needless clear");
+
+  // Strikes are per route: a module cleared last route can strike again this one.
+  charge("code-intel", 60);
+  check(store["code-intel"] === 1, "the same module can strike again in a later route");
+  resetRouteWork();
+  check(s2.cleared.length === 1 && store["code-intel"] === 1, "a struck route keeps the strike");
+
+  // Session 3: three consecutive struck routes on record.
+  store["code-intel"] = 3;
+  const s3 = session();
+  check(
+    s3.registry.snapshot().find((r) => r.id === "code-intel")?.status === "auto-disabled",
+    "three strikes on record auto-disables at boot",
+  );
+  resetRouteWork();
+  check(
+    s3.cleared.length === 0 && store["code-intel"] === 3,
+    "a route cannot clear a module that never ran — it would re-enable itself unmeasured",
+  );
+}
+
+console.log("\n── the route-close callback sees the closed route, not an empty meter ──");
+
+/* main-world.content.ts pushes diagnostics from this callback. It used to push
+ * after resetRouteWork() returned, and a probe over the real registry showed
+ * every route-end push at workMs 0 — the meter had already been cleared — so
+ * the popup read "0 / N ms" for any route that ended without a strike. */
+{
+  resetRouteWork();
+  const { registry, strikes, cleared } = build({ facepile: 1 });
+  registry.install({ id: "facepile", budgetMs: 100, install: () => {} });
+  charge("facepile", 37.5);
+
+  let seen: { workMs: number; strikes: number } | undefined;
+  resetRouteWork(() => {
+    const rec = registry.snapshot().find((r) => r.id === "facepile");
+    if (rec) seen = { workMs: rec.workMs, strikes: rec.strikes };
+  });
+  check(seen?.workMs === 37.5, "a snapshot taken from the callback carries the charged total");
+  check(seen?.strikes === 0 && cleared.length === 1, "…with the strike counters already settled");
+  check((moduleWork()["facepile"] ?? 0) === 0, "…and the meter is clear once it returns");
+
+  // A callback that throws must not leave last route's spend running into this one.
+  charge("facepile", 80);
+  try {
+    resetRouteWork(() => {
+      throw new Error("push failed");
+    });
+  } catch {
+    // The throw is the caller's to handle; the reset is not.
+  }
+  check((moduleWork()["facepile"] ?? 0) === 0, "the meter clears even when the callback throws");
+  charge("facepile", 30);
+  check(strikes.length === 0, "…so 80ms last route plus 30ms this one does not strike a 100ms budget");
+}
+
+console.log("\n── snapshot() carries the budget and the live work ────────────────────");
+
+{
+  resetRouteWork();
+  const { registry } = build();
+  registry.install({ id: "facepile", budgetMs: 30, install: () => {} });
+  charge("facepile", 12.34);
+  const rec = registry.snapshot().find((r) => r.id === "facepile");
+  check(rec?.budgetMs === 30, "the record carries budgetMs, so a reader can grade workMs");
+  check(rec?.workMs === 12.3, "workMs is the charged total, to a tenth of a ms");
+  check(rec?.installMs !== undefined && rec.installMs < 5, "installMs stays ~0 — a registration, not the work");
 }
 
 console.log(`\n${fail === 0 ? "ALL PASS" : fail + " FAILING"} (${pass}/${pass + fail} checks)`);

@@ -777,11 +777,12 @@ function buildTheme(spec: ThemeSpec): { css: string; checks: Check[] } {
    * a highlight you cannot see. A highlighter has to be brighter than the page,
    * so the direction flips: saturated on dark, pale on light.
    *
-   * Amber rather than the accent, deliberately. `::selection` is already the
-   * accent blue, and an author's highlight that looks identical to the reader's
-   * own text selection is unreadable in a different way — I misread one for the
-   * other while diagnosing this. A highlighter is yellow everywhere else in the
-   * world, and keeping that is worth more than palette purity. */
+   * Amber rather than the accent, deliberately. `::selection` takes the accent
+   * hue (the selection pair below), and an author's highlight that looks
+   * identical to the reader's own text selection is unreadable in a different
+   * way — I misread one for the other while diagnosing this. A highlighter is
+   * yellow everywhere else in the world, and keeping that is worth more than
+   * palette purity. */
   const warnHue = hexToOklch(SEEDS.warning).h;
   /* The dark themes take the saturated warning directly. The light theme needs
    * its own stop: `--dfp-warning-soft` on white measures 0.07 perceptual
@@ -845,6 +846,78 @@ function buildTheme(spec: ThemeSpec): { css: string; checks: Check[] } {
     pair: "accent-strong on surface-1",
     ratio: contrast(accentStrong, s1),
     min: 3,
+  });
+
+  /* ── Text selection: ::selection ─────────────────────────────────────────
+   * The reader dragging to copy a snippet — the most common thing a developer
+   * does on this forum — and for a long time the one highlight nothing here
+   * measured.
+   *
+   * base.css painted it with `--dfp-accent-soft`, a tint built to sit *behind*
+   * light text in a chip, and the `<mark>` comment above once described it as
+   * "the accent blue". On the shipped hex it measured 0.067 / 0.062 / 0.095 /
+   * 0.040Δ against surface-2 (dark / dim / black / light) — surface-2 being the
+   * `<pre>` background, the surface people select on most — and 0.097 / 0.089 /
+   * 0.131 / 0.062Δ against surface-1. The file's own scale calls 0.07 "a
+   * washed-out tint" and 0.10 the invisible-mark bug, so on three themes the
+   * selection was a faint stain and on light it was not there at all. The text
+   * stayed legible, which is why nobody filed it: what was missing was the
+   * feedback, not the function.
+   *
+   * Same construction as `<mark>`, for the same reason: a highlight has to
+   * move toward the viewer, so the direction flips with polarity. Dark themes
+   * take the accent hue at a fixed L 0.42 — VS Code's dark selection (#264f78)
+   * measures L 0.42 in OKLab, and it is the lightness dark editors converge on
+   * because it clears any L 0.16–0.29 surface while staying dark enough for
+   * white text. Fixed rather than relative to surface-2 so the three dark
+   * themes share one selection colour; dim is the binding theme at 0.155Δ.
+   * The light theme is searched rather than guessed, the way `accentStrong`
+   * is: from near-white down until the tint clears the floor against BOTH
+   * surfaces with a margin, because at high lightness blue is gamut-capped and
+   * only lightness can buy the distance. The foreground is picked by contrast
+   * rather than reusing `--dfp-text`: on the dark themes it is white either
+   * way, and on light the near-black keeps the pair above 10:1.
+   *
+   * Three checks, where `<mark>` has two. The extra one is surface-2, which
+   * did not matter for a highlighter (marks live in prose, on the card) and
+   * matters most here (code blocks are surface-2). */
+  const SELECTION_FLOOR = 0.13;
+  let selectionBg = oklch(0.42, accentC, accentH);
+  if (spec.mode === "light") {
+    for (let l = 0.95; l >= 0.6; l -= 0.005) {
+      const candidate = oklch(l, accentC, accentH);
+      if (
+        perceptualDistance(candidate, s1) >= SELECTION_FLOOR + 0.01 &&
+        perceptualDistance(candidate, s2) >= SELECTION_FLOOR + 0.01
+      ) {
+        selectionBg = candidate;
+        break;
+      }
+    }
+  }
+  const selectionFg =
+    contrast(selectionBg, "#ffffff") >= contrast(selectionBg, "#0a0a0a") ? "#ffffff" : "#0a0a0a";
+  vars.push(`--dfp-selection-bg: ${selectionBg};`);
+  vars.push(`--dfp-selection-fg: ${selectionFg};`);
+  checks.push({
+    theme: spec.id,
+    pair: "selection-fg on selection-bg",
+    ratio: contrast(selectionBg, selectionFg),
+    min: 4.5,
+  });
+  checks.push({
+    theme: spec.id,
+    pair: "selection-bg vs surface-1 (perceptual)",
+    ratio: perceptualDistance(selectionBg, s1),
+    min: SELECTION_FLOOR,
+    unit: "distance",
+  });
+  checks.push({
+    theme: spec.id,
+    pair: "selection-bg vs surface-2 (perceptual)",
+    ratio: perceptualDistance(selectionBg, s2),
+    min: SELECTION_FLOOR,
+    unit: "distance",
   });
 
   /* `--dfp-dep--warn` and `--dfp-dep--error` are the two decoration colours of

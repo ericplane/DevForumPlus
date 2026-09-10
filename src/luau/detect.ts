@@ -1,6 +1,11 @@
 import { API_INDEX, deprecatedOn, type ApiEntry } from "./api-index.generated";
 import { tokenize, type Token } from "./tokenizer";
 import { memberType, eventParamTypes } from "./member-types.generated";
+import {
+  DOC_DEPRECATED_GLOBALS,
+  DOC_DEPRECATED_LIB_MEMBERS,
+  DOC_NAMESPACES,
+} from "./docs-names.generated";
 
 /**
  * Find deprecated API usage in a Luau snippet.
@@ -796,6 +801,29 @@ export function declaredNames(tokens: Token[]): Set<string> {
 }
 
 /**
+ * The finding for a name the docs flag deprecated but the curated index does
+ * not name: `getfenv`, `elapsedTime`, `table.getn`.
+ *
+ * Synthesised, and plainly worded, for the same reason `deprecatedOn` does it
+ * for dump members: the index carries a replacement and a reason only where a
+ * person wrote one, and inventing either here would be the lie the curated
+ * file exists to prevent. `info`, because a docs flag on its own says "there is
+ * a newer way", not "this is harmful" — `wait` and `spawn` earn `warn` from
+ * their curated entries, which win in both callers below. One object per key,
+ * so a block with twelve `table.getn` calls does not allocate twelve reasons.
+ */
+const docsEntries = new Map<string, ApiEntry>();
+
+function docsDeprecation(key: string): ApiEntry {
+  let entry = docsEntries.get(key);
+  if (!entry) {
+    entry = { replacement: null, severity: "info", why: `${key} is marked deprecated in Creator Docs.` };
+    docsEntries.set(key, entry);
+  }
+  return entry;
+}
+
+/**
  * Method names the snippet defines for itself.
  *
  * If a block contains `function ragdoll:destroy()`, then `self:destroy()` later
@@ -818,6 +846,11 @@ export function detect(source: string): Finding[] {
   const findings: Finding[] = [];
   const localTypes = inferLocalTypes(tokens);
   const ownMethods = locallyDefined(tokens);
+  /* Deferred: `declaredNames` is a full pass of its own, and the two arms
+   * below that ask for it do so only once they hold a candidate — a block with
+   * no deprecated call in it never pays for the pass. */
+  let declaredSet: Set<string> | null = null;
+  const declared = (): Set<string> => (declaredSet ??= declaredNames(tokens));
 
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]!;
@@ -875,6 +908,25 @@ export function detect(source: string): Finding[] {
         if (cls) entry = deprecatedOn(cls, t.value) ?? undefined!;
       }
 
+      /* 3. The docs' flag on a library member: `table.getn(t)`. Neither source
+       *    above can reach it — `table` is not a class, so there is no receiver
+       *    type to walk, and the curated aliases are matched by bare name on
+       *    ANY receiver, which is exactly wrong for `getn`: someone's own
+       *    `queue.getn()` is theirs. So the receiver has to BE the library —
+       *    spelled as the namespace, reached with `.`, and not a name the block
+       *    declared for itself (`local table = require(...)` is somebody's
+       *    module, however unwisely named). */
+      if (!entry && receiver && !isMethod && DOC_NAMESPACES.has(receiverName)) {
+        const key = `${receiverName}.${t.value}`;
+        if (
+          DOC_DEPRECATED_LIB_MEMBERS.has(key) &&
+          !localTypes.has(receiverName) &&
+          !declared().has(receiverName)
+        ) {
+          entry = docsDeprecation(key);
+        }
+      }
+
       if (entry) {
         if (entry.access === "method" && !isMethod) continue;
         if (entry.access === "property" && isMethod) continue;
@@ -895,13 +947,28 @@ export function detect(source: string): Finding[] {
     // ── Globals: bare calls only ─────────────────────────────────────────
     // `wait(…)` is a finding; `myTable.wait` is not (handled above), and
     // `local wait = …` is a shadow, not a use.
-    const entry = (API_INDEX.globals as Record<string, ApiEntry>)[t.value];
+    //
+    // The curated index first, because it carries the replacement and the
+    // reason; the docs' own flag behind it for the globals nobody curated —
+    // `getfenv`, `setfenv`, `elapsedTime`, `collectgarbage` — which were never
+    // marked while the tokenizer dimmed `time()`, a current API, as legacy.
+    const entry =
+      (API_INDEX.globals as Record<string, ApiEntry>)[t.value] ??
+      (DOC_DEPRECATED_GLOBALS.has(t.value) ? docsDeprecation(t.value) : undefined);
     if (entry) {
       const isCall = next?.kind === "punct" && (next.value === "(" || next.value === "{");
-      const isShadowed = prev?.kind === "keyword" && prev.value === "local";
       const isAssignedTo =
         next?.kind === "operator" && next.value === "=" && prev?.value !== "==";
-      if (isCall && !isShadowed && !isAssignedTo) {
+      /* A name the block declared is the block's own wherever it is used. The
+       * shadow test used to look one token left for `local`, a place a call
+       * can never stand — so it caught nothing, and `local function version()
+       * end` / `version()` produced two findings, one of them on the definition
+       * itself. Tolerable while the set was nine curated legacy spellings nobody
+       * names a function after; not once the docs' flag added `version` and
+       * `stats`. `declaredNames` covers `local x`, `local function x`,
+       * `function x`, parameters and loop variables, and is asked last so a
+       * block with no such call never computes it. */
+      if (isCall && !isAssignedTo && !declared().has(t.value)) {
         findings.push({ start: t.start, end: t.end, text: t.value, kind: "global", entry });
       }
       continue;

@@ -22,6 +22,35 @@ html[data-dfp] .topic-post > article.boxed:hover {
   border-color: var(--dfp-border-strong);
 }
 
+/* ── Keyboard cursor (j/k) ───────────────────────────────────────────────
+ * Discourse walks `.selected` down the stream and draws it as
+ * `.topic-post.selected { box-shadow: -3px 0 0 var(--d-nav-color--active) }`
+ * (keyboard_shortcuts.scss, 3.5.0.beta3) — a bar hanging 3px OUTSIDE the
+ * wrapper, in the retargeted nav colour, beside a card that already has a
+ * rail of its own. Same cursor as the list gets (topic-list.css, "Keyboard
+ * cursor"): the accent replaces the card's grey hairline, and the stock bar
+ * goes. (0,3,1) against Discourse's (0,2,0), no tie to lose.
+ *
+ * An outline rather than `border-color`, unlike the list. The signal tints
+ * below own `border-color` on this element at up to (0,5,3) — the `:has()`
+ * forms of the staff match take the weight of their argument — so a cursor
+ * written as border-color would win on a plain card and vanish on a staff or
+ * solved one, the posts most worth walking to. Nothing else sets `outline`
+ * on the article (the focus ring lives on focusable elements, and the
+ * wrapper is what Discourse focuses), so the outline has no cascade to win.
+ * Inset by its own width it draws exactly where the hairline is, which is
+ * what makes it read as the border turning accent rather than a second ring;
+ * on a tinted card the 3px rail keeps its colour under all but its outer
+ * pixel. */
+html[data-dfp] .topic-post.selected {
+  box-shadow: none;
+}
+
+html[data-dfp] .topic-post.selected > article.boxed {
+  outline: 1px solid var(--dfp-accent);
+  outline-offset: -1px;
+}
+
 /* The original post anchors the thread; it gets the only real elevation.
  *
  * Deliberately no `background` here. This selector carries an id, so any
@@ -862,9 +891,11 @@ html[data-dfp] #topic-title h1 a {
   color: var(--dfp-text);
 }
 
-/* The topic map sits *inside* the OP's card, which is surface-2. Giving it
- * surface-1 made it darker than its own container — elevation running the
- * wrong way. Transparent with a hairline keeps it subordinate either way. */
+/* The topic map sits *inside* the OP's card, which is surface-1 (top of this
+ * file). It used to paint surface-1 itself, which when the card was surface-2
+ * made it darker than its own container — elevation running the wrong way —
+ * and against today's card would be no fill at all. Transparent with a
+ * hairline keeps it subordinate whichever way the card moves. */
 html[data-dfp] .topic-map {
   background: transparent;
   border: 1px solid var(--dfp-border);

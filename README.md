@@ -44,9 +44,22 @@ recently-read bodies on disk.
 - Topic lists mark solved, busy, closed and long-dormant threads
 - Replies over two years old that recommend replaced APIs carry a quiet caution
 - Thread view indents replies by depth, keeping chronological order so permalinks still work
+- Quiet replies folds runs of "thanks", "+1" and "bump" into one line you can expand — never the
+  opening post, an accepted answer, a reply someone answered, or anything with code
+- Pin the opening post keeps it in a column beside the replies, scrolling on its own — off by
+  default, on windows 1280px and wider
 - Gated categories say so before you write the post, not at submit time
 - Group chips — every group a member belongs to, with flair — on profiles, user cards and bylines
 - Long "liked this" lists fold to twelve faces behind a `+N others` toggle
+- Asset previews turn `rbxassetid://` references and catalog links into real links, with a
+  thumbnail fetched only when you hover one
+- Topic previews: hovering a link to another thread shows its title, whether it was solved and how
+  old it is, from the same request DFP already makes to open a topic
+- Creator Docs links get the hover card that API names in code already have. Reference pages
+  (classes, datatypes, enums, libraries, globals) come from the bundled index with no request; a
+  guide or tutorial page's title is read once, on hover, through the service worker — see Scope
+- Chart theming repaints Discourse's own charts to match the theme
+- Profile layout rebuilds the profile hero, stats and activity pages
 
 ### Writing
 
@@ -57,8 +70,10 @@ recently-read bodies on disk.
 ### Design
 
 Five themes — `dark`, `dim`, `black` (OLED), `light`, `off` — times three densities times three
-corner radii. Every colour derives from one OKLCH ramp, and **148 contrast checks run at build
-time**; a regression fails the build rather than shipping.
+corner radii. Every colour derives from one OKLCH ramp, and **every contrast and separation pair is
+asserted at build time** — over a thousand at the last generation; the exact count is written into
+the header of [`tokens.generated.css`](src/styles/tokens.generated.css) each time it is built. A
+regression fails the build rather than shipping.
 
 ---
 
@@ -90,7 +105,8 @@ resets settings, drafts and the topic cache.
 **Load Temporary Add-on…**, select `.output/firefox-mv3/manifest.json`. Firefox 128 is the floor:
 `world: "MAIN"` content scripts landed there, and without one the extension cannot reach
 Discourse's module loader at all. Firefox also treats host permissions as opt-in, so grant access
-to devforum.roblox.com when prompted or nothing runs.
+to devforum.roblox.com when prompted or nothing runs (create.roblox.com is asked for too; it only
+feeds the Creator Docs hover cards, and everything else works without it).
 
 Then open <https://devforum.roblox.com>.
 
@@ -98,7 +114,7 @@ The toolbar popup reports which boot rung engaged — the first thing to check i
 
 | Command           | What it does                                                     |
 | ----------------- | ---------------------------------------------------------------- |
-| `npm run build`   | Tokens → style checks → build to `.output/chrome-mv3`            |
+| `npm run build`   | Tokens → style checks → both targets to `.output/` → gzip budgets |
 | `npm run dev`     | WXT dev server with hot reload                                   |
 | `npm run check`   | Typecheck, style guardrails, unit tests                          |
 | `npm run tokens`  | Regenerate colours; **fails the build** on a contrast regression |
@@ -124,7 +140,7 @@ the plugin API after it, and finally CSS-only. A watchdog verifies rung 1 actual
 assuming it did.
 
 **Failures are contained.** Every module install is wrapped and budgeted; one that runs over budget
-three page loads running disables itself and says so in the popup. Nothing throws into Discourse.
+three routes running disables itself and says so in the popup. Nothing throws into Discourse.
 
 The highest-leverage file is [`base.css`](src/styles/base.css), which retargets Discourse's own
 custom properties at DFP tokens — one assignment restyles hundreds of rules across stylesheets we
@@ -140,4 +156,15 @@ No forum action is ever automated — no auto-like, reply, flag or vote, not beh
 is scraped into an external index. No analytics, no telemetry. Consent and age-verification scripts
 are never blocked, even optionally.
 
-`host_permissions` is exactly one origin. No `tabs`, `cookies`, `webRequest`, or `<all_urls>`.
+The palette's recent-topics list is the one record DFP keeps of what you read: the last twelve
+topics this browser opened, in `chrome.storage.local` on this device only, never sent anywhere,
+and cleared the moment the `recent-topics` module — or the palette, or DevForum Plus itself — is
+switched off.
+
+`host_permissions` is two origins, and the second is narrow. `https://devforum.roblox.com/*` is
+where everything runs. `https://create.roblox.com/*` exists for one feature: a Creator Docs link in a
+post gets a hover card naming the page, and that page sends no CORS headers, so only the service
+worker can read it. The worker fetches nothing but `/docs/…` paths on that origin — the path is
+checked against a fixed pattern and the URL rebuilt from a hardcoded origin, so a crafted link in
+someone's post cannot point it anywhere else — with `credentials: "omit"`, and only when you hover
+the link. No `tabs`, `cookies`, `webRequest`, or `<all_urls>`.

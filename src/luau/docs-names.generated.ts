@@ -20,6 +20,17 @@ export const DOC_BARE_GLOBALS: ReadonlySet<string> = new Set(["DebuggerManager",
 /** Which of the two globals pages each one documents. */
 export const DOC_GLOBAL_PAGE: Readonly<Record<string, string>> = {"_G":"LuaGlobals","_VERSION":"LuaGlobals","assert":"LuaGlobals","collectgarbage":"LuaGlobals","error":"LuaGlobals","gcinfo":"LuaGlobals","getfenv":"LuaGlobals","getmetatable":"LuaGlobals","ipairs":"LuaGlobals","loadstring":"LuaGlobals","newproxy":"LuaGlobals","next":"LuaGlobals","pairs":"LuaGlobals","pcall":"LuaGlobals","print":"LuaGlobals","rawequal":"LuaGlobals","rawget":"LuaGlobals","rawlen":"LuaGlobals","rawset":"LuaGlobals","require":"LuaGlobals","select":"LuaGlobals","setfenv":"LuaGlobals","setmetatable":"LuaGlobals","tonumber":"LuaGlobals","tostring":"LuaGlobals","type":"LuaGlobals","unpack":"LuaGlobals","xpcall":"LuaGlobals","Enum":"RobloxGlobals","game":"RobloxGlobals","plugin":"RobloxGlobals","shared":"RobloxGlobals","script":"RobloxGlobals","workspace":"RobloxGlobals","delay":"RobloxGlobals","DebuggerManager":"RobloxGlobals","elapsedTime":"RobloxGlobals","PluginManager":"RobloxGlobals","printidentity":"RobloxGlobals","settings":"RobloxGlobals","spawn":"RobloxGlobals","stats":"RobloxGlobals","tick":"RobloxGlobals","time":"RobloxGlobals","typeof":"RobloxGlobals","UserSettings":"RobloxGlobals","version":"RobloxGlobals","wait":"RobloxGlobals","warn":"RobloxGlobals","ypcall":"RobloxGlobals"};
 
+/**
+ * Bare globals the docs flag deprecated — `wait`, `spawn`, `getfenv`,
+ * `elapsedTime`. The tokenizer's legacy colour and detect.ts's fallback finding
+ * both read this, so the forum and the card agree with the docs rather than
+ * with a hand list.
+ */
+export const DOC_DEPRECATED_GLOBALS: ReadonlySet<string> = new Set(["DebuggerManager","collectgarbage","delay","elapsedTime","getfenv","printidentity","setfenv","spawn","stats","version","wait","ypcall"]);
+
+/** `library.member` pairs the docs flag deprecated — `table.getn`, `table.foreach`. */
+export const DOC_DEPRECATED_LIB_MEMBERS: ReadonlySet<string> = new Set(["table.foreach","table.foreachi","table.getn"]);
+
 export type DocGroup = "c" | "d" | "g" | "e";
 
 /** Which shard directory owns `name`, or null if it has no docs. */

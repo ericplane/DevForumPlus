@@ -3,6 +3,7 @@ import type { ModuleId } from "../../core/settings-schema";
 import type { PluginApi } from "../types";
 import { getCurrentTopic, topicIdFromPath } from "../topic-data";
 import { onDomChange } from "../dom-watch";
+import { mountTopicToggle, unmountTopicToggle } from "../topic-toggles";
 
 /**
  * Quiet replies — fold runs of replies that say nothing.
@@ -494,46 +495,32 @@ function clearRows(keep?: Set<HTMLElement>): void {
  * Zero candidates means the control is removed rather than shown inert. The
  * number counts what is loaded, so it climbs as Discourse pages more posts in —
  * that is the honest reading of it, not a bug.
+ *
+ * Where it mounts is topic-toggles.ts's decision, shared with thread-view and
+ * op-pin: the timeline rail while there is one, a DFP cluster beside the
+ * progress pill when the rail has collapsed, the footer last. This is the
+ * control that matters most for that order — a fold control belongs on a long
+ * thread by definition, and the footer does not exist until the end of one
+ * (verified live at reply #122 of 9,163, written up there).
  */
 function syncToggle(candidates: number): void {
-  let btn = document.querySelector<HTMLElement>(`.${TOGGLE}`);
   if (candidates === 0) {
-    btn?.remove();
+    unmountTopicToggle(TOGGLE);
     return;
-  }
-
-  if (!btn) {
-    /* `.topic-footer-main-buttons` is NOT the primary anchor, and this is the
-     * one place that matters most: a fold control belongs on a long thread by
-     * definition. Verified on the live forum at reply #122 of 9,163 and written
-     * up in thread-view.ts — Discourse does not render the topic footer until
-     * you reach the end of the stream, so that query returns null and the
-     * control never mounts. `.timeline-footer-controls` is the last child of
-     * the always-present timeline rail; the footer stays as the narrow-viewport
-     * fallback, where the rail itself collapses. */
-    const anchor =
-      document.querySelector(".timeline-footer-controls") ??
-      document.querySelector(".topic-footer-main-buttons") ??
-      document.querySelector("#topic-footer-buttons");
-    if (!anchor) return;
-
-    const made = document.createElement("button");
-    made.type = "button";
-    made.className = `btn btn-default ${TOGGLE}`;
-    made.addEventListener("click", () => setEnabled(!enabled));
-    // Appended, so DFP's controls collect below Discourse's own rather than
-    // pushing them down the rail — same as thread-view and op-pin, which keeps
-    // the three toggles together.
-    anchor.appendChild(made);
-    btn = made;
   }
 
   /* "Quiet", not "Quiet replies". The timeline rail is sized by its widest
    * child, so the label is load-bearing on layout: measured, "Quiet replies (3)"
    * pushed the rail from 90px to 105px and took that width out of the reply
    * column, while "Quiet (3)" leaves it at 90. The title attribute below carries
-   * the full sentence. */
-  setText(btn, `Quiet (${candidates})`);
+   * the full sentence. The helper writes the label only when it builds the
+   * button; every later count goes through `setText`, so a pass that changes
+   * nothing writes nothing. */
+  const label = `Quiet (${candidates})`;
+  const btn = mountTopicToggle(TOGGLE, label, () => setEnabled(!enabled));
+  if (!btn) return;
+
+  setText(btn, label);
   btn.setAttribute("aria-pressed", String(enabled));
   btn.title = enabled
     ? "Show every reply"

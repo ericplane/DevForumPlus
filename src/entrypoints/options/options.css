@@ -7,12 +7,18 @@
  * extension page that ignores the system theme looks broken next to the browser
  * chrome around it. */
 
+/* The popup's segmented control, for the Appearance section. It reads the
+ * variables listed at the top of that file, two of which this page did not
+ * have until it did: --surface-3 and --r-sm, declared below on the same ramp. */
+@import "../shared/segmented.css";
+
 :root {
   color-scheme: light dark;
 
   --bg: light-dark(#f6f7f9, #0c0e14);
   --surface: light-dark(#ffffff, #14171c);
   --surface-2: light-dark(#f0f2f5, #1c1f25);
+  --surface-3: light-dark(#e4e7ec, #25282e);
   --border: light-dark(#dfe3e8, #2b2f36);
   --text: light-dark(#212327, #eff4fc);
   --text-2: light-dark(#4a4f57, #b4b8c0);
@@ -20,6 +26,7 @@
   --accent: light-dark(#0077b2, #37b3ff);
   --danger: light-dark(#b3261e, #f4645d);
   --radius: 12px;
+  --r-sm: 8px;
 }
 
 * {
@@ -101,6 +108,16 @@ body {
   margin: 0 0 14px;
   color: var(--text-3);
   font-size: 13px;
+}
+
+/* The Appearance section's rows of segmented controls. Capped well under the
+ * page's 46rem: six theme buttons stretched across the full measure read as a
+ * toolbar, and the popup they mirror is 312px wide. */
+.opt__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-inline-size: 28rem;
 }
 
 .mods {

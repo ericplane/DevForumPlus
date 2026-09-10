@@ -2,6 +2,11 @@
  * importing them: it renders in an extension page with no `data-dfp` root and
  * no Discourse variables to retarget, so it owns its own small copy. */
 
+/* The segmented control's rules live with the component, since the Options
+ * page renders the same one; the variables it reads are listed there and all
+ * of them are declared below. */
+@import "../shared/segmented.css";
+
 :root {
   --bg: #0c0e14;
   --surface-1: #14171c;
@@ -84,59 +89,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
+/* The diagnostics row's heading. The segmented rows' labels are `.seg-label`
+ * in segmented.css, the same five declarations — kept apart so the shared
+ * stylesheet owns nothing this page uses elsewhere. */
 .label {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-3);
-}
-
-/* Segmented control */
-.seg {
-  display: flex;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 2px;
-  gap: 2px;
-}
-
-.seg button {
-  flex: 1;
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--text-3);
-  border-radius: 6px;
-  padding: 5px 4px;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-.seg button:hover {
-  color: var(--text);
-}
-
-.seg button[aria-pressed="true"] {
-  background: var(--surface-3);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.seg button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 /* Master switch */
@@ -290,8 +251,12 @@ body {
   font-size: 11px;
 }
 
+/* Two rows: the route to the full settings page across the top, the two
+ * maintenance actions beneath it. Three buttons on one 312px line put
+ * "Re-enable modules" onto two lines at 12px. */
 .foot {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -319,6 +284,13 @@ body {
 .btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* After `.btn`, not before it: `flex: 1` is a shorthand that resets
+ * flex-basis to 0%, and at equal specificity the later rule wins — placed
+ * above, this declared a full-width button and rendered a third of one. */
+.btn--row {
+  flex-basis: 100%;
 }
 
 /* The trim toggle carries a caveat, so its label needs two lines. */

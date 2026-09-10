@@ -32,6 +32,20 @@ html[data-dfp] .topic-list-item {
   contain-intrinsic-size: auto 79px;
 }
 
+/* With topic-excerpts on (`data-dfp-excerpts`, stamped on <html> by the module
+ * only once Discourse accepted its transformer — topic-excerpts.ts) every row
+ * carries two more lines: 2 × 13px (--dfp-fs-sm, 0.8125rem at a 16px root)
+ * × 1.4 (--dfp-lh-snug) = 36.4px, plus the 4px (--dfp-s-1) margin-block-start
+ * topic-list.css gives `.topic-excerpt` — so 79 + 40 ≈ 119. Without this the
+ * placeholder stayed at 79px while the row laid out at ~119px, ~40px per row
+ * and 1200px over a 30-row page, so the scrollbar thumb shrank continuously
+ * as rows entered the viewport — the exact drift the value above exists to
+ * stop. Derived, not measured: take the median offsetHeight of
+ * .topic-list-item on /latest with the module on and replace this number. */
+html[data-dfp][data-dfp-excerpts] .topic-list-item {
+  contain-intrinsic-size: auto 119px;
+}
+
 html[data-dfp] .topic-post {
   content-visibility: auto;
   contain-intrinsic-size: auto 180px;

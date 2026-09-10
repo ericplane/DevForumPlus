@@ -29,6 +29,20 @@ html[data-dfp] {
   --dfp-row-pad-x: var(--dfp-s-4);
   --dfp-row-gap: 6px;
 
+  /* The chrome above a list's first row (topic-list.css, "List chrome
+   * rhythm"): density used to reach only the rows, so compact took a few px
+   * off each of 30 rows while the band above them kept its height. Two
+   * lengths rather than one because at rest they were two different lengths,
+   * and comfortable has to stay where it was: `chrome-y` is the column
+   * header's padding, which was a fixed --dfp-s-2; `nav-y` replaces the
+   * `margin-bottom: var(--nav-space)` Discourse puts under the nav-pills /
+   * New Topic row — `--nav-space` is 0.75em on :root (discourse.scss) and
+   * resolves against the body's 0.9375rem, so 10.5–11.25px depending on the
+   * root Discourse sets; 12px is the grid step nearest it. Compact and
+   * spacious step each one grid unit either way. */
+  --dfp-list-chrome-y: var(--dfp-s-2);
+  --dfp-list-nav-y: var(--dfp-s-3);
+
   /* ── Type ─────────────────────────────────────────────────────────────────
    * The forum's own BuilderSans stack is kept — it is the right typeface and
    * it is already loaded. What changes is the scale and the leading: 15/1.50
@@ -112,6 +126,8 @@ html[data-dfp][data-dfp-density="compact"] {
   --dfp-row-pad-x: var(--dfp-s-3);
   --dfp-row-gap: 3px;
   --dfp-lh-body: 1.52;
+  --dfp-list-chrome-y: var(--dfp-s-1);
+  --dfp-list-nav-y: var(--dfp-s-2);
 }
 
 html[data-dfp][data-dfp-density="spacious"] {
@@ -119,6 +135,8 @@ html[data-dfp][data-dfp-density="spacious"] {
   --dfp-row-pad-x: var(--dfp-s-5);
   --dfp-row-gap: 10px;
   --dfp-lh-body: 1.7;
+  --dfp-list-chrome-y: var(--dfp-s-3);
+  --dfp-list-nav-y: var(--dfp-s-4);
 }
 
 /* ── Content width ─────────────────────────────────────────────────────────

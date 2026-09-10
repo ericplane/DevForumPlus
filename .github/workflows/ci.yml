@@ -109,3 +109,45 @@ jobs:
       # both targets — see package.json; `wxt build` alone is Chrome only.
       - name: Build
         run: npm run build
+
+      # The harness is the one place the shipped stylesheet is ever looked at,
+      # and until now nothing looked in CI: check:styles proves a class has
+      # fixture markup, the tokens step proves the palette contrasts pair by
+      # pair, and the composer's "Saving" bar still shipped black on black. So
+      # this renders the harness in the Chrome the runner already has and
+      # grades what it painted — every theme x density at 1280 and 720 px,
+      # plus the sharp and round radii — for text contrast (with the runs
+      # under 4.5:1 held by tests/visual/contrast-warnings.json, a ratchet
+      # like uncovered.json, which must be committed: an absent file fails
+      # here rather than bootstrapping a baseline that accepts everything),
+      # horizontal overflow, every corner following its radius token, and
+      # that every fixture block actually painted text on every render — a
+      # hidden fixture used to grade nothing and pass (scripts/check-harness.ts).
+      # After Build because the harness is built from the shipped CSS.
+      #
+      # The fixture renders in the runner's fonts (no @font-face ships, so
+      # Liberation/DejaVu here against Segoe/Arial on Windows). Those glyphs
+      # are wider; if the 720 px render overflows here and nowhere else, pin
+      # a metric-stable font in the harness chrome (scripts/build-harness.ts)
+      # rather than loosening the overflow check.
+      - name: Render the harness
+        run: npm run harness
+
+      - name: Audit the rendered harness
+        run: npm run check:harness
+
+      # One PNG per combination, plus the harness page itself for anyone who
+      # wants to click through the rest. Uploaded after a failure too — the
+      # screenshots are the evidence for it — but not for a cancelled run, and
+      # silently not at all when Build never got as far as writing them, which
+      # is the one way `!cancelled()` reaches this step with nothing to send.
+      - name: Upload harness screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness
+          path: |
+            .output/harness.html
+            .output/harness-shots/*.png
+          if-no-files-found: ignore
+          retention-days: 14

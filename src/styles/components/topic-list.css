@@ -61,7 +61,11 @@ html[data-dfp] .topic-list-header th .d-button-label {
 
 html[data-dfp] .topic-list-header th {
   border: 0;
-  padding-block: var(--dfp-s-2);
+  /* Density-scaled with the rest of the chrome above the first row — see
+   * `--dfp-list-chrome-y` in tokens.css and the "List chrome rhythm" rule at
+   * the end of this file. This was a fixed --dfp-s-2, which is what the token
+   * resolves to at the comfortable density. */
+  padding-block: var(--dfp-list-chrome-y);
 }
 
 /* ── Row as card ────────────────────────────────────────────────────────── */
@@ -174,15 +178,41 @@ html[data-dfp] .topic-list-item .link-bottom-line {
   margin-top: var(--dfp-s-1);
 }
 
+/* The excerpt Discourse renders under a title when a row is "expanded". The
+ * list module switches that on for every row through the
+ * `topic-list-item-expand-pinned` transformer (`/latest.json` carries an
+ * excerpt on every topic), so this is no longer a rule for pinned rows only.
+ *
+ * It is an `<a>`, so base.css would paint it accent; text-3 keeps it a preview
+ * of the post rather than a second link under the first. Two lines and cut:
+ * the payload's excerpts run to ~200 characters, three to four lines at this
+ * measure, and a row that grew to fit would double the list's height. 4px
+ * above, the same gap the category line keeps from the title, so a row stacks
+ * title / chips / excerpt on one rhythm (Discourse 3.5's topic-cell renders
+ * the excerpt after `.link-bottom-line`) — density moves the row's padding,
+ * not this.
+ * `overflow-wrap` because a pasted URL is the one thing an excerpt cannot
+ * break, and a clamped box clips rather than scrolls.
+ *
+ * The inline size is pinned to the cell. Discourse has shipped a narrow-
+ * viewport `width: 120%` on this element (not in the 3.5.0.beta3 sheet, but
+ * it has come and gone), and a table cell does not clip its content, so an
+ * over-wide clamp box would run its two lines straight through the card
+ * border. `overflow: hidden` above only clips inside the box's own width. */
 html[data-dfp] .topic-list-item .topic-excerpt {
-  color: var(--dfp-text-3);
-  font-size: var(--dfp-fs-sm);
-  line-height: var(--dfp-lh-snug);
-  margin-top: var(--dfp-s-2);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  inline-size: auto;
+  max-inline-size: 100%;
+  margin-block: var(--dfp-s-1) 0;
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-normal);
+  line-height: var(--dfp-lh-snug);
+  overflow-wrap: anywhere;
+  text-decoration: none;
 }
 
 /* ── Category chips and tags ─────────────────────────────────────────────
@@ -315,13 +345,30 @@ html[data-dfp] .topic-list-item.dfp-solved:hover > td {
 
 /* Stale threads are the forum's quiet hazard: a 2018 answer ranks in Google
  * and reads as current. Muting them is a nudge, not a warning — the real
- * warning lands on the post itself once code intelligence ships. */
-html[data-dfp] .topic-list-item.dfp-stale > td {
+ * warning lands on the post itself once code intelligence ships.
+ *
+ * `:where(:not(.dfp-solved))` is precedence, written so it costs nothing.
+ * The solved tint above and this rule are both (0,3,2) and this one is later
+ * in the file, so every solved topic older than the threshold lost its green
+ * — exactly the rows a searcher is hunting for. Excluding solved rows here
+ * leaves the solved rules, hover included, intact on a solved-and-stale row,
+ * and `:where` adds no specificity, so the rule keeps losing to everything it
+ * lost to before. The age dot below still says "dormant" on those rows.
+ *
+ * No title colour any more. Stale used to set text-2 on the title, which is
+ * byte-identical to the `visited` treatment above, so "old" and "I have read
+ * this" were the same colour. The dot is the stale cue; the tint is the nudge. */
+html[data-dfp] .topic-list-item.dfp-stale:where(:not(.dfp-solved)) > td {
   background: color-mix(in oklab, var(--dfp-surface-1) 70%, var(--dfp-bg));
 }
 
-html[data-dfp] .topic-list-item.dfp-stale a.title {
-  color: var(--dfp-text-2);
+/* Muted rows still answer the pointer. The generic hover rule is (0,3,2) and
+ * sits above this tint in the file, so at equal specificity a stale row never
+ * rose on hover — it read as disabled, the one thing the hover rule at the top
+ * of interactive.css exists to prevent. The mix keeps the mute while stepping
+ * the surface up, the way the solved hover keeps its green. */
+html[data-dfp] .topic-list-item.dfp-stale:where(:not(.dfp-solved)):hover > td {
+  background: color-mix(in oklab, var(--dfp-surface-2) 70%, var(--dfp-bg));
 }
 
 html[data-dfp] .topic-list-item.dfp-stale .age::after {
@@ -341,13 +388,65 @@ html[data-dfp] .topic-list-item.dfp-busy .posts-map .badge-posts {
   font-weight: var(--dfp-fw-semibold);
 }
 
-html[data-dfp] .topic-list-item.dfp-closed a.title {
+/* Closed dims the title — unless the thread is solved. Solved threads are the
+ * ones most often closed, and with no exception here "answered" read as
+ * "dead": text-3, the same as an abandoned thread. `:where` again, so the rule
+ * stays (0,4,2) and `:hover` and `visited` keep beating it as they did. */
+html[data-dfp] .topic-list-item.dfp-closed:where(:not(.dfp-solved)) a.title {
   color: var(--dfp-text-3);
 }
 
 /* Pinned rows earn a tint, not a different layout. */
 html[data-dfp] .topic-list-item.pinned > td {
   background: color-mix(in oklab, var(--dfp-accent) 5%, var(--dfp-surface-1));
+}
+
+/* Same equal-specificity trap as stale: the tint is later in the file than
+ * the generic hover, so without this a pinned row was the one card in the
+ * list that did not answer the pointer. */
+html[data-dfp] .topic-list-item.pinned:hover > td {
+  background: color-mix(in oklab, var(--dfp-accent) 5%, var(--dfp-surface-2));
+}
+
+/* ── Keyboard cursor (j/k) ───────────────────────────────────────────────
+ * Discourse's j/k shortcuts walk a `.selected` class down the rows, and on
+ * /search down `.fps-result`. Its own treatment is a 3px inset bar in the
+ * first cell, in `--danger` — the coloured rail this file removed as clutter
+ * — and nothing here was designed for it, so the cursor landed on the card
+ * cells as a red stripe fighting the hover state.
+ *
+ * The cursor is the hover state plus an accent outline: the same one-step
+ * lift, and the only border in the list that is not grey, so it can be found
+ * again after a scroll. After the signal tints on purpose — they are (0,3,2)
+ * too, and the cursor has to outrank a solved or pinned row's rest tint by
+ * order, or those would be the rows where the cursor vanishes. */
+html[data-dfp] .topic-list-item.selected > td {
+  background: var(--dfp-surface-2);
+  border-color: var(--dfp-accent);
+}
+
+/* The stock bar itself: `.topic-list tr.selected td:first-of-type { box-shadow:
+ * inset 3px 0 0 … }` (keyboard_shortcuts.scss, 3.5.0.beta3), which is (0,3,2)
+ * — the same weight as the rule above. DFP's sheet arrives through the
+ * manifest's content_scripts css, and Blink orders injected author sheets
+ * before the document's own, so at a tie the page wins and the bar kept
+ * painting on top of the outline. `td:first-child` makes this (0,4,2), which
+ * clears both of Discourse's shapes ((0,3,2) and `.topic-list-item.selected
+ * td:first-of-type` at (0,3,1)); a tie is not something this file relies on
+ * anywhere else either — see the title rule. Only the first cell needs it,
+ * because only the first cell ever had a bar. */
+html[data-dfp] .topic-list-item.selected > td:first-child {
+  box-shadow: none;
+}
+
+/* A search result has no card border to turn accent, so it keeps Discourse's
+ * inset-bar idiom in the accent instead of `--danger`, over the same text-mix
+ * its hover uses (search.css). One bar on one row is a cursor; it was a bar on
+ * every row that was clutter. Kept beside the row cursor so the two read as
+ * one treatment; it belongs with the `.fps-result` rules in search.css. */
+html[data-dfp] .search-container .fps-result.selected {
+  background: color-mix(in oklab, var(--dfp-text) 4%, transparent);
+  box-shadow: inset 3px 0 0 var(--dfp-accent);
 }
 
 /* ── Staff replied (PLAN.md §7.6 #43) ────────────────────────────────────────
@@ -447,4 +546,31 @@ html[data-dfp] .navigation-container button.no-text,
 html[data-dfp] .navigation-container button.btn-icon {
   inline-size: 2rem;
   padding-inline: 0;
+}
+
+/* ── List chrome rhythm ──────────────────────────────────────────────────
+ * The nav-pills / New Topic row and the column header sit between the page
+ * header and the first card, and the density setting never reached them:
+ * compact took a few px off each of 30 rows while the band above them kept
+ * its height. Two lengths in tokens.css move with density for this chrome:
+ * `--dfp-list-chrome-y` is the header padding above, `--dfp-list-nav-y` is
+ * the band under the controls here.
+ *
+ * Where the band actually comes from (common/base/_topic-list.scss,
+ * 3.5.0.beta3): `.list-controls > .container > .navigation-container` is a
+ * flex row with no margin of its own, and the `margin-bottom: var(--nav-space)`
+ * sits on its ITEMS — `#navigation-bar`, `.navigation-controls` and, on a
+ * category page, `.category-breadcrumb`. A flex item's margin is inside the
+ * container's box, so a margin on the container or on `.list-controls` (the
+ * first version of this rule) did not replace the band, it stacked a second
+ * one under it — comfortable grew by a token instead of staying put. The
+ * override has to land on the items, and it lands on all three because the
+ * row is as tall as its tallest item: leaving the breadcrumb at `--nav-space`
+ * would hold a category page's band at the stock height whatever the token
+ * said. Nothing above the controls is touched — the space under the page
+ * header is Discourse's `#main-outlet` padding and not a list concern. */
+html[data-dfp] .navigation-container #navigation-bar,
+html[data-dfp] .navigation-container .navigation-controls,
+html[data-dfp] .navigation-container .category-breadcrumb {
+  margin-block-end: var(--dfp-list-nav-y);
 }

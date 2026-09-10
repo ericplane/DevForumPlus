@@ -1,5 +1,6 @@
 import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
+import { loadCategories, type SiteCategory } from "../site-data";
 
 /**
  * Say whether you can post here, before you write the post.
@@ -35,31 +36,11 @@ import type { PluginApi } from "../types";
 
 const MARK = "data-dfp-gate";
 
-interface SiteCategory {
-  id: number;
-  name?: string;
-  permission?: number | null;
-  has_children?: boolean;
-  topic_url?: string | null;
-  description_text?: string | null;
-}
-
-let sitePromise: Promise<Map<number, SiteCategory> | null> | null = null;
-
-function loadCategories(): Promise<Map<number, SiteCategory> | null> {
-  sitePromise ??= fetch("/site.json", {
-    headers: { Accept: "application/json" },
-    // `permission` is per-user, so this is worthless without the session.
-    credentials: "same-origin",
-  })
-    .then((r) => (r.ok ? (r.json() as Promise<{ categories?: SiteCategory[] }>) : null))
-    .then((s) => {
-      if (!s?.categories) return null;
-      return new Map(s.categories.map((c) => [c.id, c]));
-    })
-    .catch(() => null);
-  return sitePromise;
-}
+/* The `/site.json` loader used to live here, module-private. It moved to
+ * site-data.ts when the topic hover card needed the same table for a name and
+ * a colour — one request per visit, shared, rather than a second copy of the
+ * same fetch. `permission` is still per-user, and the shared loader still sends
+ * the session for it. */
 
 /** `/c/updates/announcements/36` → 36. The id is always the last segment. */
 export function categoryIdFromPath(pathname: string): number | null {

@@ -43,7 +43,7 @@ export default defineContentScript({
 
     // 2. Bridge up immediately so the main world is never left waiting.
     let latestDiagnostics: Diagnostics | null = null;
-    new IsolatedBridge({ onDiagnostics: (d) => (latestDiagnostics = d) });
+    const bridge = new IsolatedBridge({ onDiagnostics: (d) => (latestDiagnostics = d) });
 
     /* Each mount is isolated, so one throwing cannot take the others with it.
      *
@@ -74,8 +74,11 @@ export default defineContentScript({
     //    nothing until someone actually hovers an API name that MAIN resolved.
     step("docs-cards", mountDocsCards);
 
-    // 5. ⌘K. One keydown listener until it is actually opened.
-    step("command-palette", mountCommandPalette);
+    // 5. ⌘K. Gated on its module flag once settings resolve; one keydown
+    //    listener and a header button until it is actually opened. A selection
+    //    goes out over the bridge so Discourse routes it in-app rather than
+    //    reloading the document (see protocol.ts, `nav:route`).
+    step("command-palette", () => mountCommandPalette({ route: (href) => bridge.route(href) }));
 
     // 6. Composer: duplicate detection, draft vault, Luau block button.
     step("composer", mountComposer);

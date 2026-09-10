@@ -252,7 +252,16 @@ html[data-dfp] .dfp-draft__restore:hover {
   background: color-mix(in oklab, var(--dfp-warning) 16%, transparent);
 }
 
+/* ── Composer toolbar: the Luau button and the paste note ───────────────────
+ *
+ * A text button in a row of icons. controls.css sizes every `.btn` in the bar
+ * (square minimum, --dfp-s-2 padding, inline-flex), so this only adds what a
+ * label needs: a gap between the glyph and the word. It used to carry
+ * Discourse's `no-text` class as well, which took the icon-only colour rule
+ * and left a lone word at the far end of the bar; composer.ts now places it
+ * beside the generic code button and drops the class. */
 html[data-dfp] .d-editor-button-bar .dfp-luau-btn {
+  gap: var(--dfp-s-1);
   font-size: var(--dfp-fs-xs);
   font-weight: var(--dfp-fw-medium);
   color: var(--dfp-text-3);
@@ -260,6 +269,43 @@ html[data-dfp] .d-editor-button-bar .dfp-luau-btn {
 
 html[data-dfp] .d-editor-button-bar .dfp-luau-btn:hover {
   color: var(--dfp-accent);
+}
+
+/* The three ticks of the fence it inserts, in the mono face. Tightened,
+ * because at this size the ticks otherwise read as three separate marks. */
+html[data-dfp] .dfp-luau-btn__glyph {
+  font-family: var(--dfp-mono);
+  font-weight: var(--dfp-fw-normal);
+  letter-spacing: -0.08em;
+}
+
+/* "Fenced as Luau — undo", after a paste, until the author types again (five
+ * seconds at the least; composer.ts `fenceNoteStays`). It lives at the end of
+ * the toolbar (flex, so `auto` margin pushes it right) rather than under it,
+ * where it shifted the textarea while the author was typing into it. */
+html[data-dfp] .dfp-fence-note {
+  margin-inline-start: auto;
+  align-self: center;
+  padding-inline: var(--dfp-s-2);
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-xs);
+  white-space: nowrap;
+}
+
+html[data-dfp] .dfp-fence-note__undo {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--dfp-accent);
+  font: inherit;
+  font-weight: var(--dfp-fw-medium);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+html[data-dfp] .dfp-fence-note__undo:hover {
+  color: var(--dfp-text);
 }
 
 /* ── Thread view (PLAN.md §7.3 #13) ──────────────────────────────────────────
@@ -354,7 +400,13 @@ html[data-dfp] .dfp-thread-toggle[aria-pressed="true"] {
  * Two earlier drafts of this comment carried arithmetic instead of
  * measurements and were wrong in both directions: first by treating the reply
  * column as the measure, then by modelling the chrome as a constant. The
- * numbers above came off `getBoundingClientRect` at each width. */
+ * numbers above came off `getBoundingClientRect` at each width.
+ *
+ * op-pin.ts holds a `matchMedia` twin of this query (`WIDE`): below it the
+ * module refuses to stamp `data-dfp-op-pin` at all and disables the toggle
+ * with the reason, because a button that lights up while nothing on screen
+ * changes is the failure the `:disabled` rule below was written against.
+ * Change the number here and there together, or the button lies. */
 @media (min-width: 1280px) {
   html[data-dfp][data-dfp-op-pin] {
     /* The panel takes whatever width is left once the reply column has the

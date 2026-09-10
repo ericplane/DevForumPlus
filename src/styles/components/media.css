@@ -223,6 +223,31 @@ html[data-dfp] .cooked aside.onebox .aspect-image img {
   border-radius: var(--dfp-r-xs);
 }
 
+/* The bare thumbnail a generic preview floats beside its title — a GitHub
+ * release, a blog post, anything Discourse fetched an og:image for. Discourse
+ * sizes it with `max-width: 20%`; base.css says `max-width: 100%; height:
+ * auto` for every post image and, at (0,4,2) against Discourse's (0,2,1),
+ * wins. Measured on a GitHub release card: the image grew to its full 690px,
+ * Discourse's `max-height: 170px` then clamped the height without re-solving
+ * the width, so a 2:1 social card rendered squashed to 4:1, the title wrapped
+ * into the 120px left beside the float (five lines, 103px), and the box was
+ * 265px tall. Restoring the cap gives 165×82, one title line, 134px.
+ *
+ * `min(20%, 180px)` rather than 20% alone: the DFP column is wider than
+ * stock, and the full-width layout would otherwise hand a thumbnail 200px.
+ * `object-fit: cover` covers the portrait case the 170px cap still squashes
+ * (stock squashes it too): crop, never distort.
+ *
+ * `.onebox-body > img` on purpose. When Discourse knows the image size it
+ * ships the thumbnail inside an `.aspect-image` wrapper that carries the
+ * width itself; a rule reaching inside would cap it a second time, so that
+ * shape is left alone. Avatars keep their 48px rule above. */
+html[data-dfp] .cooked aside.onebox .onebox-body > img.thumbnail:not(.onebox-avatar) {
+  max-inline-size: min(20%, 180px);
+  block-size: auto;
+  object-fit: cover;
+}
+
 /* ── Link click counts ───────────────────────────────────────────────────
  * The small number Discourse appends to a link showing how many people clicked
  * it. It was inheriting the generic notification-badge treatment, so a piece of
@@ -404,9 +429,11 @@ html[data-dfp] .cooked .dfp-asset:focus-visible {
  * `translate` and this sets the origin those coordinates are measured from. A
  * logical origin would flip out from under them under `dir="rtl"`.
  *
- * No z-index. There is not one anywhere in this stylesheet and this is not the
- * place to start: the card opens downward from a link in the post column, where
- * nothing is stacked.
+ * No z-index here. The card opened downward from a link in the post column,
+ * where nothing was stacked — until composer.ts marked its "Already asked?"
+ * rows inside the fixed, z-400 `#reply-control`. entity-cards.css gives both
+ * hover-card hosts their one layer (990) and records why; this rule stays at
+ * auto so the reason lives in one place.
  *
  * No entry animation either. polish.css owns the settle animation and the
  * motion opt-out that switches it off, and both are lists of class names this

@@ -1,7 +1,15 @@
 import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { decorateCooked } from "../decorate";
-import { getTopic, topicIdFromPath, type TopicPayload } from "../topic-data";
+import { categoryColor, loadCategories, type SiteCategory } from "../site-data";
+import {
+  TOPIC_HREF,
+  getPost,
+  getTopic,
+  topicIdFromPath,
+  type PostSummary,
+  type TopicPayload,
+} from "../topic-data";
 
 /**
  * Hover card for links to other DevForum topics.
@@ -25,35 +33,51 @@ import { getTopic, topicIdFromPath, type TopicPayload } from "../topic-data";
  * already makes: `getTopic` is the shared, per-visit-cached path that
  * stale-answer, thread-view, op-pin and quiet-replies all read from, so a
  * hovered topic that is later opened, or was already read on this visit, costs
- * nothing at all. A second fetch path for a hover card would not have been
- * worth building.
+ * nothing at all. The one thing that payload cannot answer is a post outside
+ * its twenty-post window, and for that — only that — the card asks
+ * `/posts/by_number/{id}/{n}.json`, a few kB, rather than quote the wrong
+ * post. See `postFor`.
  *
  * Same-origin with the forum's own cookies, so the card reflects YOUR
  * permissions: a link into a category you cannot see answers 403, and the card
  * simply does not appear. Nothing leaves the forum — unlike the two Roblox
  * cards, this makes no third-party request at all.
+ *
+ * ── The card is a contract, not just a decorator ────────────────────────────
+ * The attributes below are written by this module's cooked sweep, but they are
+ * read from the whole document: any anchor anywhere carrying `data-dfp-topic`
+ * gets the card, with `data-dfp-post` naming a post when there is one. That is
+ * what lets other modules — the topic-list work, for one — hang the same card
+ * off links that are not in a post, without a second copy of the mechanics.
+ * The listeners therefore mount at install rather than on the first sweep that
+ * finds a link; the cost is one `closest` per pointerover, which is nothing.
+ *
+ * ── What this deliberately does not do ──────────────────────────────────────
+ * A plain `/u/name` link in a post is left exactly as the author wrote it. A
+ * pass here once gave it `data-user-card`, the attribute Discourse's own card
+ * handler reads on avatar links, so it would open the user card in place. It
+ * was withdrawn unverified: Discourse's cooked-link tracker is bound on the
+ * post stream, below the document-level card handler, and exempts mentions
+ * and hashtags but not that attribute — so the likely result was a routed
+ * navigation AND a card on the same click, which is worse than the plain
+ * navigation it replaced. Until that is checked on the live forum, this file
+ * changes what no author's link does on a click.
  * ───────────────────────────────────────────────────────────────────────────
  */
 
 /** Claimed on the `.cooked` root, so a repeat sweep costs one attribute read. */
 const SCANNED = "data-dfp-topic-scan";
 
-/** Carries the topic id, and the post number when the link names one. */
+/**
+ * Carries the topic id, and the post number when the link names one. The
+ * post attribute was `data-dfp-topic-post` until the card became a contract
+ * (header); `data-dfp-post` is the name every writer uses now.
+ */
 const TOPIC = "data-dfp-topic";
-const TOPIC_POST = "data-dfp-topic-post";
+const TOPIC_POST = "data-dfp-post";
 
 /** Matches docs-card and asset-preview, so the hover affordances feel like one. */
 const OPEN_DELAY = 220;
-
-/**
- * `/t/slug/12345`, `/t/12345`, either optionally followed by `/67`.
- *
- * The slug arm refuses to match a bare number, which is not fussiness: with a
- * plain `[^/]+/` there, `/t/4301387/3191` parses as topic 3191 — a real topic,
- * and entirely the wrong one. A card that confidently describes a different
- * thread is worse than no card, so the slug has to prove it is a slug.
- */
-const TOPIC_HREF = /^\/t\/(?:(?!\d+(?:\/|$))[^/]+\/)?(\d+)(?:\/(\d+))?(?:[/?#]|$)/;
 
 const YEAR_MS = 315_576e5;
 /** stale-answer.ts's threshold, deliberately the same number. */
@@ -94,6 +118,8 @@ function mark(root: HTMLElement): number {
     // Same-origin only. `a.href` is resolved, so a relative `/t/…` works too.
     if (a.origin !== location.origin) continue;
 
+    // The guarded shape from topic-data.ts — prefetch.ts reads links with the
+    // same one, so a link this marks is a link that warms.
     const m = TOPIC_HREF.exec(a.pathname);
     if (!m) continue;
     const id = Number(m[1]);
@@ -158,7 +184,12 @@ function badge(text: string, kind: string): HTMLElement {
  * deliberately absent — they are what Discourse's onebox pads with, and neither
  * changes a decision.
  */
-function build(topic: TopicPayload, postNumber: number | null): HTMLElement {
+function build(
+  topic: TopicPayload,
+  postNumber: number | null,
+  post: PostSummary | null,
+  category: SiteCategory | null,
+): HTMLElement {
   const card = document.createElement("div");
   card.className = "dfp-topic-card";
 
@@ -172,6 +203,21 @@ function build(topic: TopicPayload, postNumber: number | null): HTMLElement {
 
   const badges = document.createElement("div");
   badges.className = "dfp-topic-card__badges";
+  /* The category leads the badge row: on this forum it is what says whether a
+   * linked thread is a bug report, a feature request or a support answer, and
+   * a title rarely does. Only the dot takes the category's own colour — the
+   * text stays on the neutral badge palette, because an arbitrary hex value
+   * from the server is outside the build-time contrast checks and a colour
+   * that fails them would fail on someone's theme. */
+  if (category?.name) {
+    const el = badge(category.name, "category");
+    const dot = document.createElement("span");
+    dot.className = "dfp-topic-card__dot";
+    const color = categoryColor(category.color);
+    if (color) dot.style.background = color;
+    el.prepend(dot);
+    badges.appendChild(el);
+  }
   if (topic.accepted_answer) {
     const by = topic.accepted_answer.username;
     badges.appendChild(badge(by ? `Solved by ${by}` : "Solved", "solved"));
@@ -200,35 +246,75 @@ function build(topic: TopicPayload, postNumber: number | null): HTMLElement {
   }
 
   /* A link to post #45 wants THAT post, which is the one thing Discourse's own
-   * onebox never shows. `getTopic` carries only the first window, so a deep
-   * post number usually is not there — in which case the topic's own opening
-   * lines are still the better answer than nothing, and the "post #45" above
-   * has already said which post you are heading for. */
-  const posts = topic.post_stream?.posts ?? [];
-  const chosen = (postNumber !== null && posts.find((p) => p.post_number === postNumber)) || posts[0];
-  const body = chosen ? asText(chosen.cooked ?? "") : "";
-  if (body) {
+   * onebox never shows — and the words here are always that post's, or absent.
+   * They used to fall back to the opening post whenever the numbered one was
+   * outside the loaded window, which on a long thread is nearly always: the
+   * card then read "post #3191" over the OP's text, a confident description of
+   * the wrong post. `postFor` has since fetched the post itself; when even that
+   * failed, the title and badges above stand on their own. */
+  const body = post ? asText(post.cooked ?? "") : "";
+  if (post && body) {
     const excerpt = document.createElement("div");
     excerpt.className = "dfp-topic-card__excerpt";
-    const who = chosen?.username;
-    excerpt.textContent = who && chosen !== posts[0] ? `${who}: ${body}` : body;
+    const who = post.username;
+    excerpt.textContent = who && post.post_number !== 1 ? `${who}: ${body}` : body;
     card.appendChild(excerpt);
   }
 
   return card;
 }
 
+/**
+ * The post the card quotes: from the loaded window when it is there, otherwise
+ * from Discourse's single-post route.
+ *
+ * The window is twenty posts, so a "see reply #3191" link into a long thread —
+ * exactly the link a preview saves the most scrolling on — is almost never in
+ * it. And because topic-data is primed with whatever window Discourse loaded
+ * for the page, on a deep-linked page even post #1 can be missing, so the
+ * opening post takes the same route. Verified live:
+ * `/posts/by_number/{id}/{n}.json` is a few kB with the same cookies, and
+ * answers with `cooked` and `username`. A deleted post yields a card without
+ * an excerpt, cached like any other under `id#post`: the title and badges are
+ * still right, and re-requesting a deleted post on every hover is the thing
+ * the null entries in `cards` exist to prevent. A 5xx or no network is not
+ * that — `getPost` rejects for those, and `open` forgets the key so the next
+ * hover asks again instead of standing on a blip for the visit.
+ */
+async function postFor(
+  id: number,
+  topic: TopicPayload,
+  postNumber: number,
+): Promise<PostSummary | null> {
+  const posts = topic.post_stream?.posts ?? [];
+  return posts.find((p) => p.post_number === postNumber) ?? (await getPost(id, postNumber));
+}
+
 // ── The hover mechanics ─────────────────────────────────────────────────────
 
 /**
- * key → built card, or `null` once it is known there is nothing to show.
+ * key → the card, or `null` once it is known there is nothing to show — as a
+ * promise, from the moment the first hover starts building it.
  *
  * Keyed by topic AND post number, because the same topic hovered through two
  * different links renders two different cards. `null` is the important half: a
  * deleted or unreadable topic must not be re-requested on every hover.
+ *
+ * The promise rather than its result, for the reason `getTopic` keeps one: the
+ * key used to be written only once the card existed, so a pointer that left
+ * and came back inside `OPEN_DELAY` plus the `/posts/by_number` round trip
+ * started a second, identical request. Now the second hover joins the first.
  */
-const cards = new Map<string, HTMLElement | null>();
+const cards = new Map<string, Promise<HTMLElement | null>>();
 const CARD_CAP = 16;
+
+function remember(key: string, card: Promise<HTMLElement | null>): void {
+  if (cards.size >= CARD_CAP) {
+    const oldest = cards.keys().next();
+    if (!oldest.done) cards.delete(oldest.value);
+  }
+  cards.set(key, card);
+}
 
 let host: HTMLElement | null = null;
 let openTimer = 0;
@@ -286,6 +372,8 @@ function show(anchor: HTMLElement, card: HTMLElement): void {
 function hide(): void {
   clearTimeout(openTimer);
   pending = null;
+  // A spent tap is spent only while its card stands — see `armed`.
+  armed = null;
   if (!shownFor) return;
   shownFor = null;
   // Removed rather than hidden, so a card cannot survive a route change as a
@@ -303,27 +391,38 @@ function open(anchor: HTMLElement): void {
   const key = postNumber === null ? String(id) : `${id}#${postNumber}`;
   pending = key;
 
-  const hit = cards.get(key);
-  if (hit !== undefined) {
-    // Known bad stays bad; the reference remains an ordinary working link.
-    if (hit) show(anchor, hit);
-    return;
+  let hit = cards.get(key);
+  if (!hit) {
+    /* The category table rides alongside the topic request rather than after
+     * it — one `/site.json` per visit at most, and never one per hover. The
+     * honest cost: on the visit's FIRST hover the card waits for whichever of
+     * the two is slower, and `/site.json` (every category, group and
+     * post-action type, hundreds of kB here) is usually that one, even when
+     * the topic is instant from `primeTopic` — a "see reply #N" link into the
+     * thread being read, the commonest case. Paid once; every later hover
+     * finds the table cached and costs what the topic alone costs. */
+    hit = Promise.all([getTopic(id), loadCategories()]).then(async ([topic, categories]) => {
+      // Known bad stays bad; the reference remains an ordinary working link.
+      if (!topic) return null;
+      const category =
+        topic.category_id !== undefined ? (categories?.get(topic.category_id) ?? null) : null;
+      return build(topic, postNumber, await postFor(id, topic, postNumber ?? 1), category);
+    });
+    remember(key, hit);
   }
 
-  void getTopic(id).then((topic) => {
-    if (!topic) {
-      cards.set(key, null);
-      return;
-    }
-    const card = build(topic, postNumber);
-    if (cards.size >= CARD_CAP) {
-      const oldest = cards.keys().next();
-      if (!oldest.done) cards.delete(oldest.value);
-    }
-    cards.set(key, card);
+  const claim = hit;
+  void claim.then(
     // Only if the pointer is still on the same link by the time this lands.
-    if (pending === key && hovered === anchor) show(anchor, card);
-  });
+    (card) => {
+      if (card && pending === key && hovered === anchor) show(anchor, card);
+    },
+    // No answer from the server — see `getPost`. Forget the attempt, unless a
+    // later hover has already replaced it, so the next one asks again.
+    () => {
+      if (cards.get(key) === claim) cards.delete(key);
+    },
+  );
 }
 
 function target(node: EventTarget | null): HTMLElement | null {
@@ -333,19 +432,66 @@ function target(node: EventTarget | null): HTMLElement | null {
 let mounted = false;
 
 /**
- * Mounted lazily, the first sweep that actually finds a topic link. A reader who
- * never opens a thread containing one pays for no listeners at all.
+ * Touch, and the two taps — the same shape as asset-preview.ts, for the same
+ * reason: on `(hover: none)` nothing rests on a link, so a first tap opens the
+ * card without navigating and the second follows the link. `armed` is the
+ * link whose first tap was spent; `hide` forgets it, so a card taken away by a
+ * scroll or Escape is shown again by the next tap rather than skipped.
+ *
+ * The first tap is claimed only inside `.cooked`. The attribute is a contract
+ * (header) and a topic-list row may carry it; on a phone that row's tap IS
+ * the navigation, and a card in front of it would be the wrong trade. Hover,
+ * where there is one, opens for the attribute anywhere.
+ *
+ * The listener is on `document` in the CAPTURE phase, and that is the whole
+ * mechanism. Discourse's cooked-link tracker is bound on the post stream,
+ * below `document`, and for every link in a post it runs first in the bubble:
+ * it calls `preventDefault` and hands an internal href to `routeTo` — the
+ * same call protocol.ts describes for `nav:route`. A bubble listener here saw
+ * only the aftermath, so the first tap navigated exactly as it does today and
+ * no card ever opened. In capture nothing has run yet, so the first tap is
+ * taken whole — `preventDefault` so the anchor does not navigate,
+ * `stopPropagation` so the tracker never sees it — and the second tap is
+ * left untouched to be tracked and routed as it always was. There is no
+ * `defaultPrevented` to consult in capture; the `button` and media guards
+ * are what keep this off the mouse.
+ *
+ * On touch no timer is ever armed — see `enter` for the gesture that made
+ * that rule — so a tap that navigates leaves nothing to fire mid-route-change
+ * and spend a `/t/{id}.json` on a card `show` then refuses because the anchor
+ * is gone. The `clearTimeout` calls in the branches that navigate stay for
+ * the one device that has a hover AND reports `(hover: none)` for a gesture.
+ *
+ * The query is created in `mountHover`, not at import — op-pin.ts records why
+ * `matchMedia` at module scope breaks importing from Node.
+ */
+let touch: MediaQueryList | null = null;
+let armed: HTMLElement | null = null;
+
+/**
+ * Mounted at install. This used to wait for the first sweep that found a
+ * topic link, so a reader who never opened a thread with one paid for no
+ * listeners — but the attribute is written by other modules now (header), on
+ * elements no cooked sweep visits, and a card that opens only once a post
+ * happens to contain a topic link is a contract nobody can rely on.
  */
 function mountHover(): void {
   if (mounted) return;
   mounted = true;
+  touch = matchMedia("(hover: none)");
 
+  /* On touch the click handler is the only opener; the timer is never armed.
+   * asset-preview.ts records the gesture that decided it: a long-press or a
+   * short drag on a carded link is `pointerover` with no click, so the timer
+   * ran out, fetched, and mounted a card nobody asked for that nothing took
+   * away — and because that path never set `armed`, the next tap re-opened
+   * the card instead of following the link. */
   const enter = (node: EventTarget | null) => {
     const anchor = target(node);
     if (anchor === hovered) return;
     hovered = anchor;
     hide();
-    if (anchor) openTimer = window.setTimeout(() => open(anchor), OPEN_DELAY);
+    if (anchor && !touch?.matches) openTimer = window.setTimeout(() => open(anchor), OPEN_DELAY);
   };
 
   document.addEventListener("pointerover", (e) => enter(e.target), { passive: true });
@@ -354,7 +500,52 @@ function mountHover(): void {
     hovered = null;
     hide();
   });
+  /* Not on touch: a touch pointer leaves the document at the end of every
+   * tap, which would close the card the same tap had just opened. */
   document.documentElement.addEventListener("pointerleave", () => {
+    if (touch?.matches) return;
+    hovered = null;
+    hide();
+  });
+  /* The two touch gestures `pointerleave` used to cover — the long-press
+   * context menu and a scroll or pinch takeover — are the ones the browser
+   * reports as `pointercancel`, and neither is followed by a click. */
+  document.addEventListener("pointercancel", () => {
+    hovered = null;
+    hide();
+  });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!touch?.matches || e.button !== 0) return;
+      const anchor = target(e.target);
+      if (!anchor) return;
+      // Second tap: the card was asked for; this one leaves.
+      if (armed === anchor) {
+        hovered = null;
+        hide();
+        return;
+      }
+      // A marked link outside a post: the tap is the navigation.
+      if (!anchor.closest(".cooked")) {
+        clearTimeout(openTimer);
+        hovered = null;
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      clearTimeout(openTimer);
+      hovered = anchor;
+      armed = anchor;
+      open(anchor);
+    },
+    { capture: true },
+  );
+
+  // Escape closes the card, as it does every other overlay in the product.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
     hovered = null;
     hide();
   });
@@ -375,7 +566,7 @@ function mountHover(): void {
 function enhance(root: HTMLElement): void {
   if (root.hasAttribute(SCANNED)) return;
   root.setAttribute(SCANNED, "1");
-  if (mark(root) > 0) mountHover();
+  mark(root);
 }
 
 export function topicPreview(api: PluginApi): DfpModule {
@@ -384,6 +575,8 @@ export function topicPreview(api: PluginApi): DfpModule {
     budgetMs: 60,
 
     install() {
+      // First, so a link another module marks before the first sweep is live.
+      mountHover();
       decorateCooked(api, (element) => enhance(element), {
         id: "dfp-topic-preview",
         onlyStream: true,

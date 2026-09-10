@@ -158,10 +158,18 @@ html[data-dfp] :focus:not(:focus-visible) {
   outline: none;
 }
 
-/* ── Selection ──────────────────────────────────────────────────────────── */
+/* ── Selection ────────────────────────────────────────────────────────────
+ * Its own pair, generated and asserted in build-tokens.ts. This used to be
+ * `--dfp-accent-soft` under `--dfp-text` — a chip tint doing a highlighter's
+ * job. Measured on the shipped hex it sat 0.067 / 0.062 / 0.095 / 0.040Δ from
+ * surface-2 (dark / dim / black / light), the `<pre>` background people select
+ * on most, against the 0.13Δ the generator calls perceptible: a dragged
+ * selection was a faint stain on the dark themes and absent on light. Nothing
+ * caught it because no assertion covered the pair; the generator now checks it
+ * the way it checks `<mark>`, plus once more against surface-2. */
 html[data-dfp] ::selection {
-  background: var(--dfp-accent-soft);
-  color: var(--dfp-text);
+  background: var(--dfp-selection-bg);
+  color: var(--dfp-selection-fg);
 }
 
 /* ── Highlighted text ───────────────────────────────────────────────────────
@@ -177,9 +185,9 @@ html[data-dfp] ::selection {
  * one role, consumed in the other. Setting both halves here means neither
  * Discourse nor the UA gets to supply the missing one.
  *
- * Amber rather than the accent, deliberately — `::selection` above is already
- * the accent blue, and an author's highlight that looks identical to the
- * reader's own selection is unreadable in a different way. */
+ * Amber rather than the accent, deliberately — `::selection` above takes the
+ * accent hue, and an author's highlight that looks identical to the reader's
+ * own selection is unreadable in a different way. */
 html[data-dfp] mark {
   background: var(--dfp-mark-bg);
   color: var(--dfp-mark-fg);
@@ -209,27 +217,40 @@ html[data-dfp] a {
   transition: color var(--dfp-dur-1) var(--dfp-ease);
 }
 
-/* ── Typography inside posts ───────────────────────────────────────────── */
-html[data-dfp] .cooked {
+/* ── Typography inside posts ─────────────────────────────────────────────
+ *
+ * `:is(.cooked, .d-editor-preview)` on every prose rule from here to the
+ * image rule, and the reason is the composer preview. It renders the same
+ * cooked HTML as a post, and only three prose rules in the whole stylesheet
+ * had a preview twin (pre, pre code, the details box) — so a `>` quote had its
+ * rail in the post and not in the preview, a table had a header fill in one
+ * and hairlines in the other, inline code had a chip in one and nothing in
+ * the other. What you previewed was visibly not what you posted.
+ *
+ * `:is()` takes the specificity of its heaviest argument, and both arguments
+ * are one class, so every rule keeps exactly the weight it had against
+ * Discourse — the cascade that was bisected against the live site is
+ * untouched; only the set of elements each rule reaches grows. */
+html[data-dfp] :is(.cooked, .d-editor-preview) {
   font-size: var(--dfp-fs-md);
   line-height: var(--dfp-lh-body);
   color: var(--dfp-text-2);
 }
 
-html[data-dfp] .cooked > * {
+html[data-dfp] :is(.cooked, .d-editor-preview) > * {
   color: var(--dfp-text-2);
 }
 
-html[data-dfp] .cooked strong,
-html[data-dfp] .cooked b {
+html[data-dfp] :is(.cooked, .d-editor-preview) strong,
+html[data-dfp] :is(.cooked, .d-editor-preview) b {
   color: var(--dfp-text);
   font-weight: var(--dfp-fw-semibold);
 }
 
-html[data-dfp] .cooked h1,
-html[data-dfp] .cooked h2,
-html[data-dfp] .cooked h3,
-html[data-dfp] .cooked h4 {
+html[data-dfp] :is(.cooked, .d-editor-preview) h1,
+html[data-dfp] :is(.cooked, .d-editor-preview) h2,
+html[data-dfp] :is(.cooked, .d-editor-preview) h3,
+html[data-dfp] :is(.cooked, .d-editor-preview) h4 {
   color: var(--dfp-text);
   line-height: var(--dfp-lh-tight);
   letter-spacing: var(--dfp-track-title);
@@ -237,40 +258,90 @@ html[data-dfp] .cooked h4 {
   margin-block: var(--dfp-s-5) var(--dfp-s-3);
 }
 
-html[data-dfp] .cooked p {
+html[data-dfp] :is(.cooked, .d-editor-preview) p {
   margin-block: 0 var(--dfp-s-4);
 }
 
-html[data-dfp] .cooked blockquote {
+/* A bare `>` quote — not the aside.quote a quote-reply produces.
+ *
+ * This was surface-1, which is what the post card is too (post.css), so inside
+ * a plain post the quote had no fill at all and only the rail and the muted
+ * colour marked it; inside a tinted staff, OP or solution card it read as a
+ * darker hole. The quote-reply beside it sits at surface-2 with a hairline
+ * (post.css, "Quotes"), so two kinds of quote in one thread looked like two
+ * products. Same surface and the same hairline now, and the 3px rail is what
+ * still says "quoted" rather than "replied to". post.css resets `aside.quote
+ * blockquote` to transparent and borderless, so the quote-reply and the
+ * solved-panel excerpt do not pick this up. The shorthand comes first so the
+ * rail wins its own edge. */
+html[data-dfp] :is(.cooked, .d-editor-preview) blockquote {
+  border: 1px solid var(--dfp-border);
   border-inline-start: 3px solid var(--dfp-border-strong);
-  background: var(--dfp-surface-1);
+  background: var(--dfp-surface-2);
   border-radius: 0 var(--dfp-r-sm) var(--dfp-r-sm) 0;
   padding: var(--dfp-s-3) var(--dfp-s-4);
   margin-block: var(--dfp-s-4);
   color: var(--dfp-text-3);
 }
 
-/* Tables inside posts currently overflow the column on narrow viewports. */
-html[data-dfp] .cooked table {
-  display: block;
+/* ── Tables ──────────────────────────────────────────────────────────────
+ * Discourse's markdown pipeline wraps every cooked table in `div.md-table`,
+ * and that wrapper is the scroll container. The table itself used to be
+ * `display: block; overflow-x: auto` — a scroll container of its own that
+ * throws away table layout: columns could no longer share the measure, so a
+ * wide table never wrapped a cell and a narrow one had no width of its own.
+ * The wrapper scrolls; the table is a table again, sized to its content and
+ * capped at the column, which is where a three-column comparison belongs. */
+html[data-dfp] :is(.cooked, .d-editor-preview) .md-table {
   overflow-x: auto;
   max-width: 100%;
+}
+
+html[data-dfp] :is(.cooked, .d-editor-preview) table {
+  display: table;
+  inline-size: max-content;
+  max-inline-size: 100%;
   border-collapse: collapse;
 }
 
-html[data-dfp] .cooked table th,
-html[data-dfp] .cooked table td {
+/* A table with no wrapper — cooked HTML baked before Discourse added it and
+ * not rebaked since — keeps the old block-scroll shape, so it still cannot
+ * push the page sideways. `max-content` capped at 100% then sizes the scroller
+ * to the table rather than to the column. */
+html[data-dfp] :is(.cooked, .d-editor-preview) table:not(.md-table > table) {
+  display: block;
+  overflow-x: auto;
+}
+
+html[data-dfp] :is(.cooked, .d-editor-preview) table th,
+html[data-dfp] :is(.cooked, .d-editor-preview) table td {
   border: 1px solid var(--dfp-border);
   padding: var(--dfp-s-2) var(--dfp-s-3);
 }
 
-html[data-dfp] .cooked table th {
-  background: var(--dfp-surface-2);
+/* Surface-3, not surface-2, and a 2px rule under it. The card is surface-1
+ * and surface-2 sits 0.031Δ above it on dark (#1c1f25 on #14171c) — a header
+ * fill nobody could see, so a twelve-row benchmark was a grid of hairlines
+ * with no top. The rule is the half that survives the light theme, where the
+ * three surfaces are within 0.04Δ of each other and a fill alone would not. */
+html[data-dfp] :is(.cooked, .d-editor-preview) table th {
+  background: var(--dfp-surface-3);
+  border-block-end: 2px solid var(--dfp-border-strong);
   color: var(--dfp-text);
   font-weight: var(--dfp-fw-semibold);
+  text-align: start;
 }
 
-html[data-dfp] .cooked img:not(.emoji):not(.avatar) {
+/* Striping mixed from the text colour rather than a surface token, for the
+ * reason post.css gives for the post-chrome hover: in the light theme the
+ * surfaces are near-white and a surface-based stripe vanishes, while 4% of the
+ * text colour reads on every theme. 4% is a whisper on purpose — enough to
+ * follow a row across five columns, not enough to compete with the header. */
+html[data-dfp] :is(.cooked, .d-editor-preview) table tbody tr:nth-child(even) td {
+  background: color-mix(in oklab, var(--dfp-text) 4%, transparent);
+}
+
+html[data-dfp] :is(.cooked, .d-editor-preview) img:not(.emoji):not(.avatar) {
   border-radius: var(--dfp-r-sm);
   max-width: 100%;
   height: auto;

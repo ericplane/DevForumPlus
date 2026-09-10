@@ -1,6 +1,7 @@
-import type { DfpModule } from "../../core/registry";
+import { charge, type DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { decorateCooked } from "../decorate";
+import { looksLikeLuauText } from "../../luau/sniff";
 import {
   detect,
   inferLocalTypes,
@@ -40,6 +41,9 @@ const DOCS_ROOT = "https://create.roblox.com/docs/reference/engine/";
  *
  *  3. Creator Docs links on class names.
  *
+ * The first two also run in the composer preview, while the code can still be
+ * changed — see the section note above `enhancePreview`.
+ *
  * Presentation is deliberately advisory. These are other people's posts, often
  * years old, and the author cannot edit them — so findings are an underline and
  * a hover, never a banner, never a blocking overlay, and never a claim that the
@@ -49,46 +53,14 @@ const DOCS_ROOT = "https://create.roblox.com/docs/reference/engine/";
 const PROCESSED = "data-dfp-code";
 
 /**
- * Structure only Luau has. Any one of these is enough on its own.
+ * Discourse tags fenced blocks `lang-lua`; unfenced blocks have no class.
  *
- * A local declaration that assigns or annotates, a `:GetService(` call, or a
- * long comment — none of which survive being read as any other language in a
- * `<pre>`.
+ * The structural sniff for an unfenced block lives in luau/sniff.ts, shared
+ * with the isolated world's composer — it used to be a copy here, and a test
+ * with the history END_KEYWORD carries is exactly the kind that drifts between
+ * two copies. Only the fence rule and the "a foreign class is an answer" rule
+ * are this file's own.
  */
-const LUAU_SIGNALS = [
-  /\blocal\s+(?:function\b|[A-Za-z_]\w*\s*[:=,])/,
-  /[.:]GetService\s*\(/,
-  /--\[=*\[/,
-];
-
-/**
- * An opener that Luau closes with `end`.
- *
- * `do` is not one of them on its own — it is a common English word, and this
- * runs on classless blocks that sometimes hold prose. The loop header is matched
- * whole instead (`for i = `, `for k, v in `), which is a shape neither prose nor
- * JavaScript produces; Python's `for x in y:` produces it but has no `end`.
- */
-const BLOCK_OPENER =
-  /\b(?:function|then)\b|\bfor\s+[A-Za-z_]\w*\s*(?:,\s*[A-Za-z_]\w*\s*)*(?:=|\bin\b)/;
-
-/**
- * `end` closing a block, rather than somebody's variable called `end`.
- *
- * A terminator ends a statement: nothing hands it to anything, and it takes no
- * arguments. So it is never preceded by `,` `(` `[` `=` `:` or a quote — which
- * covers `line[start:end]`, `slice(start, end)`, `{"end": 2}` and the JS shape
- * that survives every looser test,
- * `function trim(s, start, end) { return s.slice(start, end); }` — and it is
- * never followed by an assignment, call, index or member access.
- *
- * Anchoring to the start of a line would have been simpler and was tried; it
- * rejects the one-line paste this forum is full of,
- * `part.Touched:Connect(function(hit) hit:Destroy() end)`.
- */
-const END_KEYWORD = /(?<![,([=:"'][ \t]{0,8})\bend\b(?![ \t]*[=({[.:])/;
-
-/** Discourse tags fenced blocks `lang-lua`; unfenced blocks have no class. */
 function isLuauBlock(code: HTMLElement): boolean {
   const cls = code.className;
   if (/lang-(lua|luau)\b/.test(cls)) return true;
@@ -96,20 +68,7 @@ function isLuauBlock(code: HTMLElement): boolean {
   // Luau if it actually looks like it — a shell transcript or a JSON blob must
   // not get Luau colouring just for sitting in a <pre>.
   if (cls.trim() !== "") return false;
-  const text = code.textContent ?? "";
-  if (text.length < 12) return false;
-
-  /* The two halves of this test used to share an alternation —
-   * `/\b(local|function|end|then|elseif)\b/ && /\bend\b/` — and because `end`
-   * appeared in both, the whole expression reduced to `/\bend\b/`. It claimed
-   * `return line[start:end]`, `str.slice(start, end)`,
-   * `WHERE id BETWEEN start AND end;` and the English sentence "read the thread
-   * to the end please", painting each as Luau and hanging fake deprecation marks
-   * on any `spawn` or `wait` in them — while rejecting
-   * `local Players = game:GetService("Players")` for not containing `end`.
-   * Keep the signals disjoint: a bare `end` proves nothing by itself. */
-  if (LUAU_SIGNALS.some((re) => re.test(text))) return true;
-  return BLOCK_OPENER.test(text) && END_KEYWORD.test(text);
+  return looksLikeLuauText(code.textContent ?? "");
 }
 
 const KIND_CLASS: Partial<Record<TokenKind, string>> = {
@@ -275,11 +234,16 @@ function apiRefAt(
   }
 
   // ── A bare global: `print`, `pcall`, `tick`, `warn`, `require` ───────────
-  // Only as a call or a bare reference, and never where it is being declared.
-  if (DOC_BARE_GLOBALS.has(t.value)) {
-    const shadowed = prev?.kind === "keyword" && prev.value === "local";
+  // Only as a call or a bare reference, never where it is being assigned, and
+  // never once the block has declared the name. The shadow test used to look
+  // one token left for `local`, which caught `local version = 2` and nothing
+  // after it: the `version` in `print(version)` two lines down still resolved
+  // to `globals.version` — an inert anchor the isolated world confirms and
+  // turns into a live link to the engine's `version()`, on the author's own
+  // number. The same veto the receiver branch has always applied.
+  if (DOC_BARE_GLOBALS.has(t.value) && !declared.has(t.value)) {
     const assigned = next?.kind === "operator" && next.value === "=";
-    if (!shadowed && !assigned) return `globals.${t.value}`;
+    if (!assigned) return `globals.${t.value}`;
   }
 
   return undefined;
@@ -408,8 +372,16 @@ export function segment(source: string): Segment[] {
       return { cls: "dfp-tok-type", ref: typeRef(t, declared) };
     }
 
+    /* A legacy name the block declared is the block's own. The dim colour is
+     * the tokenizer's, and the tokenizer answers from spelling alone — so once
+     * the set became the docs' flag, which lists `stats`, `version` and
+     * `DebuggerManager`, `local stats = {}` / `stats.kills = 1` painted every
+     * `stats` legacy with no mark and no finding: the colour-only wrong signal
+     * that was taken off `time()`, moved to two ordinary variable names.
+     * `apiRefAt` and detect.ts veto declared names; the colour now does too. */
+    const kind: TokenKind = t.kind === "legacy" && declared.has(t.value) ? "ident" : t.kind;
     return {
-      cls: memberClass(prevIdx >= 0 ? tokens[prevIdx]!.value : undefined, t.kind) ?? KIND_CLASS[t.kind],
+      cls: memberClass(prevIdx >= 0 ? tokens[prevIdx]!.value : undefined, kind) ?? KIND_CLASS[kind],
       ref: apiRefAt(tokens, i, localTypes, declared, after, before),
     };
   };
@@ -427,16 +399,23 @@ export function segment(source: string): Segment[] {
        * `Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))`
        * flattened a builtin, two properties, a method and a string to plain
        * white under the underline. */
-      const parts: SegmentPart[] = [{ text: t.value, cls: styleAt(i).cls }];
+      const first = styleAt(i);
+      const parts: SegmentPart[] = [{ text: t.value, cls: first.cls }];
       let text = t.value;
       while (i + 1 < tokens.length && tokens[i + 1]!.end <= finding.end) {
         i++;
         text += tokens[i]!.value;
         parts.push({ text: tokens[i]!.value, cls: styleAt(i).cls });
       }
+      /* A single-token finding keeps its docs reference. The mark used to be
+       * pushed without one, so `wait` carried no `data-dfp-api` while the
+       * unmarked `tick` beside it did — the one token a reader most wants the
+       * signature and the deprecation for was the one token that had neither.
+       * `styleAt` already answered; it is not asked twice. A multi-token
+       * finding names an argument, not an API, so it stays bare. */
       out.push(
         parts.length === 1
-          ? { text, cls: parts[0]!.cls, finding }
+          ? { text, cls: first.cls, finding, api: first.ref }
           : { text, finding, parts },
       );
       continue;
@@ -463,20 +442,43 @@ function typeRef(t: Token, declared: Set<string>): string | undefined {
   return undefined;
 }
 
-function renderBlock(code: HTMLElement): Finding[] {
+/** A mark the renderer placed, with the docs reference its token resolved to. */
+export interface Mark {
+  finding: Finding;
+  api?: string;
+}
+
+interface RenderOptions {
+  /**
+   * Emit Creator Docs anchors on resolved tokens. Off in the composer preview:
+   * every re-cook there would put a fresh set of inert member-level anchors in
+   * front of the isolated world's confirm pass, which fetches the member index
+   * and rewrites them — work nobody asked for on every keystroke burst, on
+   * markup the next re-cook throws away.
+   */
+  anchors: boolean;
+}
+
+/** The native tooltip on a mark, and the no-JS fallback on a note chip. */
+function markTitle(replacement: string | null, why: string): string {
+  return replacement ? `Deprecated — use ${replacement}. ${why}` : `Deprecated. ${why}`;
+}
+
+function renderBlock(code: HTMLElement, opts: RenderOptions = { anchors: true }): Mark[] {
   const source = code.textContent ?? "";
   const segments = segment(source);
   const frag = document.createDocumentFragment();
-  const found: Finding[] = [];
+  const found: Mark[] = [];
 
   for (const seg of segments) {
-    if (!seg.finding && !seg.cls && !seg.api) {
+    const link = opts.anchors ? seg.api : undefined;
+    if (!seg.finding && !seg.cls && link === undefined) {
       frag.appendChild(document.createTextNode(seg.text));
       continue;
     }
 
     if (seg.finding) {
-      found.push(seg.finding);
+      found.push({ finding: seg.finding, api: seg.api });
       const mark = document.createElement("span");
       mark.className = `dfp-dep dfp-dep--${seg.finding.entry.severity}`;
       if (seg.cls) mark.classList.add(seg.cls);
@@ -499,26 +501,32 @@ function renderBlock(code: HTMLElement): Finding[] {
         mark.textContent = seg.text;
       }
       const { replacement, why } = seg.finding.entry;
-      mark.setAttribute(
-        "title",
-        replacement
-          ? `Deprecated — use ${replacement}. ${why}`
-          : `Deprecated. ${why}`,
-      );
+      /* `title` stays for now as the no-JS fallback; the isolated world's card
+       * (docs-card.ts) reads the three data attributes and decides whether to
+       * drop it. `data-dfp-group` is the key the note's chips look a mark up by
+       * — the same text `groupMarks` groups on — because for the pattern
+       * finding the mark's own text is `, parent…` while its label is
+       * `Instance.new(…, parent)`, so nothing on the mark said which chip it
+       * belonged to. `data-dfp-api` uses the same `Owner.member` / `globals.x`
+       * vocabulary as the anchors, so one card can carry the signature and the
+       * deprecation together. */
+      mark.setAttribute("title", markTitle(replacement, why));
       mark.dataset["dfpReplacement"] = replacement ?? "";
       mark.dataset["dfpWhy"] = why;
+      mark.dataset["dfpGroup"] = seg.finding.text;
+      if (seg.api) mark.dataset["dfpApi"] = seg.api;
       frag.appendChild(mark);
       continue;
     }
 
-    if (seg.api) {
+    if (link !== undefined) {
       const a = document.createElement("a");
       a.textContent = seg.text;
       if (seg.cls) a.className = seg.cls;
       /* The hover card is rendered by the ISOLATED world, which owns chrome.*
        * and can read the packaged docs shards. It finds these by attribute —
        * the two worlds share the DOM, so nothing has to cross the bridge. */
-      a.dataset["dfpApi"] = seg.api;
+      a.dataset["dfpApi"] = link;
 
       /* Only owner-level references are linked here.
        *
@@ -533,12 +541,12 @@ function renderBlock(code: HTMLElement): Finding[] {
        * one. The isolated world confirms it against the real member index and
        * adds the href. Affordances are only ever ADDED, so nothing on screen is
        * ever wrong — the failure mode is a missing link, not a lying one. */
-      if (!seg.api.includes(".")) {
+      if (!link.includes(".")) {
         a.className = `dfp-doc-link${seg.cls ? ` ${seg.cls}` : ""}`;
-        a.href = docsUrl(seg.api);
+        a.href = docsUrl(link);
         a.target = "_blank";
         a.rel = "noopener noreferrer";
-        a.title = `${seg.api} — Creator Docs`;
+        a.title = `${link} — Creator Docs`;
       }
       frag.appendChild(a);
       continue;
@@ -554,38 +562,208 @@ function renderBlock(code: HTMLElement): Finding[] {
   return found;
 }
 
+/** One distinct issue in a block, and how often it occurs. */
+export interface FindingGroup {
+  /** What the chip says: `wait`, `Instance.new(…, parent)`. The same text is on every mark's `data-dfp-group`. */
+  label: string;
+  count: number;
+  replacement: string | null;
+  why: string;
+  /** From the first mark in the group that resolved — `globals.wait`. */
+  api?: string;
+}
+
 /**
- * A quiet line above the block naming what was found.
+ * Group marks by what they name, most frequent first.
  *
  * Grouped, not counted. A real corpus block produced 48 findings that were all
  * the same `Instance.new(…, parent)` idiom — "48 deprecated APIs" is both a wall
  * and a lie, since that one is a replication cost rather than a deprecation.
  * Naming the distinct issues is shorter *and* more useful.
  *
+ * Ties keep first-seen order (`sort` is stable), so the chips read in the
+ * order a reader meets the marks.
+ */
+export function groupMarks(marks: readonly Mark[]): FindingGroup[] {
+  const groups = new Map<string, FindingGroup>();
+  for (const m of marks) {
+    const label = m.finding.text;
+    const g = groups.get(label);
+    if (g) {
+      g.count++;
+      g.api ??= m.api;
+      continue;
+    }
+    groups.set(label, {
+      label,
+      count: 1,
+      replacement: m.finding.entry.replacement,
+      why: m.finding.entry.why,
+      api: m.api,
+    });
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+/** Chips shown before the note folds the rest into `+N more`. */
+const NOTE_LIMIT = 3;
+
+/** On the mark a chip scrolled to, briefly. code-marks.css draws it. */
+const FLASH = "dfp-dep--flash";
+const FLASH_MS = 1400;
+
+/**
+ * A quiet line above the block naming what was found — and the keyboard
+ * surface for the marks underneath it.
+ *
+ * Each group is a `<button>` chip carrying the same `data-dfp-replacement` /
+ * `data-dfp-why` / `data-dfp-api` the marks carry, so the isolated world's card
+ * answers on hover or focus here exactly as it does on a mark. The marks
+ * themselves stay plain spans: a `tabindex` on every underline would add three
+ * or four stops per block to content this extension does not own, whereas the
+ * note is DFP's own element. One tab stop per block — roving `tabindex`, arrows
+ * between chips — because a thread with twenty marked blocks must not cost
+ * sixty presses to Tab through.
+ *
+ * A chip is also the way to a mark hidden under code-chrome's collapse. Over
+ * 28 lines that module clips the block to 22rem with a fade, so on a long
+ * paste the note told the reader there were findings they could not see and
+ * left them to expand and scan for a wavy underline. Clicking a chip expands
+ * through code-chrome's own button (so its label stays right), scrolls the
+ * first mark of that group into view and flashes it. "N below the fold" is
+ * measured on the note's first hover or focus, never in the decorator: the
+ * two modules are unordered, so the note cannot know at build time whether the
+ * block will be clipped, and layout reads 0 during a decorator pass anyway.
+ *
  * Inserted *before* the `<pre>`, not inside it. Discourse's own copy and
  * fullscreen buttons act on the block, and a note living inside it would end up
  * pasted into someone's editor.
  */
-function addSummary(pre: HTMLElement, findings: Finding[]): void {
-  if (findings.length === 0) return;
+function addSummary(pre: HTMLElement, marks: readonly Mark[]): void {
+  if (marks.length === 0) return;
 
-  const groups = new Map<string, number>();
-  for (const f of findings) {
-    const label = f.kind === "pattern" ? f.text : `${f.text}`;
-    groups.set(label, (groups.get(label) ?? 0) + 1);
-  }
-
-  const parts = [...groups]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([label, n]) => (n > 1 ? `${label} ×${n}` : label));
-  const hidden = groups.size - parts.length;
-  if (hidden > 0) parts.push(`+${hidden} more`);
+  const groups = groupMarks(marks);
+  const shown = groups.slice(0, NOTE_LIMIT);
+  const hidden = groups.length - shown.length;
 
   const bar = document.createElement("div");
   bar.className = "dfp-code-note";
-  bar.textContent = `${parts.join(" · ")} — hover for details`;
+  bar.setAttribute("role", "group");
+  bar.setAttribute("aria-label", "Deprecated API findings in this code block");
+
+  shown.forEach((g, i) => {
+    if (i > 0) bar.appendChild(document.createTextNode(" · "));
+    bar.appendChild(findingChip(pre, g, i === 0));
+  });
+  if (hidden > 0) bar.appendChild(document.createTextNode(` · +${hidden} more`));
+  bar.appendChild(document.createTextNode(" — hover or Tab for details"));
+
+  bar.addEventListener("keydown", (e) => roveChips(bar, e));
+  bar.addEventListener("pointerenter", () => syncFold(bar, pre));
+  bar.addEventListener("focusin", () => syncFold(bar, pre));
+
   pre.parentElement?.insertBefore(bar, pre);
+}
+
+function findingChip(pre: HTMLElement, g: FindingGroup, first: boolean): HTMLButtonElement {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "dfp-code-finding";
+  chip.textContent = g.count > 1 ? `${g.label} ×${g.count}` : g.label;
+  chip.tabIndex = first ? 0 : -1;
+  chip.title = markTitle(g.replacement, g.why);
+  chip.dataset["dfpGroup"] = g.label;
+  chip.dataset["dfpReplacement"] = g.replacement ?? "";
+  chip.dataset["dfpWhy"] = g.why;
+  if (g.api) chip.dataset["dfpApi"] = g.api;
+  chip.addEventListener("click", () => revealMark(pre, g.label));
+  return chip;
+}
+
+/** Arrow keys move between chips; Tab leaves the note. */
+function roveChips(bar: HTMLElement, e: KeyboardEvent): void {
+  const chips = [...bar.querySelectorAll<HTMLElement>(".dfp-code-finding")];
+  const from = chips.indexOf(e.target as HTMLElement);
+  if (from < 0 || chips.length < 2) return;
+  let to: number;
+  switch (e.key) {
+    case "ArrowRight":
+    case "ArrowDown":
+      to = (from + 1) % chips.length;
+      break;
+    case "ArrowLeft":
+    case "ArrowUp":
+      to = (from - 1 + chips.length) % chips.length;
+      break;
+    case "Home":
+      to = 0;
+      break;
+    case "End":
+      to = chips.length - 1;
+      break;
+    default:
+      return;
+  }
+  e.preventDefault();
+  chips[from]!.tabIndex = -1;
+  chips[to]!.tabIndex = 0;
+  chips[to]!.focus();
+}
+
+/** Bring the first mark of a group on screen, through the collapse if need be. */
+function revealMark(pre: HTMLElement, label: string): void {
+  let mark: HTMLElement | null = null;
+  for (const m of pre.querySelectorAll<HTMLElement>(".dfp-dep")) {
+    if (m.dataset["dfpGroup"] === label) {
+      mark = m;
+      break;
+    }
+  }
+  if (!mark) return;
+
+  /* Through code-chrome's button, never by toggling the class from here. The
+   * button's label is state that module owns; un-clipping behind its back
+   * leaves it reading "Show all 300 lines" over a block that is already open. */
+  if (pre.classList.contains("dfp-code--clipped")) {
+    const expand = pre.nextElementSibling as HTMLElement | null;
+    if (expand?.classList.contains("dfp-code-expand")) expand.click();
+  }
+
+  mark.scrollIntoView({ block: "center" });
+  const target = mark;
+  target.classList.add(FLASH);
+  setTimeout(() => target.classList.remove(FLASH), FLASH_MS);
+}
+
+/**
+ * "N below the fold", kept true to the block's current state.
+ *
+ * Recomputed on every hover or focus of the note rather than once: the reader
+ * may expand the block through code-chrome's button between two hovers, and a
+ * count that survives the expansion is a lie. A handful of `offsetTop` reads
+ * on a hover is nothing; the same reads inside the decorator would return 0.
+ */
+function syncFold(bar: HTMLElement, pre: HTMLElement): void {
+  let fold = bar.querySelector<HTMLElement>(".dfp-code-note__fold");
+  if (!pre.classList.contains("dfp-code--clipped")) {
+    fold?.remove();
+    return;
+  }
+  const limit = pre.clientHeight;
+  let below = 0;
+  for (const m of pre.querySelectorAll<HTMLElement>(".dfp-dep")) {
+    if (m.offsetTop + m.offsetHeight > limit) below++;
+  }
+  if (below === 0) {
+    fold?.remove();
+    return;
+  }
+  if (!fold) {
+    fold = document.createElement("span");
+    fold.className = "dfp-code-note__fold";
+    bar.appendChild(fold);
+  }
+  fold.textContent = `${below} below the fold`;
 }
 
 function enhance(root: HTMLElement): void {
@@ -597,27 +775,199 @@ function enhance(root: HTMLElement): void {
 
     // Highlight.js may have already wrapped tokens; start from the text so the
     // Lua-grammar markup is replaced rather than nested inside ours.
-    const found = renderBlock(code);
+    const marks = renderBlock(code);
     code.classList.add("dfp-luau");
 
     const pre = code.parentElement;
-    if (pre?.tagName === "PRE") addSummary(pre, found);
+    if (pre?.tagName === "PRE") addSummary(pre, marks);
   }
+}
+
+/* ── Composer preview ─────────────────────────────────────────────────────
+ *
+ * The stream registration below is `onlyStream: true`, which is precisely the
+ * flag that excludes Discourse's composer preview (`.d-editor-preview` inside
+ * `#reply-control`). So the one place an author could still fix a `wait()` or
+ * a `BodyVelocity` — while writing — showed highlight.js's Lua colouring and no
+ * mark, and DFP's colours and marks arrived only once the post could no longer
+ * be edited in place. code.css already frames the preview's `<pre>` in DFP's
+ * style, so the block looked like ours and was tokenised wrong.
+ *
+ * A second registration, and not through `decorateCooked`, for three reasons.
+ *
+ *   1. No sweeps. The hook alone covers the preview: it fires for every
+ *      re-cook, and there is no "already rendered before install" gap to
+ *      close, since the composer opens long after boot.
+ *
+ *   2. No per-route charging to code-intel. decorate.ts charges every callback
+ *      to the module and registry.ts strikes on cumulative cost per route —
+ *      and a composer session is one route. A 400-line block re-tokenises in
+ *      about 2ms (6.7ms measured for 1,247 lines), so a long draft over a
+ *      capped block would accumulate hundreds of ms and strike the module for
+ *      answering the author's own typing; three such sessions on consecutive
+ *      routes would switch it off. The work is still measured — charged under
+ *      `PREVIEW_OWNER`, which `moduleWork()` reports — but there is no budget
+ *      under that key, so it cannot strike. That is deliberate: the strike net
+ *      exists for pages the extension made slow, not for a draft the author is
+ *      choosing to write.
+ *
+ *   3. Different guard. `data-dfp-code` survives `innerHTML` replacement —
+ *      attributes stay, children go — so on a block hljs rewrites after us it
+ *      would say "done" over Lua-grammar markup. The preview reads the answer
+ *      from the children instead (`isRendered`): a `<code>` is ours while no
+ *      element child wears a class other than a `dfp-` one. Re-cooks make new
+ *      elements and reset naturally; hljs's asynchronous worker result, which
+ *      this build may land before or after the decorator, is caught by a
+ *      MutationObserver on the preview and rendered over. That observer sees
+ *      this module's own render as a mutation too, so the timer drains its
+ *      records after each pass — see `schedulePreview`.
+ *
+ * Trailing-debounced at 300ms per preview element: Discourse re-cooks on a
+ * short debounce of its own, and painting marks a third of a second after the
+ * author pauses is indistinguishable from immediate, while re-tokenising on
+ * every cook is not. Blocks over PREVIEW_MAX_LINES are left to hljs — a
+ * 3,000-line paste must never make typing stutter — and they get the full
+ * treatment once posted.
+ *
+ * Highlight and marks only. No docs anchors (see RenderOptions), no note: the
+ * marks carry their own title and data attributes, and a keyboard surface for
+ * the preview would sit beside a textarea that already has focus.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+const PREVIEW = ".d-editor-preview";
+const PREVIEW_DEBOUNCE_MS = 300;
+const PREVIEW_MAX_LINES = 400;
+/** Accounting key for preview work: reported by `moduleWork()`, never budgeted. */
+const PREVIEW_OWNER = "code-intel:preview";
+
+const previewTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+const previewObservers = new WeakMap<HTMLElement, MutationObserver>();
+
+function onPreviewCooked(element: HTMLElement): void {
+  const preview = element.closest<HTMLElement>(PREVIEW);
+  if (!preview) return;
+  watchPreview(preview);
+  schedulePreview(preview);
+}
+
+function watchPreview(preview: HTMLElement): void {
+  if (previewObservers.has(preview)) return;
+  const observer = new MutationObserver(() => schedulePreview(preview));
+  observer.observe(preview, { childList: true, subtree: true });
+  previewObservers.set(preview, observer);
+}
+
+/**
+ * Called from the timer, not from the observer's own callback. The callback
+ * used to check `isConnected` and disconnect — but nothing is ever delivered on
+ * a detached subtree: Ember removes the editor's root element whole when the
+ * composer closes, and a `childList` observer on the preview never hears about
+ * its own removal, so that branch could not run after the one event it was
+ * written for. The timer does run after detach whenever a cook landed in the
+ * last 300ms. A close with nothing pending keeps its observer until the element
+ * is collected, which it can be — an observer holds its target weakly.
+ */
+function unwatchPreview(preview: HTMLElement): void {
+  previewObservers.get(preview)?.disconnect();
+  previewObservers.delete(preview);
+}
+
+function schedulePreview(preview: HTMLElement): void {
+  const pending = previewTimers.get(preview);
+  if (pending !== undefined) clearTimeout(pending);
+  previewTimers.set(
+    preview,
+    setTimeout(() => {
+      previewTimers.delete(preview);
+      if (!preview.isConnected) {
+        unwatchPreview(preview);
+        return;
+      }
+      const t0 = performance.now();
+      try {
+        enhancePreview(preview);
+      } catch {
+        // A half-typed snippet must never break the composer.
+      } finally {
+        /* The render just made is itself a childList mutation on the preview.
+         * Left queued, the observer would deliver it as a microtask and put
+         * another pass 300ms out, whose render would queue another — the loop
+         * `isRendered` closes for text-only blocks, closed here for every
+         * block. Draining is safe because nothing but this module writes to the
+         * preview inside this timer task: what is thrown away is its own work,
+         * and a re-cook or an hljs rewrite is a later task that queues afresh. */
+        previewObservers.get(preview)?.takeRecords();
+        charge(PREVIEW_OWNER, performance.now() - t0);
+      }
+    }, PREVIEW_DEBOUNCE_MS),
+  );
+}
+
+/**
+ * Is this block still wearing this module's markup? See the section note.
+ *
+ * "No element child that is not ours", not "the first child is ours". The
+ * first-child test said `false` for any block whose render is text only — a
+ * lone `myVar`, `foo bar`, the half-typed line an author is in the middle of —
+ * because a plain identifier is emitted as a text node and a `<code>` with no
+ * element child at all read as hljs's. Each pass then `replaceChildren`'d the
+ * same text, a childList mutation the observer turned into another pass 300ms
+ * on: a timer loop for as long as the composer was open, waking composer.ts's
+ * `#reply-control` observer in the isolated world on every tick and growing
+ * `moduleWork()["code-intel:preview"]` without bound. Three passes over such a
+ * block rendered [1, 1, 1]. A block hljs rewrote still has `hljs-*` spans and
+ * is rendered again; a text-only block converges on its first pass.
+ */
+function isRendered(code: HTMLElement): boolean {
+  if (!code.classList.contains("dfp-luau")) return false;
+  for (const child of code.children) {
+    if (!child.className.includes("dfp-")) return false;
+  }
+  return true;
+}
+
+function lineCount(source: string): number {
+  let n = 1;
+  for (let i = source.indexOf("\n"); i !== -1; i = source.indexOf("\n", i + 1)) n++;
+  return n;
+}
+
+/**
+ * One pass over a composer preview. Exported for the test; the decorator
+ * reaches it through the debounce above. Returns how many blocks it rendered.
+ */
+export function enhancePreview(root: HTMLElement): number {
+  let rendered = 0;
+  for (const code of root.querySelectorAll<HTMLElement>("pre > code")) {
+    if (isRendered(code) || !isLuauBlock(code)) continue;
+    if (lineCount(code.textContent ?? "") > PREVIEW_MAX_LINES) continue;
+    renderBlock(code, { anchors: false });
+    code.classList.add("dfp-luau");
+    rendered++;
+  }
+  return rendered;
 }
 
 export function codeIntel(api: PluginApi): DfpModule {
   return {
     id: "code-intel",
-    /* This number measures nothing, and the claim it used to carry — that the
-     * registry disables the module if the tokenizing proves too expensive — was
-     * false. registry.ts wraps `install()` only, and install here is a single
-     * `decorateCooked` call that registers a hook and queues deferred sweeps, so
-     * it reads about 0ms however much code the page contains. Every block this
-     * module actually tokenizes is processed later, in passes nothing measures
-     * (see discourse/decorate.ts, which documents the same thing from the other
-     * side). Kept because the registry requires a number; read it as a
-     * placeholder, not as a budget. */
-    budgetMs: 12,
+    /* A real budget, per route. For most of this file's life it was 12 and
+     * measured nothing: registry.ts wrapped `install()` only, and install here
+     * is one `decorateCooked` call that reads about 0ms. Two things changed.
+     * decorate.ts and dom-watch.ts now charge every decorator pass to the
+     * module that registered it, and registry.ts resets the meter — and
+     * settles strikes — at each route change, so the number is compared against
+     * the tokenizing a whole page of posts actually costs.
+     *
+     * Sizing: a single large block tokenizes in 6.7ms (measured, see
+     * classifyMembers), and a code-heavy Scripting Support window is twenty
+     * posts with a block or two each — on the order of 100-150ms of real work
+     * per route. 250 leaves that room and still strikes on a pathological
+     * page (several multi-thousand-line pastes), which is the case the
+     * three-strike net exists for. Left at 12, the module would have disabled
+     * itself on the third ordinary code-heavy route after the accounting
+     * landed. */
+    budgetMs: 250,
 
     install() {
       /* decorateCooked, not decorateCookedElement: the hook alone misses every
@@ -626,6 +976,15 @@ export function codeIntel(api: PluginApi): DfpModule {
       decorateCooked(api, (element) => enhance(element), {
         id: "dfp-code-intel",
         onlyStream: true,
+      });
+
+      /* The composer preview, through the raw hook and without `onlyStream` —
+       * which is what makes Discourse call it for `.d-editor-preview` at all.
+       * It is called for every stream post too, and bails on `closest()` in a
+       * few hundred nanoseconds. Everything else about why this is not a second
+       * `decorateCooked` is in the section note above `enhancePreview`. */
+      api.decorateCookedElement((element) => onPreviewCooked(element), {
+        id: "dfp-code-intel-preview",
       });
     },
   };

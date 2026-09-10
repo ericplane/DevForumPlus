@@ -346,6 +346,19 @@ const bareGlobals: Shard = { s: "Luau and Roblox globals", m: {} };
 /** Which docs page each bare global lives on, so links land on the right one. */
 const bareGlobalPage: Record<string, "LuaGlobals" | "RobloxGlobals"> = {};
 
+/**
+ * `library.member` pairs the docs flag deprecated — `table.getn`,
+ * `table.foreach`, `table.foreachi` at generation.
+ *
+ * Collected here rather than read from the shards at runtime because the main
+ * world never opens a shard: those are fetched by the isolated world when a
+ * card opens. The deprecation scanner (detect.ts) runs in the main world and
+ * used to reach dump members only through a resolved receiver class — `table`
+ * is not a class, so `table.getn(t)`, which Studio's own linter flags, sailed
+ * through. A names-only set is a few hundred bytes and closes that gap.
+ */
+const deprecatedLibMembers: string[] = [];
+
 for (const g of GROUPS) {
   const dir = join(engine, g.from);
   if (!existsSync(dir)) continue;
@@ -404,6 +417,12 @@ for (const g of GROUPS) {
       }
     }
 
+    if (g.from === "libraries") {
+      for (const [member, packed] of Object.entries(shard.m)) {
+        if (packed[4] & F_DEPRECATED) deprecatedLibMembers.push(`${name}.${member}`);
+      }
+    }
+
     st.bytes += writeShard(join(outDir, g.to), name, shard);
     st.files++;
     st.members += Object.keys(shard.m).length;
@@ -415,6 +434,17 @@ for (const g of GROUPS) {
  * cannot collide with a library — there is no `globals` library. */
 const bareBytes = writeShard(join(outDir, "g"), "globals", bareGlobals);
 const bareNames = Object.keys(bareGlobals.m).sort();
+/* The docs' own deprecated flag, as a names-only set for the main world.
+ *
+ * Three channels used to disagree about which globals are legacy: the
+ * tokenizer carried a hand list that dimmed `time` and `tick` — neither of
+ * which the docs flag, and `time()` is current API — while `elapsedTime`,
+ * `getfenv`, `setfenv` and `collectgarbage`, which the docs DO flag, were never
+ * marked because the curated index only names the scheduler globals. The flag
+ * is computed above for every card; exporting the names is what lets the
+ * tokenizer and detect.ts read the same answer the card shows. */
+const deprecatedGlobals = bareNames.filter((k) => (bareGlobals.m[k]![4] & F_DEPRECATED) !== 0);
+deprecatedLibMembers.sort();
 (stats["globals"] ??= { files: 0, bytes: 0, members: 0 }).files = 1;
 stats["globals"]!.bytes = bareBytes;
 
@@ -503,6 +533,17 @@ export const DOC_BARE_GLOBALS: ReadonlySet<string> = new Set(${JSON.stringify(ba
 
 /** Which of the two globals pages each one documents. */
 export const DOC_GLOBAL_PAGE: Readonly<Record<string, string>> = ${JSON.stringify(bareGlobalPage)};
+
+/**
+ * Bare globals the docs flag deprecated — \`wait\`, \`spawn\`, \`getfenv\`,
+ * \`elapsedTime\`. The tokenizer's legacy colour and detect.ts's fallback finding
+ * both read this, so the forum and the card agree with the docs rather than
+ * with a hand list.
+ */
+export const DOC_DEPRECATED_GLOBALS: ReadonlySet<string> = new Set(${JSON.stringify(deprecatedGlobals)});
+
+/** \`library.member\` pairs the docs flag deprecated — \`table.getn\`, \`table.foreach\`. */
+export const DOC_DEPRECATED_LIB_MEMBERS: ReadonlySet<string> = new Set(${JSON.stringify(deprecatedLibMembers)});
 
 export type DocGroup = "c" | "d" | "g" | "e";
 

@@ -2,6 +2,7 @@ import {
   MAIN_READY_TYPE,
   isHandshake,
   isInbound,
+  isRoutePath,
   type Diagnostics,
   type Request,
 } from "./protocol";
@@ -22,6 +23,41 @@ type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 type OutgoingRequest = DistributiveOmit<Request, "id">;
+
+/** The shape of `require("discourse/lib/url")`, as far as this file reads it. */
+interface DiscourseUrlModule {
+  default?: { routeTo?: (path: string) => unknown };
+}
+
+/**
+ * Hand a same-origin path to Discourse's router, the way an intercepted link
+ * click would be.
+ *
+ * `window.require` is the AMD loader boot.ts already reads; the module is the
+ * one Discourse's own click interceptor calls into. Anything short of a
+ * function there — the loader missing on the css-only rung, the module not yet
+ * defined before boot, a future rename — falls back to a document load, which
+ * is exactly what the palette did before and is never wrong, only slow. The
+ * path is re-checked here rather than trusted from the port, see protocol.ts.
+ *
+ * Nothing in here may throw: this runs inside a MessagePort callback in the
+ * page's world, and an exception would surface in the forum's console blamed
+ * on the forum.
+ */
+function routeTo(href: string): void {
+  if (!isRoutePath(href)) return;
+  try {
+    const mod = window.require?.("discourse/lib/url") as DiscourseUrlModule | undefined;
+    const url = mod?.default;
+    if (url && typeof url.routeTo === "function") {
+      url.routeTo(href);
+      return;
+    }
+  } catch {
+    // Fall through to the document load.
+  }
+  location.assign(href);
+}
 
 /**
  * MAIN-world half of the bridge.
@@ -71,10 +107,17 @@ export class MainBridge {
     const msg = event.data;
     if (!isInbound(msg)) return;
 
-    if ("t" in msg && msg.t === "settings:changed") {
-      const settings = normalizeSettings(msg.settings);
-      for (const fn of this.settingsListeners) fn(settings);
-      return;
+    if ("t" in msg) {
+      switch (msg.t) {
+        case "settings:changed": {
+          const settings = normalizeSettings(msg.settings);
+          for (const fn of this.settingsListeners) fn(settings);
+          return;
+        }
+        case "nav:route":
+          routeTo(msg.href);
+          return;
+      }
     }
 
     if (!("id" in msg)) return;

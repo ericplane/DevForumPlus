@@ -413,13 +413,69 @@ html[data-dfp] #reply-control {
   background: var(--dfp-surface-1);
   border-top: 1px solid var(--dfp-border-strong);
   box-shadow: var(--dfp-e-3);
+  /* Stated, because the collapsed states below inherit it and nothing else.
+   * Measured without this: `color` resolved to rgb(12,14,20) — the page
+   * background — on a rgb(20,23,28) bar. */
+  color: var(--dfp-text-2);
 }
 
 /* Rounded where it meets the page. The composer slides up over the topic and
  * previously met it on a hard full-width edge. */
-html[data-dfp] #reply-control.open {
+html[data-dfp] #reply-control.open,
+html[data-dfp] #reply-control.saving,
+html[data-dfp] #reply-control.draft {
   border-start-start-radius: var(--dfp-r-lg);
   border-start-end-radius: var(--dfp-r-lg);
+}
+
+/* ── Collapsed states ─────────────────────────────────────────────────────
+ *
+ * Two of them. While a post is being sent (`.saving`) and while the composer
+ * is minimised (`.draft`), Discourse shrinks #reply-control to a 40px bar with
+ * one line in it: "Saving" and a spinner, or a share icon and the title of
+ * what is being answered. Measured with a reply composer forced into each
+ * state: the line takes its colour from #reply-control, which was the page
+ * background — black on black, so the bar read as empty for the second or two
+ * the post took to send, and "Draft in progress" was a blank strip with two
+ * icons at the far end. Every other element in the composer states its own
+ * colour, which is why nothing else was affected.
+ *
+ * The spinner's ring is `border: 4px solid` with the right side transparent,
+ * so it was invisible for the same reason: currentColor. */
+html[data-dfp] #reply-control .saving-text,
+html[data-dfp] #reply-control .draft-text {
+  align-items: center;
+  gap: var(--dfp-s-2);
+  padding-inline: var(--dfp-s-4);
+  color: var(--dfp-text-2);
+  font-size: var(--dfp-fs-sm);
+  font-weight: var(--dfp-fw-medium);
+}
+
+html[data-dfp] #reply-control .saving-text .spinner {
+  border-color: var(--dfp-accent) transparent var(--dfp-accent) var(--dfp-accent);
+}
+
+/* Block in stock, so the icon and the title were not on one baseline and a
+ * long title had nowhere to go. Clicking it reopens the composer, which the
+ * hover now says. */
+html[data-dfp] #reply-control.draft .draft-text {
+  display: flex;
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] #reply-control .draft-text .d-icon {
+  flex: 0 0 auto;
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] #reply-control.draft .draft-text:hover {
+  color: var(--dfp-text);
 }
 
 /* ── The editor frame ─────────────────────────────────────────────────────

@@ -23,6 +23,32 @@
 <section class="harness-block">
   <h2 class="harness-label">Topic list</h2>
 
+  <!-- The chrome above the first row, transcribed from /latest. The nav-pills
+       and the New Topic cluster are flex ITEMS of `.navigation-container`, and
+       Discourse's `--nav-space` band is their margin-bottom, not the
+       container's (common/base/_topic-list.scss, 3.5.0.beta3). DFP replaces
+       that margin with `--dfp-list-nav-y`, so this block is what shows the band
+       at all three densities. Report Bug is Roblox's MUI injection, kept
+       because the cluster rules in topic-list.css exist to line it up. -->
+  <div class="list-controls">
+    <div class="container">
+      <section class="navigation-container">
+        <ul id="navigation-bar" class="nav nav-pills">
+          <li class="ember-view nav-item_latest active"><a href="#" class="active">Latest</a></li>
+          <li class="ember-view nav-item_top"><a href="#">Top</a></li>
+          <li class="ember-view nav-item_unread"><a href="#">Unread <span class="badge-notification unread-posts">4</span></a></li>
+          <li class="ember-view nav-item_bookmarks"><a href="#">Bookmarks</a></li>
+        </ul>
+        <div class="navigation-controls">
+          <button class="MuiButtonBase-root MuiButton-root MuiButton-contained" type="button">Report Bug</button>
+          <span class="fk-d-button-tooltip"><button id="create-topic" class="btn btn-icon-text btn-default" type="button"><svg class="fa d-icon d-icon-plus svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span class="d-button-label">New Topic</span></button></span>
+          <button class="btn no-text btn-icon btn-default" type="button" aria-label="More options"><svg class="fa d-icon d-icon-chevron-down svg-icon svg-string" aria-hidden="true"><use href="#hx-chevron"></use></svg></button>
+          <button class="btn no-text btn-icon btn-default" type="button" aria-label="Notifications"><svg class="fa d-icon d-icon-bell svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
+        </div>
+      </section>
+    </div>
+  </div>
+
   <table class="topic-list --glimmer">
     <thead class="topic-list-header">
       <tr>
@@ -54,7 +80,14 @@
       </tr>
 
       <!-- Solved -->
-      <tr data-topic-id="2" class="topic-list-item category-help-and-feedback-scripting-support dfp-solved">
+      <!-- `has-excerpt excerpt-expanded` are what Discourse 3.5's
+           topic-list/item.gjs adds to a row it expands, and the excerpt is an
+           <a class="topic-excerpt"> with <span class="topic-excerpt-more">
+           inside, rendered AFTER .link-bottom-line (topic-cell.gjs) — so
+           base.css's `html[data-dfp] a { color }` is what topic-list.css has
+           to beat; a <div> here would never exercise that. The text runs to a
+           third line, which the 2-line clamp must hide. -->
+      <tr data-topic-id="2" class="topic-list-item category-help-and-feedback-scripting-support dfp-solved has-excerpt excerpt-expanded">
         <td class="main-link topic-list-data" colspan="1">
           <span class="link-top-line" role="heading" aria-level="2">
             <span class="topic-statuses"></span>
@@ -66,6 +99,7 @@
             </a>
             <div class="discourse-tags"><a class="discourse-tag" href="#">datastore</a><a class="discourse-tag" href="#">luau</a></div>
           </div>
+          <a href="#" class="topic-excerpt">GetAsync keeps throwing &quot;Request was throttled&quot; once the server passes about 40 players, even with the calls spread out over several seconds. I have tried wrapping it in pcall with a retry and a 2s wait, and the queue just grows until the server hangs. This is the third line, which the clamp should hide entirely. <span class="topic-excerpt-more">read more</span></a>
         </td>
         <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%232f855a'/%3E%3C/svg%3E"></a></td>
         <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">7</button></td>
@@ -129,6 +163,73 @@
         <td class="num views topic-list-data">63.7k</td>
         <td class="num age activity topic-list-data"><span class="relative-date">Mar 2018</span></td>
       </tr>
+
+      <!-- Keyboard cursor. Discourse's j/k moves `selected` down the rows and,
+           stock, draws a 3px inset bar in the first cell; DFP's cursor is the
+           hover lift plus an accent border, and no bar may show here. The
+           excerpt is what the topic-excerpts module switches on for every row
+           (an <a> after .link-bottom-line, the shape row 2 documents); the URL
+           is there because it is the one thing a clamped excerpt cannot break. -->
+      <tr data-topic-id="6" class="topic-list-item category-help-and-feedback-scripting-support selected has-excerpt excerpt-expanded">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"></span>
+            <a href="#" class="title raw-link raw-topic-link">Humanoid:MoveTo() stops 8 studs short of the target on slopes</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#0074BD;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="55" class="badge-category --has-parent --style-square"><span class="badge-category__name">Scripting Support</span></span>
+            </a>
+            <div class="discourse-tags"><a class="discourse-tag" href="#">pathfinding</a></div>
+          </div>
+          <a href="#" class="topic-excerpt">MoveTo works on flat baseplates but on any slope steeper than about 30 degrees the NPC gives up short of the goal and MoveToFinished fires with false. Repro place: https://www.roblox.com/games/0000000000/moveto-slope-repro-with-a-very-long-slug-that-cannot-wrap-anywhere. I have tried setting the network owner to the server, changing HipHeight, and… <span class="topic-excerpt-more">read more</span></a>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23c05621'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">5</button></td>
+        <td class="num views topic-list-data">208</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">4h</span></td>
+      </tr>
+
+      <!-- Solved AND stale: the precedence case. The stale tint excludes solved
+           rows, so this keeps the green (and its hover) and shows only the age
+           dot for "dormant". -->
+      <tr data-topic-id="7" class="topic-list-item category-help-and-feedback-scripting-support dfp-solved dfp-stale">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"></span>
+            <a href="#" class="title raw-link raw-topic-link">Best way to save a player's inventory with DataStore2?</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#0074BD;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="55" class="badge-category --has-parent --style-square"><span class="badge-category__name">Scripting Support</span></span>
+            </a>
+            <div class="discourse-tags"><a class="discourse-tag" href="#">datastore</a></div>
+          </div>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%232f855a'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">14</button></td>
+        <td class="num views topic-list-data">27.3k</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">Aug 2019</span></td>
+      </tr>
+
+      <!-- Closed and NOT solved: the only case where closed dims the title. -->
+      <tr data-topic-id="8" class="topic-list-item category-feature-requests dfp-closed">
+        <td class="main-link topic-list-data" colspan="1">
+          <span class="link-top-line" role="heading" aria-level="2">
+            <span class="topic-statuses"><span title="This topic is closed; it no longer accepts new replies" class="topic-status closed">🔒</span></span>
+            <a href="#" class="title raw-link raw-topic-link">Please bring back the old Studio explorer icons</a>
+          </span>
+          <div class="link-bottom-line">
+            <a class="badge-category__wrapper" href="#" style="--category-badge-color:#9EB83B;--category-badge-text-color:#FFFFFF;">
+              <span data-category-id="170" class="badge-category --style-square"><span class="badge-category__name">Feature Requests</span></span>
+            </a>
+          </div>
+        </td>
+        <td class="posters topic-list-data"><a href="#"><img class="avatar" width="24" height="24" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23718096'/%3E%3C/svg%3E"></a></td>
+        <td class="num posts-map posts topic-list-data"><button class="btn-link posts-map badge-posts">61</button></td>
+        <td class="num views topic-list-data">5.2k</td>
+        <td class="num age activity topic-list-data"><span class="relative-date">Feb 12</span></td>
+      </tr>
     </tbody>
   </table>
 </section>
@@ -187,13 +288,18 @@
                 <img class="avatar" title="ArawDev" width="16" height="16" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234c8bf5'/%3E%3C/svg%3E">
                 <span>ArawDev</span>
               </a>
-              <div class="post-info post-date"><a class="widget-link post-date" href="#" title="Post date"><span class="relative-date">Jan 14</span></a></div>
+              <div class="post-info post-date"><a class="widget-link post-date" href="#" title="Post date" data-dfp-n="1"><span class="relative-date">Jan 14</span></a></div>
               <div class="read-state read" title="Post is unread"><svg class="fa d-icon d-icon-circle svg-icon" aria-hidden="true"><use href="#hx-dot"></use></svg></div>
             </div>
           </div>
           <div class="regular contents">
             <div class="cooked">
-              <p>Request budgets are per-server, not per-key. If you are seeing <code>DataStoreService</code> throttling at high player counts, the usual cause is <strong>one call per player per heartbeat</strong> rather than a batched write.</p>
+              <!-- docs-links.ts sets data-dfp-api only on an inline <code>
+                   whose whole text is one documented name / Owner.Member /
+                   Owner:Member(); code-marks.css styles it through the
+                   attribute. The bare <code>UpdateAsync</code> in the
+                   blockquote below has no owner and is correctly unmarked. -->
+              <p>Request budgets are per-server, not per-key. If you are seeing <code data-dfp-api="DataStoreService">DataStoreService</code> throttling at high player counts, the usual cause is <strong>one call per player per heartbeat</strong> rather than a batched write through <code data-dfp-api="GlobalDataStore.UpdateAsync">GlobalDataStore:UpdateAsync()</code>.</p>
               <p>The pattern we recommend:</p>
               <pre><code class="lang-lua">local function safeGetAsync(store, key)
 	local attempts = 0
@@ -208,6 +314,39 @@
 	error("GetAsync failed after 3 attempts")
 end</code></pre>
               <blockquote>Note that <code>UpdateAsync</code> counts against both the read and write budget.</blockquote>
+              <!-- [details] blocks, as cooked: a summary line and whatever the
+                   author hid behind it. Three because a Community Resource OP
+                   holds a dozen and the stack has to read as one control list;
+                   the second is open so the surface-3 bar over the surface-2
+                   well is on screen without a click. -->
+              <details>
+                <summary>Click to expand</summary>
+                <pre><code class="lang-lua">local budget = DataStoreService:GetRequestBudgetForRequestType(Enum.DataStoreRequestType.GetAsync)
+if budget &lt; 5 then
+	task.wait(1)
+end</code></pre>
+              </details>
+              <details open>
+                <summary>Why the budget is per-server</summary>
+                <p>Each server gets its own request budget that refills over time. A single <code>GetAsync</code> per player per heartbeat drains it in seconds at 40+ players.</p>
+                <!-- A 90-character inline span: below 720px (and at 400% zoom)
+                     touch.css lets it wrap with the pill's border and padding
+                     on every fragment; above, code.css keeps it on one line
+                     and the column scrolls nothing. Review it in the harness's
+                     390 column or the pop-out window. No new class — it
+                     exercises `.cooked code:not(pre code)`. -->
+                <p>Ours resolves the store through <code>game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("DataStoreConfig")</code> before the first save, which is where the budget goes first.</p>
+              </details>
+              <details>
+                <summary>Click to expand</summary>
+                <p>A second closed block, so the closed-to-closed gap is visible under an open one.</p>
+              </details>
+              <!-- A table with NO `div.md-table` wrapper: cooked HTML baked
+                   before Discourse added the wrapper and never rebaked. It keeps
+                   the block-scroll fallback in base.css ("Tables"); the wrapped
+                   shape is in the accepted answer below. Both stay reviewable. -->
+              <table><thead><tr><th>Request type</th><th>Budget per minute</th></tr></thead>
+              <tbody><tr><td>GetAsync</td><td>60 + players × 10</td></tr><tr><td>SetIncrementAsync</td><td>60 + players × 10</td></tr></tbody></table>
             </div>
           </div>
           <!-- Action bar, transcribed from the live DOM. `aria-expanded` on
@@ -260,8 +399,14 @@ end</code></pre>
         <div class="topic-body clearfix">
           <div class="regular contents">
             <div class="cooked">
-              <div class="dfp-code-note">wait · Instance.new(…, parent) · Hat · +2 more — hover for details</div>
-              <pre><code class="lang-lua dfp-luau"><span class="dfp-tok-com">-- Killbrick off the old wiki, with types bolted on. The forum runs this</span>
+              <!-- The note is a group of chip buttons now (code-intel.ts,
+                   findingChip), and two transient states are added by hand for
+                   coverage: the trailing .dfp-code-note__fold span (appears on
+                   hover of a clipped block) and dfp-dep--flash on the wait(0.5)
+                   mark (the mark a chip just scrolled to). `tick` no longer
+                   wears dfp-tok-legacy: the docs do not flag it. -->
+              <div class="dfp-code-note" role="group" aria-label="Deprecated API findings in this code block"><button type="button" class="dfp-code-finding" tabindex="0" title="Deprecated — use task.wait(). Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it." data-dfp-group="wait" data-dfp-replacement="task.wait()" data-dfp-why="Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it." data-dfp-api="globals.wait">wait</button> · <button type="button" class="dfp-code-finding" tabindex="-1" title="Deprecated — use set .Parent last. The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead." data-dfp-group="Instance.new(…, parent)" data-dfp-replacement="set .Parent last" data-dfp-why="The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead.">Instance.new(…, parent)</button> · <button type="button" class="dfp-code-finding" tabindex="-1" title="Deprecated. Hat is marked deprecated in Roblox's API dump." data-dfp-group="Hat" data-dfp-replacement="" data-dfp-why="Hat is marked deprecated in Roblox's API dump." data-dfp-api="Hat">Hat</button> · +2 more — hover or Tab for details<span class="dfp-code-note__fold">2 below the fold</span></div>
+              <pre><code class="lang-lua dfp-luau" data-dfp-code="1"><span class="dfp-tok-com">-- Killbrick off the old wiki, with types bolted on. The forum runs this</span>
 <span class="dfp-tok-com">-- through highlight.js's *Lua* grammar, which has no idea what half of it is.</span>
 <span class="dfp-tok-kw">type</span> <span class="dfp-tok-type">Damage</span> <span class="dfp-tok-op">=</span> <span class="dfp-tok-op">{</span> amount<span class="dfp-tok-op">:</span> <span class="dfp-tok-type">number</span><span class="dfp-tok-op">,</span> fatal<span class="dfp-tok-op">:</span> <span class="dfp-tok-type">boolean</span> <span class="dfp-tok-op">}</span>
 
@@ -281,16 +426,16 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
 	<span class="dfp-tok-kw">local</span> hum <span class="dfp-tok-op">=</span> hit<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Parent</span><span class="dfp-tok-op">:</span><span class="dfp-tok-method">FindFirstChildOfClass</span><span class="dfp-tok-op">(</span><a class="dfp-doc-link dfp-tok-str" href="https://create.roblox.com/docs/reference/engine/classes/Humanoid" target="_blank" rel="noopener noreferrer" title="Humanoid — Creator Docs" data-dfp-api="Humanoid">"Humanoid"</a><span class="dfp-tok-op">)</span>
 	<span class="dfp-tok-kw">if</span> <span class="dfp-tok-kw">not</span> hum <span class="dfp-tok-kw">then</span> <span class="dfp-tok-kw">return</span> <span class="dfp-tok-kw">end</span>
 	<span class="dfp-tok-kw">if</span> hurt<span class="dfp-tok-op">(</span>hum<span class="dfp-tok-op">,</span> <span class="dfp-tok-op">{</span> amount <span class="dfp-tok-op">=</span> <span class="dfp-tok-num">25</span><span class="dfp-tok-op">,</span> fatal <span class="dfp-tok-op">=</span> <span class="dfp-tok-kw">true</span> <span class="dfp-tok-op">}</span><span class="dfp-tok-op">)</span> <span class="dfp-tok-kw">then</span>
-		<a class="dfp-tok-builtin" data-dfp-api="globals.print">print</a><span class="dfp-tok-op">(</span><span class="dfp-tok-str">`</span><span class="dfp-tok-op">{</span><a class="dfp-doc-link" href="https://create.roblox.com/docs/reference/engine/classes/Players" target="_blank" rel="noopener noreferrer" title="Players — Creator Docs" data-dfp-api="Players">Players</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Players.LocalPlayer">LocalPlayer</a><span class="dfp-tok-op">}</span><span class="dfp-tok-str"> died at </span><span class="dfp-tok-op">{</span><a class="dfp-tok-legacy" data-dfp-api="globals.tick">tick</a><span class="dfp-tok-op">(</span><span class="dfp-tok-op">)</span><span class="dfp-tok-op">}</span><span class="dfp-tok-str">`</span><span class="dfp-tok-op">)</span>
+		<a class="dfp-tok-builtin" data-dfp-api="globals.print">print</a><span class="dfp-tok-op">(</span><span class="dfp-tok-str">`</span><span class="dfp-tok-op">{</span><a class="dfp-doc-link" href="https://create.roblox.com/docs/reference/engine/classes/Players" target="_blank" rel="noopener noreferrer" title="Players — Creator Docs" data-dfp-api="Players">Players</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Players.LocalPlayer">LocalPlayer</a><span class="dfp-tok-op">}</span><span class="dfp-tok-str"> died at </span><span class="dfp-tok-op">{</span><a data-dfp-api="globals.tick">tick</a><span class="dfp-tok-op">(</span><span class="dfp-tok-op">)</span><span class="dfp-tok-op">}</span><span class="dfp-tok-str">`</span><span class="dfp-tok-op">)</span>
 	<span class="dfp-tok-kw">end</span>
-	<span class="dfp-dep dfp-dep--warn dfp-tok-legacy" title="Deprecated — use task.wait(). Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it." data-dfp-replacement="task.wait()" data-dfp-why="Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it.">wait</span><span class="dfp-tok-op">(</span><span class="dfp-tok-num">0.5</span><span class="dfp-tok-op">)</span>      <span class="dfp-tok-com">-- dimmed and marked</span>
+	<span class="dfp-dep dfp-dep--warn dfp-dep--flash dfp-tok-legacy" title="Deprecated — use task.wait(). Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it." data-dfp-replacement="task.wait()" data-dfp-why="Throttled and imprecise. `task.wait()` resumes on the next frame with the real elapsed time, and returns it." data-dfp-group="wait" data-dfp-api="globals.wait">wait</span><span class="dfp-tok-op">(</span><span class="dfp-tok-num">0.5</span><span class="dfp-tok-op">)</span>      <span class="dfp-tok-com">-- dimmed and marked</span>
 	<a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/libraries/task" target="_blank" rel="noopener noreferrer" title="task — Creator Docs" data-dfp-api="task">task</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="task.wait">wait</a><span class="dfp-tok-op">(</span><span class="dfp-tok-num">0.5</span><span class="dfp-tok-op">)</span> <span class="dfp-tok-com">-- the replacement, and neither</span>
 <span class="dfp-tok-kw">end</span><span class="dfp-tok-op">)</span>
 
-<span class="dfp-tok-kw">local</span> gui <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/Instance" target="_blank" rel="noopener noreferrer" title="Instance — Creator Docs" data-dfp-api="Instance">Instance</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Instance.new">new</a><span class="dfp-tok-op">(</span><a class="dfp-doc-link dfp-tok-str" href="https://create.roblox.com/docs/reference/engine/classes/ScreenGui" target="_blank" rel="noopener noreferrer" title="ScreenGui — Creator Docs" data-dfp-api="ScreenGui">"ScreenGui"</a><span class="dfp-dep dfp-dep--warn" title="Deprecated — use set .Parent last. The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead." data-dfp-replacement="set .Parent last" data-dfp-why="The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead."><span class="dfp-tok-op">,</span> Players<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">LocalPlayer</span></span><span class="dfp-tok-op">)</span>
-<span class="dfp-tok-kw">local</span> old <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/Instance" target="_blank" rel="noopener noreferrer" title="Instance — Creator Docs" data-dfp-api="Instance">Instance</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Instance.new">new</a><span class="dfp-tok-op">(</span><span class="dfp-dep dfp-dep--info dfp-tok-str" title="Deprecated. Hat is marked deprecated in Roblox's API dump." data-dfp-replacement="" data-dfp-why="Hat is marked deprecated in Roblox's API dump.">"Hat"</span><span class="dfp-tok-op">)</span>
-<span class="dfp-tok-kw">local</span> util <span class="dfp-tok-op">=</span> <span class="dfp-dep dfp-dep--error" title="Deprecated. Removed from the engine. Calling it errors." data-dfp-replacement="" data-dfp-why="Removed from the engine. Calling it errors.">LoadLibrary</span><span class="dfp-tok-op">(</span><span class="dfp-tok-str">"RbxUtility"</span><span class="dfp-tok-op">)</span>
-<span class="dfp-dep dfp-dep--info dfp-tok-legacy" title="Deprecated. Debug-only global; not meaningful in shipped code." data-dfp-replacement="" data-dfp-why="Debug-only global; not meaningful in shipped code.">printidentity</span><span class="dfp-tok-op">(</span><span class="dfp-tok-op">)</span></code></pre>
+<span class="dfp-tok-kw">local</span> gui <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/Instance" target="_blank" rel="noopener noreferrer" title="Instance — Creator Docs" data-dfp-api="Instance">Instance</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Instance.new">new</a><span class="dfp-tok-op">(</span><a class="dfp-doc-link dfp-tok-str" href="https://create.roblox.com/docs/reference/engine/classes/ScreenGui" target="_blank" rel="noopener noreferrer" title="ScreenGui — Creator Docs" data-dfp-api="ScreenGui">"ScreenGui"</a><span class="dfp-dep dfp-dep--warn" title="Deprecated — use set .Parent last. The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead." data-dfp-replacement="set .Parent last" data-dfp-why="The second argument to `Instance.new` parents the instance before its properties are set, which forces the engine to re-render and replicate each change. Set .Parent last instead." data-dfp-group="Instance.new(…, parent)"><span class="dfp-tok-op">,</span> Players<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">LocalPlayer</span></span><span class="dfp-tok-op">)</span>
+<span class="dfp-tok-kw">local</span> old <span class="dfp-tok-op">=</span> <a class="dfp-doc-link dfp-tok-builtin" href="https://create.roblox.com/docs/reference/engine/classes/Instance" target="_blank" rel="noopener noreferrer" title="Instance — Creator Docs" data-dfp-api="Instance">Instance</a><span class="dfp-tok-op">.</span><a class="dfp-tok-prop" data-dfp-api="Instance.new">new</a><span class="dfp-tok-op">(</span><span class="dfp-dep dfp-dep--info dfp-tok-str" title="Deprecated. Hat is marked deprecated in Roblox's API dump." data-dfp-replacement="" data-dfp-why="Hat is marked deprecated in Roblox's API dump." data-dfp-group="Hat" data-dfp-api="Hat">"Hat"</span><span class="dfp-tok-op">)</span>
+<span class="dfp-tok-kw">local</span> util <span class="dfp-tok-op">=</span> <span class="dfp-dep dfp-dep--error" title="Deprecated. Removed from the engine. Calling it errors." data-dfp-replacement="" data-dfp-why="Removed from the engine. Calling it errors." data-dfp-group="LoadLibrary">LoadLibrary</span><span class="dfp-tok-op">(</span><span class="dfp-tok-str">"RbxUtility"</span><span class="dfp-tok-op">)</span>
+<span class="dfp-dep dfp-dep--info dfp-tok-legacy" title="Deprecated. Debug-only global; not meaningful in shipped code." data-dfp-replacement="" data-dfp-why="Debug-only global; not meaningful in shipped code." data-dfp-group="printidentity" data-dfp-api="globals.printidentity">printidentity</span><span class="dfp-tok-op">(</span><span class="dfp-tok-op">)</span></code></pre>
             </div>
           </div>
         </div>
@@ -298,8 +443,12 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
     </article>
   </div>
 
-  <!-- Accepted answer -->
-  <div class="topic-post clearfix accepted-answer regular">
+  <!-- Accepted answer. `selected` is Discourse's j/k cursor. It sits on the
+       accepted answer on purpose: the tints own this card's border-color at
+       (0,5,3), which is why the cursor is an outline (post.css, "Keyboard
+       cursor") — a plain card would not exercise that. Stock, Discourse also
+       hangs a 3px bar outside the wrapper; none may show. -->
+  <div class="topic-post clearfix accepted-answer regular selected">
     <article id="post_2" class="boxed onscreen-post" data-post-id="2">
       <div class="row">
         <div class="topic-avatar">
@@ -310,13 +459,39 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
         <div class="topic-body clearfix">
           <div class="topic-meta-data">
             <div class="names trigger-user-card"><span class="first full-name"><a href="#">ashenix_dev</a></span><span class="user-title">Regular</span></div>
-            <div class="post-infos"><div class="post-info post-date"><a class="widget-link post-date" href="#"><span class="relative-date">6d</span></a></div></div>
+            <!-- `data-dfp-n` is what post-numbers.ts stamps on the post's own
+                 date link; timeline-marks.css renders "#N" from it with attr(). -->
+            <div class="post-infos"><div class="post-info post-date"><a class="widget-link post-date" href="#" data-dfp-n="2"><span class="relative-date">6d</span></a></div></div>
           </div>
           <div class="regular contents">
             <div class="cooked">
               <p>Batching solved it for us. We queue writes and flush every 30 seconds plus on <code>BindToClose</code>. Went from ~400 requests/min to under 20.</p>
-              <table><thead><tr><th>Approach</th><th>Requests/min</th><th>p99 latency</th></tr></thead>
-              <tbody><tr><td>Per-heartbeat</td><td>412</td><td>2400 ms</td></tr><tr><td>Batched (30s)</td><td>18</td><td>140 ms</td></tr></tbody></table>
+              <!-- Discourse's markdown pipeline wraps every cooked table in
+                   `div.md-table`; the wrapper is the scroll container and the
+                   table is a table again (base.css, "Tables"). Four body rows
+                   so the even-row stripe has two to paint. -->
+              <div class="md-table">
+                <table><thead><tr><th>Approach</th><th>Requests/min</th><th>p99 latency</th></tr></thead>
+                <tbody><tr><td>Per-heartbeat</td><td>412</td><td>2400 ms</td></tr><tr><td>Per-second</td><td>96</td><td>900 ms</td></tr><tr><td>Batched (10s)</td><td>41</td><td>310 ms</td></tr><tr><td>Batched (30s)</td><td>18</td><td>140 ms</td></tr></tbody></table>
+              </div>
+              <!-- Generic link preview, transcribed from a live GitHub release
+                   onebox. The thumbnail is a BARE child of `.onebox-body` with
+                   width/height attributes and no `.aspect-image` wrapper — the
+                   shape whose sizing a generic post-image rule silently broke
+                   (690px wide, squashed to 4:1). 690×344 matches what Discourse
+                   serves so the aspect ratio in the harness is the real one. -->
+              <aside class="onebox allowlistedgeneric" data-onebox-src="https://github.com/example/store/releases/tag/v2.3.0">
+                <header class="source">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23e6edf3'/%3E%3C/svg%3E" class="site-icon" width="32" height="32">
+                  <a href="#" target="_blank" rel="noopener nofollow ugc">GitHub</a>
+                </header>
+                <article class="onebox-body">
+                  <img width="690" height="344" class="thumbnail" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 690 344'%3E%3Crect width='690' height='344' fill='%23eff3f8'/%3E%3Crect x='480' y='90' width='150' height='150' rx='18' fill='%239b6bd6'/%3E%3C/svg%3E" data-dominant-color="EFF3F8">
+                  <h3><a href="#" target="_blank" rel="noopener nofollow ugc">Release Store v2.3.0 - The Policy Update · example/store</a></h3>
+                  <p>Paid random items, a product-state query for your shop UI, and bigger templates before Luau's type solver gives up. Behaviour changes PromptPurchase now refuses with the fixed Store.ProductState …</p>
+                </article>
+                <div style="clear: both"></div>
+              </aside>
             </div>
           </div>
           <section class="post-menu-area clearfix">
@@ -431,6 +606,34 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
        is the real anchor: verified live that `.topic-footer-main-buttons` does not
        exist until you reach the end of a long stream. -->
   <div class="topic-timeline">
+    <!-- The rail, matching the live shape `.topic-timeline >
+         .timeline-scrollarea-wrapper + .timeline-footer-controls`. Transcribed
+         from the live DOM: the scrollarea is 83x300px with an inline height,
+         paddings and scroller in flow, and the layer timeline-marks.ts prepends
+         first. Tick heights are the inline `--dfp-tl-pct` the module sets
+         (tickPercent): staff at #4 of 83 → 3/83, the solution at #17 → 16/83,
+         staff at #31 → 30/83, and staff at the last post pinned to 1 to show
+         the end clamp. The scroller sits at post 1 so the positioned-scroller
+         rule (it paints over a tick it covers) is visible. -->
+    <div class="timeline-scrollarea-wrapper">
+      <div class="timeline-scrollarea" style="height: 300px">
+        <div class="dfp-timeline-marks">
+          <a class="dfp-timeline-mark dfp-timeline-mark--staff" href="#" style="--dfp-tl-pct: 0.0361" title="#4 · Cactus_Cat · staff" aria-label="#4 · Cactus_Cat · staff"></a>
+          <a class="dfp-timeline-mark dfp-timeline-mark--solved" href="#" style="--dfp-tl-pct: 0.1928" title="#17 · ashenix_dev · solution" aria-label="#17 · ashenix_dev · solution"></a>
+          <a class="dfp-timeline-mark dfp-timeline-mark--staff" href="#" style="--dfp-tl-pct: 0.3614" title="#31 · Bluff_006 · staff" aria-label="#31 · Bluff_006 · staff"></a>
+          <a class="dfp-timeline-mark dfp-timeline-mark--staff" href="#" style="--dfp-tl-pct: 1.0000" title="#83 · Bluff_006 · staff" aria-label="#83 · Bluff_006 · staff"></a>
+        </div>
+        <div class="timeline-padding" style="height: 0px"></div>
+        <div class="timeline-scroller" style="height: 50px">
+          <div class="timeline-handle"></div>
+          <div class="timeline-scroller-content">
+            <div class="timeline-replies">1 / 83</div>
+            <div class="timeline-ago">Jan 14</div>
+          </div>
+        </div>
+        <div class="timeline-padding" style="height: 250px"></div>
+      </div>
+    </div>
     <div class="timeline-footer-controls">
       <button type="button" class="btn btn-default dfp-thread-toggle" aria-pressed="false">Thread view</button>
       <button type="button" class="btn btn-default dfp-op-toggle" aria-pressed="true">Pin post</button>
@@ -440,6 +643,114 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
       <button type="button" class="btn btn-default dfp-op-toggle" aria-pressed="false" disabled
               title="The opening post is not loaded this far down the topic — scroll to the top to pin it">Pin post</button>
     </div>
+  </div>
+
+  <!-- The composer's collapsed bar, transcribed from the live DOM with the
+       reply composer forced into the saving state. Both lines are always in
+       the markup; Discourse shows `.saving-text` under `.saving` and
+       `.draft-text` under `.draft`. It is `.saving` here because that is the
+       state that was measured as black-on-black: the line inherits its colour
+       from #reply-control, and the spinner ring is currentColor. -->
+  <div class="harness-row">
+    <div id="reply-control" class="saving composer-action-reply show-preview ember-view" style="display: flex; align-items: center; justify-content: space-between; height: 40px">
+      <div class="grippie" hidden></div>
+      <div class="saving-text" style="display: flex">
+        Saving
+        <div class="spinner small" style="width: 10px; height: 10px; border-width: 4px; border-style: solid; border-radius: 50%"></div>
+      </div>
+      <div class="draft-text" style="display: flex">
+        <svg class="fa d-icon d-icon-share svg-icon svg-string" width="14" height="14" viewBox="0 0 16 16"><use href="#share"></use></svg>
+        Scribe v2.3.0 - Persistent, typed, auto-replicated player data built on ProfileStore
+      </div>
+      <div class="composer-controls">
+        <button class="btn no-text btn-icon btn-transparent toggle-fullscreen btn-mini-toggle" type="button" title="open the composer panel">⌃</button>
+        <button class="btn no-text btn-icon btn-transparent toggler toggle-minimize btn-mini-toggle" type="button" title="close composer and discard draft">×</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The composer preview pane. It renders the same cooked HTML as a post,
+       and the prose rules in base.css / code.css / interactive.css reach it
+       through `:is(.cooked, .d-editor-preview)`, so this is the staff post's
+       body again — anything that renders differently here is a twin that is
+       missing. -->
+  <div class="harness-row">
+    <div class="d-editor-preview-wrapper" style="flex: 1 1 100%">
+      <div class="d-editor-preview">
+        <p>Request budgets are <strong>per-server</strong>, so one <code>GetAsync</code> per player per heartbeat drains it.</p>
+        <blockquote>Note that <code>UpdateAsync</code> counts against both the read and write budget.</blockquote>
+        <details><summary>Click to expand</summary><pre><code class="lang-lua">task.wait(2 ^ attempts)  -- exponential backoff</code></pre></details>
+        <div class="md-table"><table><thead><tr><th>Approach</th><th>Requests/min</th></tr></thead><tbody><tr><td>Per-heartbeat</td><td>412</td></tr><tr><td>Batched (30s)</td><td>18</td></tr></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The open composer's DFP surfaces, as composer.ts renders them into a
+       new-topic composer: the "Already asked?" box and the unsent-draft banner
+       land after .composer-fields; the Luau button sits after Discourse's
+       generic code button (`.code`) in the toolbar, and the "Fenced as Luau"
+       note takes the end of the bar for five seconds after a paste. No
+       id="reply-control" here because the collapsed bar above already carries
+       it, so controls.css's composer-frame rules do not apply to this block;
+       reading.css keys every class below on the name alone, which is what the
+       coverage check reads. -->
+  <div class="harness-row">
+    <div class="open composer-action-createTopic show-preview ember-view">
+      <div class="composer-fields">
+        <input id="reply-title" type="text" placeholder="Type title, or paste a link here" value="DataStore keeps returning nil after a server restart">
+      </div>
+      <aside class="dfp-dupes" data-dfp-dupes="1">
+        <div class="dfp-dupes__head">
+          <span class="dfp-dupes__label">Already asked?</span>
+          <button type="button" class="dfp-dupes__dismiss">Dismiss</button>
+        </div>
+        <a class="dfp-dupes__row" href="/t/12345" target="_blank" rel="noopener noreferrer" data-dfp-topic="12345">
+          <span class="dfp-dupes__title">DataStore returns nil on rejoin — how do I make sure the save finished?</span>
+          <span class="dfp-dupes__meta"><span class="dfp-dupes__solved">solved</span><span>14 replies</span></span>
+        </a>
+        <a class="dfp-dupes__row" href="/t/23456" target="_blank" rel="noopener noreferrer" data-dfp-topic="23456">
+          <span class="dfp-dupes__title">Why is my datastore nil after server restart</span>
+          <span class="dfp-dupes__meta"><span>3 replies</span></span>
+        </a>
+      </aside>
+      <aside class="dfp-draft">
+        <span class="dfp-draft__text">Unsent draft from 04/09/2026, 10:12:00: “DataStore keeps returning nil after a server r…”</span>
+        <button type="button" class="dfp-draft__restore">Restore</button>
+        <button type="button" class="dfp-draft__discard">Discard</button>
+      </aside>
+      <div class="d-editor">
+        <div class="d-editor-textarea-wrapper">
+          <div class="d-editor-button-bar" role="toolbar">
+            <button class="btn no-text btn-icon btn-flat bold" type="button" title="Strong">B</button>
+            <button class="btn no-text btn-icon btn-flat italic" type="button" title="Emphasis">I</button>
+            <button class="btn no-text btn-icon btn-flat code" type="button" title="Preformatted text">&lt;/&gt;</button>
+            <button class="btn btn-flat dfp-luau-btn" type="button" title="Insert a Luau code block" aria-label="Insert a Luau code block"><span class="dfp-luau-btn__glyph" aria-hidden="true">```</span>Luau</button>
+            <span class="dfp-fence-note" role="status">Fenced as Luau — <button type="button" class="dfp-fence-note__undo">undo</button></span>
+          </div>
+          <textarea class="d-editor-input" rows="6">```lua
+local Players = game:GetService("Players")
+```
+</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Palette trigger. The isolated world mounts this before Discourse's search
+       icon (command-palette.ts, mountTrigger): chrome.css styles .dfp-palette-item,
+       .dfp-palette-btn and .dfp-palette-btn kbd. Both labels are shown — the
+       chord where there is a keyboard, a word on a coarse pointer, where the
+       accessible name carries no chord. The fixture has no .d-header, and the
+       rules do not need one. -->
+  <div class="harness-row">
+    <ul class="icons" style="display: flex; align-items: center; gap: 4px; list-style: none; margin: 0; padding: 0">
+      <li class="dfp-palette-item">
+        <button type="button" class="dfp-palette-btn" aria-label="Search and commands (Ctrl+K)" title="Search and commands (Ctrl+K)"><kbd>Ctrl</kbd><kbd>K</kbd></button>
+      </li>
+      <li class="dfp-palette-item">
+        <button type="button" class="dfp-palette-btn" aria-label="Go to: search and commands" title="Search and commands">Go to</button>
+      </li>
+    </ul>
   </div>
 
   <!-- The code-block control cluster. Every button here is opacity:0 at rest and
@@ -470,6 +781,10 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
       <div class="dfp-topic-card">
         <div class="dfp-topic-card__title">DataStore :GetAsync() throttling on high player counts — what is the correct retry pattern for a live game?</div>
         <div class="dfp-topic-card__badges">
+          <!-- The category leads the badge row; the inline background is what
+               the module writes from `categoryColor`, and the dot's ring must
+               be visible over it. -->
+          <span class="dfp-topic-card__badge dfp-topic-card__badge--category"><span class="dfp-topic-card__dot" style="background: #0e76a8"></span>Scripting Support</span>
           <span class="dfp-topic-card__badge dfp-topic-card__badge--solved">Solved by Abstler</span>
           <span class="dfp-topic-card__badge dfp-topic-card__badge--stale">last active 3 years ago</span>
           <span class="dfp-topic-card__badge dfp-topic-card__badge--closed">Closed</span>
@@ -500,6 +815,138 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
         <div class="dfp-asset-preview__by">by Eurotunnel | Le Shuttle Community Team</div>
         <div class="dfp-asset-preview__meta">337 playing · 45.2M visits</div>
       </div>
+    </div>
+
+    <!-- The asset card grew a name and a kind chip under the picture, because a
+         waveform icon never said which sound an id was. The name is deliberately
+         longer than the 150px picture so the ellipsis at the picture's edge is on
+         show, and the creator is the item in the row that shrinks — the chip
+         keeps its size. -->
+    <div class="dfp-asset-preview dfp-asset-preview--asset" style="position: static">
+      <div class="dfp-asset-preview__asset">
+        <img width="150" height="150" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Crect width='150' height='150' fill='%232b3a55'/%3E%3Cpath d='M20 75h14l8-30 12 60 12-45 10 30 8-15h36' fill='none' stroke='%234c8bf5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+        <div class="dfp-asset-preview__title">Realistic Grass Mesh Pack v2 (Low Poly, PBR)</div>
+        <div class="dfp-asset-preview__meta">
+          <span class="dfp-asset-preview__chip">MeshPart</span>
+          <div class="dfp-asset-preview__by">by Eurotunnel | Le Shuttle Community Team</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A group: icon beside the text, the verified mark a flex sibling of a
+         name long enough to lose its tail, then owner and size. -->
+    <div class="dfp-asset-preview dfp-asset-preview--entity" style="position: static">
+      <div class="dfp-asset-preview__entity dfp-asset-preview__entity--group">
+        <img width="56" height="56" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Crect width='150' height='150' fill='%231f2b3d'/%3E%3Crect x='30' y='30' width='90' height='90' rx='12' fill='%23e8c15a'/%3E%3C/svg%3E">
+        <div class="dfp-asset-preview__text">
+          <div class="dfp-asset-preview__title">
+            <span class="dfp-asset-preview__name">Eurotunnel | Le Shuttle Community Team</span>
+            <span class="dfp-asset-preview__verified"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
+          </div>
+          <div class="dfp-asset-preview__by">by Someone</div>
+          <div class="dfp-asset-preview__meta">12.3K members</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A user: the same card with a round headshot and the handle as the
+         second line. -->
+    <div class="dfp-asset-preview dfp-asset-preview--entity" style="position: static">
+      <div class="dfp-asset-preview__entity dfp-asset-preview__entity--user">
+        <img width="56" height="56" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Crect width='150' height='150' fill='%232b3a55'/%3E%3Ccircle cx='75' cy='58' r='28' fill='%234c8bf5'/%3E%3Cellipse cx='75' cy='130' rx='48' ry='32' fill='%234c8bf5'/%3E%3C/svg%3E">
+        <div class="dfp-asset-preview__text">
+          <div class="dfp-asset-preview__title"><span class="dfp-asset-preview__name">Builderman</span></div>
+          <div class="dfp-asset-preview__by">@builderman</div>
+          <div class="dfp-asset-preview__meta">joined 2006</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Topic toggles beside the progress pill (touch.css, topic-toggles.ts) ──
+     Below 925px, or with the composer preview open in a short window,
+     Discourse drops the timeline rail and renders #topic-progress-wrapper
+     instead; topic-toggles.ts builds .dfp-topic-toggles as its PREVIOUS
+     sibling. The inline style stands in for Discourse's own <=924px layout of
+     the wrapper (`display: flex; justify-content: flex-end; align-items:
+     center`), which the harness does not ship; the shipped rules bottom-align
+     the row, space the two apart and stack the buttons as a column. Pin post
+     is shown live, not disabled: op-pin mounts here only at 1280px and up,
+     where it works. -->
+<section class="harness-block">
+  <h2 class="harness-label">Topic toggles beside the progress pill (rail collapsed)</h2>
+  <div class="topic-navigation with-topic-progress" style="display:flex;justify-content:flex-end;align-items:center">
+    <div class="dfp-topic-toggles" role="group" aria-label="DevForum Plus">
+      <button type="button" class="btn btn-default dfp-thread-toggle" aria-pressed="true" title="Show replies flat">Thread view</button>
+      <button type="button" class="btn btn-default dfp-quiet-toggle" aria-pressed="false" title="Fold 3 replies that say nothing">Quiet (3)</button>
+      <button type="button" class="btn btn-default dfp-op-toggle" aria-pressed="false" title="Keep the opening post beside the replies">Pin post</button>
+    </div>
+    <div id="topic-progress-wrapper">
+      <div class="topic-progress"><span class="nums"><span>82</span> / <span>83</span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Search results (search.css; the j/k cursor rule in topic-list.css) ──
+     Not ratchet-tracked: no dfp- class. The shape follows the selectors
+     search.css already keys on (`.fps-result .search-link`, `.blurb .date`,
+     `.search-highlight`) and Discourse's full-page-search template, NOT a
+     live-DOM transcription: `.fps-result > .fps-topic > .topic > a.search-link`
+     is unverified against /search and should be checked once a browser is
+     to hand. Two rows so the border-between and the cursor's inset bar over
+     the hover mix are both on screen. -->
+<section class="harness-block">
+  <h2 class="harness-label">Search results</h2>
+  <div class="search-container">
+    <div class="fps-result">
+      <div class="fps-topic">
+        <div class="topic"><a class="search-link" href="#"><span class="topic-title">DataStore budget exhausted the moment forty players join</span></a></div>
+        <div class="blurb"><span class="date">Mar 2024</span> - We hit the GetAsync <span class="search-highlight">budget</span> within a second of a full server joining, and every retry made it worse.</div>
+      </div>
+    </div>
+    <!-- The j/k cursor: accent inset bar over the hover mix. -->
+    <div class="fps-result selected">
+      <div class="fps-topic">
+        <div class="topic"><a class="search-link" href="#"><span class="topic-title">Batching DataStore writes: what interval is safe?</span></a></div>
+        <div class="blurb"><span class="date">Jan 2025</span> - Flushing every 30 seconds plus on BindToClose kept us under the <span class="search-highlight">budget</span> with 100 players.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="harness-block">
+  <h2 class="harness-label">User menu</h2>
+
+  <!-- The panel behind the header avatar, transcribed from the live DOM with
+       unread notifications present — that is the state where Discourse adds
+       the "Dismiss" button beside the "view all" chevron in the footer. The
+       footer used to give every button the full row, so Dismiss wrapped under
+       the chevron with no gap and an 8px indent (interactive.css, "Panel
+       footer"). Shown static; in the product it is position: absolute under
+       the header. -->
+  <div class="user-menu revamped menu-panel drop-down" style="position: static; width: 360px; display: flex">
+    <div class="panel-body" style="flex: 1 1 auto; min-width: 0">
+      <div class="panel-body-contents" style="display: flex; flex-direction: column">
+        <div class="quick-access-panel quick-access-notifications">
+          <ul>
+            <li class="notification liked"><a href="#"><svg class="fa d-icon d-icon-heart svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><div><span class="item-label">wolkesau</span><span class="item-description">Scribe v2.3.0 - Persistent, typed, auto-replicated player data built on ProfileStore</span></div></a></li>
+            <li class="notification replied"><a href="#"><svg class="fa d-icon d-icon-reply svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><div><span class="item-label">1XPotato_X1</span><span class="item-description">Scribe v2.3.0 - Persistent, typed, auto-replicated player data built on ProfileStore</span></div></a></li>
+            <li class="notification private-message read"><a href="#"><svg class="fa d-icon d-icon-envelope svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><div><span class="item-label">annamossity683</span><span class="item-description">Dev Opportunities at Cinnamon</span></div></a></li>
+            <li class="notification group-message-summary read"><a href="#"><svg class="fa d-icon d-icon-users svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><div><span class="item-label">darwin_1802 @DEDevelopers</span><span class="item-description">Sommercamp Woche 3: Vibe Coding</span></div></a></li>
+          </ul>
+        </div>
+        <div class="panel-body-bottom">
+          <a href="#" class="btn no-text btn-default show-all" title="view all notifications" aria-label="view all notifications"><svg class="fa d-icon d-icon-chevron-down svg-icon svg-string" aria-hidden="true"><use href="#hx-chevron"></use></svg></a>
+          <button class="btn btn-icon-text btn-default notifications-dismiss" type="button" title="Dismiss all notifications"><svg class="fa d-icon d-icon-check svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg> <span class="d-button-label">Dismiss</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="menu-tabs-container" style="display: flex; flex-direction: column">
+      <button class="btn no-text btn-flat user-menu-tab active" type="button" aria-label="Notifications"><svg class="fa d-icon d-icon-bell svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span class="badge-notification" aria-hidden="true"></span></button>
+      <button class="btn no-text btn-flat user-menu-tab" type="button" aria-label="Replies"><svg class="fa d-icon d-icon-reply svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
+      <button class="btn no-text btn-flat user-menu-tab" type="button" aria-label="Bookmarks"><svg class="fa d-icon d-icon-bookmark svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
+      <button class="btn no-text btn-flat user-menu-tab" type="button" aria-label="Profile"><svg class="fa d-icon d-icon-user svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
     </div>
   </div>
 </section>

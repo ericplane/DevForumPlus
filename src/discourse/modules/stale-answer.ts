@@ -2,7 +2,7 @@ import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { decorateCooked } from "../decorate";
 import { detect } from "../../luau/detect";
-import { getCurrentTopic, postNumberOf, postsByNumber } from "../topic-data";
+import { articleOf, getCurrentTopic, postNumberOf, postsByNumber } from "../topic-data";
 
 /**
  * Warn when an old post recommends something that is no longer the answer.
@@ -24,6 +24,25 @@ import { getCurrentTopic, postNumberOf, postsByNumber } from "../topic-data";
  * Deliberately not shown on the opening post: a question that happens to be old
  * and uses `wait()` is not giving anyone bad advice, and warning about it reads
  * as a scold.
+ *
+ * ── Where the age comes from ────────────────────────────────────────────────
+ * The byline, not the topic payload. This used to look the post up in the
+ * shared `/t/{id}.json`, and that payload carried only the first window —
+ * thread-view.ts measured "20 posts loaded, 178 not" on a 198-post topic — so
+ * for any reply past roughly #20 the lookup missed and the module returned
+ * without a word. Every post reached by scrolling, and every post reached by a
+ * deep link (a `/t/…/400` render holds posts 395-414 and the payload was fetched
+ * without a post number, so it still held 1-20), was skipped. The Google
+ * result that lands you on a 2019 reply mid-thread is a deep link: the exact
+ * post this module exists for was the one it could never see.
+ *
+ * Discourse stamps the byline with the same number it uses for its own
+ * relative-age refresh — `a.post-date span.relative-date[data-time]`, the ms
+ * epoch, with the full date in `title` — measured on the live forum. Reading it
+ * costs no request, needs no await, and puts the tokenizing back inside the
+ * window `decorateCooked` charges to this module. The payload stays as the
+ * fallback for a byline that is missing or unparseable.
+ * ───────────────────────────────────────────────────────────────────────────
  */
 
 const MARK = "data-dfp-stale";
@@ -42,6 +61,40 @@ const STALE_AFTER = 2 * YEAR;
 
 /** Dismissals live for the session only — a reload is a fresh judgement. */
 const dismissed = new Set<number>();
+
+/**
+ * The post's creation time from what Discourse rendered into the byline.
+ *
+ * `data-time` first: it is the ms epoch Discourse itself re-reads to refresh
+ * "3h" into "4h", so it is exact and locale-free. The `title` is the fallback —
+ * a formatted long date ("Jan 14, 2026 1:10 pm"), which V8 parses (see the
+ * unit test) but which depends on the forum's locale, so it is only consulted
+ * when the stamp is absent; an engine that returns NaN for it falls through to
+ * the payload, which is the designed floor. `null` means neither answered, and
+ * the caller falls through to the topic payload. Exported for the test.
+ */
+export function bylineTime(dataTime: string | null, title: string | null): number | null {
+  const ms = Number(dataTime);
+  if (dataTime && Number.isFinite(ms) && ms > 0) return ms;
+  const parsed = title ? Date.parse(title) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Embedded replies — the ones a reader expands above the post through
+ * `section.embedded-posts.top` and below it through `.bottom` — render their
+ * byline as `.topic-meta-data.embedded-reply`: a poster name and a link arrow,
+ * with no `.post-infos` at all (Discourse's embedded-post widget), so this
+ * selector can only ever match the post's own byline. That is what protects
+ * the read, not document order: the `top` section is rendered in a row BEFORE
+ * the post's own avatar/body row, so the first match in document order would
+ * be the wrong byline whenever "in reply to" is expanded.
+ */
+function bylineTimeOf(element: HTMLElement): number | null {
+  const stamp = articleOf(element)?.querySelector(".post-infos .post-date .relative-date");
+  if (!stamp) return null;
+  return bylineTime(stamp.getAttribute("data-time"), stamp.getAttribute("title"));
+}
 
 function ageText(ms: number): string {
   const years = ms / YEAR;
@@ -79,8 +132,8 @@ function build(postNumber: number, age: number, replacements: string[]): HTMLEle
   return box;
 }
 
-function enhance(element: HTMLElement, createdAt: string, postNumber: number): void {
-  const age = Date.now() - new Date(createdAt).getTime();
+function enhance(element: HTMLElement, createdMs: number, postNumber: number): void {
+  const age = Date.now() - createdMs;
   // Age gate first, deliberately: `detect()` is the expensive half, and most
   // posts in a thread are recent, so this skips tokenizing nearly all of them.
   if (!Number.isFinite(age) || age < STALE_AFTER) return;
@@ -103,6 +156,19 @@ function enhance(element: HTMLElement, createdAt: string, postNumber: number): v
   element.before(build(postNumber, age, [...replacements]));
 }
 
+/**
+ * `decorateCooked` catches a throw on the synchronous path, but the payload
+ * path resolves after it has returned, where nothing else is listening — so
+ * the catch lives here and both paths share it.
+ */
+function tryEnhance(element: HTMLElement, createdMs: number, postNumber: number): void {
+  try {
+    enhance(element, createdMs, postNumber);
+  } catch {
+    // A malformed snippet must never break the post it is in.
+  }
+}
+
 export function staleAnswer(api: PluginApi): DfpModule {
   return {
     id: "stale-answer",
@@ -122,18 +188,32 @@ export function staleAnswer(api: PluginApi): DfpModule {
            * — without this the whole thread is re-tokenized on every pass,
            * because the old guard was only checked after the tokenizing. */
           if (element.hasAttribute(SEEN)) return;
-          element.setAttribute(SEEN, "1");
 
+          const fromByline = bylineTimeOf(element);
+          if (fromByline !== null) {
+            element.setAttribute(SEEN, "1");
+            tryEnhance(element, fromByline, postNumber);
+            return;
+          }
+
+          /* Fallback: the topic payload, which knows only the window Discourse
+           * loaded — the head of the thread, or on a deep link the posts around
+           * the linked one. The claim is made when the payload ANSWERS, not
+           * before the await: a miss leaves the element unclaimed so a later
+           * sweep can try again, and a miss is cheap — the promise is cached,
+           * so a retry builds a Map over the loaded window and tokenizes
+           * nothing. The sweeps overlap the await, so the first callback to
+           * land re-checks the claim and the rest stand down; that is what
+           * keeps the tokenizing to once per post. */
           void getCurrentTopic().then((topic) => {
             if (!topic || !element.isConnected) return;
-            const post = postsByNumber(topic).get(postNumber);
-            if (!post?.created_at) return;
+            const created = postsByNumber(topic).get(postNumber)?.created_at;
+            const createdMs = created ? Date.parse(created) : NaN;
+            if (!Number.isFinite(createdMs)) return;
+            if (element.hasAttribute(SEEN)) return;
+            element.setAttribute(SEEN, "1");
             if (dismissed.has(postNumber)) return;
-            try {
-              enhance(element, post.created_at, postNumber);
-            } catch {
-              // A malformed snippet must never break the post it is in.
-            }
+            tryEnhance(element, createdMs, postNumber);
           });
         },
         { id: "dfp-stale-answer", onlyStream: true },

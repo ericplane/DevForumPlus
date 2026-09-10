@@ -13,20 +13,52 @@ import { decorateCooked } from "../decorate";
  *
  * Two things are added, and only two:
  *   1. a real link, built from the digits and a fixed path;
- *   2. a thumbnail, on hover, from one `<img>`.
+ *   2. a card, on hover, that says what the id is.
  *
- * ── Why an <img> and nothing else ───────────────────────────────────────────
+ * ── What the card says ──────────────────────────────────────────────────────
+ * It began as the bare thumbnail and stayed that way for a while, which never
+ * answered the question above: for audio — the commonest id kind in Scripting
+ * Support — the thumbnail is Roblox's generic waveform icon, and for a model
+ * or a plugin it is a render with no name. So the picture now carries the
+ * asset's name and a kind chip ("Audio", "MeshPart", "Plugin") from the
+ * economy details endpoint, requested in parallel with the thumbnail. The
+ * details are a bonus, exactly as the game card treats its info request: the
+ * card is still mounted only once the image has loaded, and if the details
+ * fail the picture stands alone as it always did.
+ *
+ * Two more link kinds get cards, because they are what the rest of the forum
+ * pastes: a group ("community", in the current spelling) and a user profile.
+ * Those follow the game card's shape — page-origin, credentials omitted, two
+ * requests fired only on hover, mounted only after the icon or headshot has
+ * loaded. For these the details are NOT optional: an icon with no name does
+ * not say which group it is, so both requests must answer or there is no card.
+ *
+ * The 4-digit id floor below does NOT apply to groups and users. It did for
+ * one revision, on the argument that one validation rule for every attribute
+ * read back out of the DOM was worth more than a card for builderman — and
+ * that argument was wrong on both halves. The floor exists so that
+ * `rbxassetid://1` in prose is left as text (see `ID`), and an anchor whose
+ * path segment already says `users/` has no such ambiguity; and the read-back
+ * validates the kind attribute on its own, so the id rule never had to carry
+ * it. The accounts that sit below 1000 — Roblox (1), builderman (156),
+ * Shedletsky (261) — and the first few hundred groups are exactly the staff
+ * and legacy pages DevForum posts do link, so `ENTITY_ID` starts at one digit.
+ *
+ * ── What the requests are, and why they cost no permission ──────────────────
  * wxt.config.ts declares exactly one origin and says why: "No <all_urls>, no
- * tabs, no cookies, no webRequest." So there is no fetch here, and there cannot
- * be one — the thumbnails JSON API would need a second host permission for a
- * feature that is meant to cost nothing. An image load is not an extension
- * request at all; it is the page loading an image, governed by the page's own
- * CSP, which is why the redirect endpoint is used instead of the JSON one.
+ * tabs, no cookies, no webRequest." Every request in this file honours that
+ * without a second host permission because of where it runs: the MAIN world
+ * is page context, so a fetch to thumbnails, economy, groups, users or apis
+ * .roblox.com is the page asking, governed by CORS and the forum's own
+ * `connect-src`, not by anything in the manifest. All five were verified from
+ * page context — 200, CORS-clean — with `credentials: "omit"`, so none can
+ * ever carry a forum cookie, and every one fires only on hover: Roblox learns
+ * which id someone deliberately pointed at, never what they scrolled past.
  *
- * The consequence is that we never learn whether an id is real. That is fine,
- * because the failure mode is designed rather than caught: the card is mounted
- * only after `load` fires, so a 404, a CSP block or a moderated asset produces
- * no card at all. There is no state in which a broken-image glyph can appear in
+ * The load-bearing design is still the image. Whatever the JSON says, the
+ * card is mounted only after the picture's `load` fires, so a 404, a CSP
+ * block, a moderated asset or a "thumbnail pending" placeholder produces no
+ * card at all. There is no state in which a broken-image glyph can appear in
  * somebody's post.
  *
  * ── Why hover, and not inline ───────────────────────────────────────────────
@@ -90,12 +122,24 @@ const THUMB_API = (id: string) =>
   `?assetIds=${id}&size=420x420&format=Png&isCircular=false`;
 
 /**
- * Marks the anchors that point at a PLACE rather than a catalog asset.
+ * Name, kind and creator of an asset. Verified from page context with
+ * `credentials: "omit"`: 200 JSON with `Name`, `AssetTypeId` and
+ * `Creator.Name`. The toolbox-service endpoint the audit proposed first
+ * answers 404 from here, and `develop.roblox.com` wants a session (401), so
+ * this is the one that works without asking for anything.
+ */
+const ASSET_INFO_API = (id: string) => `https://economy.roblox.com/v2/assets/${id}/details`;
+
+/**
+ * Marks what kind of thing the id names: `game`, `group` or `user`.
  *
  * Absent means "ordinary asset". Kept as a separate attribute rather than
  * encoded into the id so the id stays a plain run of digits everywhere.
  */
 const KIND = "data-dfp-asset-kind";
+
+/** What a marked link points at. `asset` is the unmarked default. */
+export type Kind = "asset" | "game" | "group" | "user";
 
 /**
  * Games get a different card, because a game is not a square.
@@ -125,7 +169,24 @@ const GAME_INFO_API = (universeId: string) =>
   `https://games.roblox.com/v1/games?universeIds=${universeId}`;
 
 /**
- * Ids are 4-16 digits everywhere in this file.
+ * Groups and people: one details request and one picture request each, both
+ * verified from page context with `credentials: "omit"` — 200 JSON, CORS-clean,
+ * no extension privilege. 150px is the size the card draws them at; the
+ * thumbnail endpoints answer the same `data[0].imageUrl` / `state` shape as
+ * the asset one, so `firstShot` reads all three.
+ */
+const GROUP_API = (id: string) => `https://groups.roblox.com/v1/groups/${id}`;
+
+const GROUP_ICON_API = (id: string) =>
+  `https://thumbnails.roblox.com/v1/groups/icons?groupIds=${id}&size=150x150&format=Png`;
+
+const USER_API = (id: string) => `https://users.roblox.com/v1/users/${id}`;
+
+const USER_HEADSHOT_API = (id: string) =>
+  `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${id}&size=150x150&format=Png`;
+
+/**
+ * An asset or place id is 4-16 digits.
  *
  * The floor is not cosmetic. `rbxassetid://0` and `rbxassetid://1` are what
  * people type when they mean "put your id here", and linking those would ship a
@@ -133,12 +194,32 @@ const GAME_INFO_API = (universeId: string) =>
  */
 const ID = String.raw`\d{4,16}`;
 
-/** The same rule, anchored, for reading an id back out of the DOM. */
-const ID_ONLY = new RegExp(`^${ID}$`);
+/**
+ * A group or user id is 1-16 digits. The floor above guards prose, where a
+ * short number is more often a placeholder than an id; a `users/156` path
+ * segment has already said what its digits are, and 156 is builderman.
+ */
+const ENTITY_ID = String.raw`\d{1,16}`;
 
-/** A cooked anchor Discourse already built. Kind is ignored — the href stays. */
+/**
+ * Digits only, anchored, for reading an id back out of the DOM — one rule for
+ * every kind, at the wider floor. The kind attribute is validated separately
+ * in `referenceOf`, so a short id here is at worst a request for asset 1,
+ * which exists.
+ */
+const ID_ONLY = new RegExp(`^${ENTITY_ID}$`);
+
+/**
+ * A cooked anchor Discourse already built. The href stays; the path segment
+ * decides the card. `communities` is the current spelling of `groups` and the
+ * two ids are the same namespace, so they share a kind. Two arms because the
+ * two families take different floors; `referenceFromHref` reads whichever
+ * matched.
+ */
 const HREF_RE = new RegExp(
-  String.raw`^https?://(?:www\.|web\.|m\.)?roblox\.com/(?:library|catalog|asset|games)/(${ID})(?:[/?#]|$)`,
+  String.raw`^https?://(?:www\.|web\.|m\.)?roblox\.com/` +
+    String.raw`(?:(library|catalog|asset|games)/(${ID})|(groups|communities|users)/(${ENTITY_ID}))` +
+    String.raw`(?:[/?#]|$)`,
   "i",
 );
 
@@ -166,12 +247,120 @@ const TEXT_RE = new RegExp(
   "g",
 );
 
-function assetIdFromHref(href: string): string | null {
-  return HREF_RE.exec(href)?.[1] ?? STORE_RE.exec(href)?.[1] ?? null;
+export interface Reference {
+  id: string;
+  kind: Kind;
 }
 
-/** `/games/<id>` is a place; everything else this file matches is an asset. */
-const isGameHref = (href: string) => /roblox\.com\/games\/\d/i.test(href);
+function kindOfSegment(segment: string): Kind {
+  switch (segment.toLowerCase()) {
+    case "games":
+      return "game";
+    case "groups":
+    case "communities":
+      return "group";
+    case "users":
+      return "user";
+    default:
+      return "asset";
+  }
+}
+
+/**
+ * What a Roblox href points at, or null when it is not something this file
+ * cards. entity-cards.test.ts holds it to the shapes people actually paste.
+ * `TEXT_RE` deliberately does not grow to match: Discourse autolinks every
+ * pasted URL, so a group or profile link is always an anchor by the time a
+ * decorator sees it.
+ */
+export function referenceFromHref(href: string): Reference | null {
+  const m = HREF_RE.exec(href);
+  if (m) {
+    const segment = m[1] ?? m[3];
+    const id = m[2] ?? m[4];
+    if (segment && id) return { id, kind: kindOfSegment(segment) };
+  }
+  const s = STORE_RE.exec(href);
+  return s?.[1] ? { id: s[1], kind: "asset" } : null;
+}
+
+/**
+ * `AssetTypeId` → the word a reader would use. The ids are Roblox's
+ * `Enum.AssetType` values; the labels collapse families the card has no room
+ * to distinguish — every body-part accessory is "Accessory", every emote and
+ * walk cycle is "Animation" — because the chip's job is to tell a sound from a
+ * mesh, not to reproduce the catalog taxonomy. Unknown ids get no chip rather
+ * than a guess.
+ */
+const ASSET_TYPES: Record<number, string> = {
+  1: "Image",
+  2: "Clothing",
+  3: "Audio",
+  4: "Mesh",
+  5: "Script",
+  8: "Accessory",
+  9: "Place",
+  10: "Model",
+  11: "Clothing",
+  12: "Clothing",
+  13: "Decal",
+  17: "Head",
+  18: "Face",
+  19: "Gear",
+  21: "Badge",
+  24: "Animation",
+  27: "Body part",
+  28: "Body part",
+  29: "Body part",
+  30: "Body part",
+  31: "Body part",
+  32: "Package",
+  34: "Game pass",
+  38: "Plugin",
+  39: "Union",
+  40: "MeshPart",
+  41: "Accessory",
+  42: "Accessory",
+  43: "Accessory",
+  44: "Accessory",
+  45: "Accessory",
+  46: "Accessory",
+  47: "Accessory",
+  48: "Animation",
+  49: "Animation",
+  50: "Animation",
+  51: "Animation",
+  52: "Animation",
+  53: "Animation",
+  54: "Animation",
+  55: "Animation",
+  56: "Animation",
+  57: "Accessory",
+  58: "Accessory",
+  59: "Animation",
+  61: "Video",
+  62: "Accessory",
+  63: "Accessory",
+  64: "Accessory",
+  65: "Accessory",
+  66: "Accessory",
+  67: "Accessory",
+  68: "Accessory",
+  69: "Accessory",
+  70: "Accessory",
+  71: "Font",
+  72: "Font",
+  74: "Accessory",
+  75: "Accessory",
+  76: "Animation",
+  77: "Dynamic head",
+  79: "Video",
+  80: "Font",
+};
+
+export function assetTypeLabel(typeId: unknown): string | null {
+  return typeof typeId === "number" ? (ASSET_TYPES[typeId] ?? null) : null;
+}
 
 // ── Marking references ──────────────────────────────────────────────────────
 
@@ -192,10 +381,10 @@ function markAnchors(root: HTMLElement): number {
      * meant to remove. `aside.quote` is deliberately NOT excluded: a quoted
      * asset id is still an asset id. */
     if (a.closest("pre, aside.onebox")) continue;
-    const id = assetIdFromHref(a.href);
-    if (!id) continue;
-    a.setAttribute(ASSET, id);
-    if (isGameHref(a.href)) a.setAttribute(KIND, "game");
+    const ref = referenceFromHref(a.href);
+    if (!ref) continue;
+    a.setAttribute(ASSET, ref.id);
+    if (ref.kind !== "asset") a.setAttribute(KIND, ref.kind);
     found++;
   }
   return found;
@@ -306,10 +495,10 @@ const OPEN_DELAY = 220;
 /**
  * cache key → the card's contents, or `null` once loading has failed.
  *
- * Keyed `"<id>"` for an asset and `"game:<id>"` for a place, because the same
- * number means different things down the two paths and they build different
- * cards. The value is an element rather than an `<img>` for the same reason: a
- * game card is a splash plus a name plus its stats.
+ * Keyed `"<id>"` for an asset and `"<kind>:<id>"` for a place, a group or a
+ * user, because the same number means different things down the four paths
+ * and they build different cards. The value is the card's content — the
+ * picture and the lines under or beside it — never a bare `<img>`.
  *
  * `null` is the important half: a moderated or deleted asset would otherwise
  * re-request on every hover for the life of the page, and each one would end in
@@ -334,10 +523,15 @@ let pending: string | null = null;
 /** The anchor the card currently belongs to. */
 let shownFor: HTMLElement | null = null;
 
-function thumbnail(id: string): HTMLElement | null {
-  const hit = shots.get(id);
-  if (hit !== undefined) return hit;
-
+/**
+ * The image every card is gated on, wired to the cache key it belongs to.
+ *
+ * `error` remembers the failure and takes the affordance away — from there the
+ * reference is just a link, which is the designed floor. `load` mounts the
+ * card, but only if the pointer is still on a link asking for this key: a
+ * stale load must never open a card for something the reader has left.
+ */
+function picture(key: string, content: HTMLElement): HTMLImageElement {
   const img = document.createElement("img");
   /* Empty alt, deliberately: if this element ever did reach the page while
    * broken, an alt string is exactly what would render as a caption next to a
@@ -346,49 +540,115 @@ function thumbnail(id: string): HTMLElement | null {
   img.decoding = "async";
   /* The CDN never needs to know which thread someone is reading. */
   img.referrerPolicy = "no-referrer";
-
   img.addEventListener(
     "error",
     () => {
-      // Remember the failure and take the affordance away. From here the
-      // reference is just a link, which is the designed floor.
-      shots.set(id, null);
-      if (pending === id) hide();
+      shots.set(key, null);
+      if (pending === key) hide();
     },
     { once: true },
   );
   img.addEventListener(
     "load",
     () => {
-      if (pending === id && hovered) show(hovered, img);
+      if (pending === key && hovered) show(hovered, content);
     },
     { once: true },
   );
+  return img;
+}
 
-  /* Two hops, so the failure paths converge on the one the `error` handler
-   * already implements: any non-200, any malformed body, and any state other
-   * than "Completed" all end as `shots.set(id, null)` and no card.
-   *
-   * The state check is not belt-and-braces. Roblox answers 200 with a grey
-   * "thumbnail pending" placeholder for assets it has not rendered yet, and
-   * that image loads perfectly well — so without this, a hover would show a
-   * confident grey square that is not a picture of the asset. */
-  void fetch(THUMB_API(id), { credentials: "omit" })
-    .then((r) => (r.ok ? (r.json() as Promise<unknown>) : null))
-    .then((body) => {
-      const entry = (body as { data?: { imageUrl?: unknown; state?: unknown }[] } | null)?.data?.[0];
-      if (entry?.state !== "Completed" || typeof entry.imageUrl !== "string") {
-        throw new Error("no thumbnail");
+/** One page-origin JSON request, cookies never attached; a non-200 is null. */
+function json(url: string): Promise<unknown> {
+  return fetch(url, { credentials: "omit" }).then((r) =>
+    r.ok ? (r.json() as Promise<unknown>) : null,
+  );
+}
+
+/**
+ * The CDN URL out of a thumbnails.roblox.com body, or null.
+ *
+ * The state check is not belt-and-braces. Roblox answers 200 with a grey
+ * "thumbnail pending" placeholder for assets it has not rendered yet, and that
+ * image loads perfectly well — so without this, a hover would show a
+ * confident grey square that is not a picture of the asset.
+ */
+function firstShot(body: unknown): string | null {
+  const entry = (body as { data?: { imageUrl?: unknown; state?: unknown }[] } | null)?.data?.[0];
+  return entry?.state === "Completed" && typeof entry.imageUrl === "string" ? entry.imageUrl : null;
+}
+
+function line(className: string, text: string): HTMLElement {
+  const el = document.createElement("div");
+  el.className = className;
+  el.textContent = text;
+  return el;
+}
+
+interface AssetInfo {
+  Name?: unknown;
+  AssetTypeId?: unknown;
+  Creator?: { Name?: unknown } | null;
+}
+
+/**
+ * An asset card: the thumbnail, its name, and a chip saying what kind of
+ * thing it is.
+ *
+ * Both requests go out together. The details ride the same rule the game
+ * card's info request does — a bonus, never a condition — so their failure
+ * path is `.catch(() => null)` and the picture stands alone. The thumbnail
+ * keeps the two-hop failure convergence it always had: any non-200, any
+ * malformed body and any state other than "Completed" all end as
+ * `shots.set(id, null)` and no card.
+ */
+function assetCard(id: string): HTMLElement | null {
+  const hit = shots.get(id);
+  if (hit !== undefined) return hit;
+
+  const wrap = document.createElement("div");
+  wrap.className = "dfp-asset-preview__asset";
+  const img = picture(id, wrap);
+  wrap.appendChild(img);
+
+  void Promise.all([json(THUMB_API(id)), json(ASSET_INFO_API(id)).catch(() => null)])
+    .then(([thumbBody, infoBody]) => {
+      const shot = firstShot(thumbBody);
+      if (!shot) throw new Error("no thumbnail");
+
+      const info = infoBody as AssetInfo | null;
+      if (info && typeof info.Name === "string" && info.Name.trim()) {
+        wrap.appendChild(line("dfp-asset-preview__title", info.Name.trim()));
+
+        /* Kind first, creator after, on one line under the name. The chip is
+         * the reason the details are fetched at all; the creator is the line
+         * allowed to lose its tail, as on the game card. */
+        const meta = document.createElement("div");
+        meta.className = "dfp-asset-preview__meta";
+        const type = assetTypeLabel(info.AssetTypeId);
+        if (type) meta.appendChild(chip(type));
+        const by = info.Creator?.Name;
+        if (typeof by === "string" && by) meta.appendChild(line("dfp-asset-preview__by", `by ${by}`));
+        if (meta.childElementCount) wrap.appendChild(meta);
       }
-      img.src = entry.imageUrl;
+
+      // Last, so `load` cannot fire before the text it sits above exists.
+      img.src = shot;
     })
     .catch(() => {
       shots.set(id, null);
       if (pending === id) hide();
     });
 
-  remember(id, img);
-  return img;
+  remember(id, wrap);
+  return wrap;
+}
+
+function chip(text: string): HTMLElement {
+  const el = document.createElement("span");
+  el.className = "dfp-asset-preview__chip";
+  el.textContent = text;
+  return el;
 }
 
 function remember(key: string, node: HTMLElement): void {
@@ -434,26 +694,7 @@ function gameCard(placeId: string): HTMLElement | null {
 
   const wrap = document.createElement("div");
   wrap.className = "dfp-asset-preview__game";
-
-  const img = document.createElement("img");
-  img.alt = "";
-  img.decoding = "async";
-  img.referrerPolicy = "no-referrer";
-  img.addEventListener(
-    "error",
-    () => {
-      shots.set(key, null);
-      if (pending === key) hide();
-    },
-    { once: true },
-  );
-  img.addEventListener(
-    "load",
-    () => {
-      if (pending === key && hovered) show(hovered, wrap);
-    },
-    { once: true },
-  );
+  const img = picture(key, wrap);
   wrap.appendChild(img);
 
   const fail = () => {
@@ -461,21 +702,16 @@ function gameCard(placeId: string): HTMLElement | null {
     if (pending === key) hide();
   };
 
-  void fetch(UNIVERSE_API(placeId), { credentials: "omit" })
-    .then((r) => (r.ok ? (r.json() as Promise<{ universeId?: unknown }>) : null))
+  void json(UNIVERSE_API(placeId))
     .then((body) => {
-      const universe = body?.universeId;
+      const universe = (body as { universeId?: unknown } | null)?.universeId;
       if (typeof universe !== "number") throw new Error("no universe");
       /* Both hang off the universe id, so they go out together — a game hover
        * costs two round trips, not three. */
       return Promise.all([
-        fetch(GAME_THUMB_API(String(universe)), { credentials: "omit" }).then((r) =>
-          r.ok ? (r.json() as Promise<unknown>) : null,
-        ),
-        fetch(GAME_INFO_API(String(universe)), { credentials: "omit" })
-          .then((r) => (r.ok ? (r.json() as Promise<unknown>) : null))
-          // Details are a bonus; the splash alone is still worth showing.
-          .catch(() => null),
+        json(GAME_THUMB_API(String(universe))),
+        // Details are a bonus; the splash alone is still worth showing.
+        json(GAME_INFO_API(String(universe))).catch(() => null),
       ]);
     })
     .then(([thumbBody, infoBody]) => {
@@ -528,6 +764,153 @@ function gameCard(placeId: string): HTMLElement | null {
   return wrap;
 }
 
+/** The lines an entity card draws, worked out from a details body. */
+export interface EntityLines {
+  title: string;
+  by: string | null;
+  meta: string | null;
+  verified: boolean;
+}
+
+interface GroupInfo {
+  name?: unknown;
+  memberCount?: unknown;
+  hasVerifiedBadge?: unknown;
+  owner?: { displayName?: unknown; username?: unknown } | null;
+}
+
+interface UserInfo {
+  name?: unknown;
+  displayName?: unknown;
+  created?: unknown;
+  hasVerifiedBadge?: unknown;
+}
+
+/**
+ * `groups.roblox.com/v1/groups/{id}` → name, owner, size. Null when the body
+ * has no name, which is the one line the card cannot do without.
+ */
+export function describeGroup(body: unknown): EntityLines | null {
+  const g = body as GroupInfo | null;
+  if (!g || typeof g.name !== "string" || !g.name.trim()) return null;
+  // The display name, or the handle when the display name is absent OR blank
+  // — `??` alone let an empty string through and lost the owner line.
+  const owner = [g.owner?.displayName, g.owner?.username].find(
+    (v): v is string => typeof v === "string" && v.trim() !== "",
+  );
+  const count = g.memberCount;
+  return {
+    title: g.name.trim(),
+    by: owner ? `by ${owner.trim()}` : null,
+    meta:
+      typeof count === "number" && Number.isFinite(count)
+        ? `${compact(count)} ${count === 1 ? "member" : "members"}`
+        : null,
+    verified: g.hasVerifiedBadge === true,
+  };
+}
+
+/**
+ * `users.roblox.com/v1/users/{id}` → display name, handle, join year. The
+ * handle is always shown, even when it equals the display name: it is what a
+ * reader would type to find the account, and the two differ often enough that
+ * omitting it only sometimes would look like an omission.
+ */
+export function describeUser(body: unknown): EntityLines | null {
+  const u = body as UserInfo | null;
+  if (!u || typeof u.name !== "string" || !u.name.trim()) return null;
+  const handle = u.name.trim();
+  const display = typeof u.displayName === "string" && u.displayName.trim() ? u.displayName.trim() : handle;
+  const joined = typeof u.created === "string" ? new Date(u.created).getTime() : NaN;
+  return {
+    title: display,
+    by: `@${handle}`,
+    meta: Number.isFinite(joined) ? `joined ${new Date(joined).getUTCFullYear()}` : null,
+    verified: u.hasVerifiedBadge === true,
+  };
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * Roblox's verified badge, as a check in a filled circle. Built with
+ * `createElementNS` from a fixed path — no markup string, same as the flair
+ * icons in group-chips.ts. It sits beside the name rather than in the meta
+ * line because that is where every Roblox surface puts it, and a mark a reader
+ * has to look for is not a mark.
+ */
+function verifiedMark(): HTMLElement {
+  const mark = document.createElement("span");
+  mark.className = "dfp-asset-preview__verified";
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", "M20 6 9 17l-5-5");
+  svg.appendChild(path);
+  mark.appendChild(svg);
+  return mark;
+}
+
+/**
+ * A group or user card: icon or headshot on the left, name with the verified
+ * mark, then who owns it or what the handle is, then how big or how old.
+ *
+ * Unlike the asset and game cards, the details are a condition here, not a
+ * bonus: a headshot with no name under it does not say whose profile this is.
+ * Both requests go out together and both must answer; the card is still only
+ * ever mounted once the picture has loaded, so every failure — a deleted
+ * group, a banned account, a network error — ends as a plain working link.
+ */
+function entityCard(kind: "group" | "user", id: string): HTMLElement | null {
+  const key = `${kind}:${id}`;
+  const hit = shots.get(key);
+  if (hit !== undefined) return hit;
+
+  const wrap = document.createElement("div");
+  wrap.className = `dfp-asset-preview__entity dfp-asset-preview__entity--${kind}`;
+  const img = picture(key, wrap);
+  wrap.appendChild(img);
+  const text = document.createElement("div");
+  text.className = "dfp-asset-preview__text";
+  wrap.appendChild(text);
+
+  const infoUrl = kind === "group" ? GROUP_API(id) : USER_API(id);
+  const shotUrl = kind === "group" ? GROUP_ICON_API(id) : USER_HEADSHOT_API(id);
+
+  void Promise.all([json(infoUrl), json(shotUrl)])
+    .then(([infoBody, shotBody]) => {
+      const shot = firstShot(shotBody);
+      if (!shot) throw new Error("no picture");
+      const lines = kind === "group" ? describeGroup(infoBody) : describeUser(infoBody);
+      if (!lines) throw new Error("no details");
+
+      /* The name is a span inside the title so the verified mark can sit
+       * beside it as a flex sibling that never gets clipped — a long name
+       * loses its tail to the ellipsis, not the badge. */
+      const title = document.createElement("div");
+      title.className = "dfp-asset-preview__title";
+      const name = document.createElement("span");
+      name.className = "dfp-asset-preview__name";
+      name.textContent = lines.title;
+      title.appendChild(name);
+      if (lines.verified) title.appendChild(verifiedMark());
+      text.appendChild(title);
+      if (lines.by) text.appendChild(line("dfp-asset-preview__by", lines.by));
+      if (lines.meta) text.appendChild(line("dfp-asset-preview__meta", lines.meta));
+
+      // Last, so `load` cannot fire before the text beside it exists.
+      img.src = shot;
+    })
+    .catch(() => {
+      shots.set(key, null);
+      if (pending === key) hide();
+    });
+
+  remember(key, wrap);
+  return wrap;
+}
+
 function ensureCard(): HTMLElement {
   if (card) return card;
   const el = document.createElement("div");
@@ -549,11 +932,13 @@ function ensureCard(): HTMLElement {
  * silently re-anchors `position: fixed` to itself. At body level there is no
  * such ancestor to worry about.
  *
- * No z-index, because there is not one in the whole stylesheet and this does not
- * need to be the first. The card opens downward from a link in the post column,
- * where nothing is stacked; the only element it could lose to is the fixed site
- * header, and the placement below only flips upward near the bottom of the
- * viewport, which is nowhere near it.
+ * The card's layer is entity-cards.css's business, not this function's: it
+ * sat at `z-index: auto` for as long as every anchor it served was in the
+ * post column, where nothing is stacked, and stopped being enough once the
+ * topic card became a contract other modules hang off links inside the
+ * composer (composer.ts's dupes rows) — a panel Discourse fixes at 400. Both
+ * cards take 990 there, Discourse's own user-card layer, under the 1000
+ * header.
  */
 function place(anchor: HTMLElement): void {
   if (!card) return;
@@ -583,7 +968,16 @@ function show(anchor: HTMLElement, content: HTMLElement): void {
   // Ember can re-render the stream between the hover and the load resolving.
   if (!anchor.isConnected || !document.body) return;
   const el = ensureCard();
-  el.classList.toggle("dfp-asset-preview--game", content.classList.contains("dfp-asset-preview__game"));
+  /* The host wears a variant named after the content it holds. The three with
+   * text under or beside the picture need the line box back that the bare
+   * card kills (media.css / entity-cards.css); toggling all three keeps a card
+   * from inheriting the previous hover's variant. */
+  for (const variant of ["game", "asset", "entity"]) {
+    el.classList.toggle(
+      `dfp-asset-preview--${variant}`,
+      content.classList.contains(`dfp-asset-preview__${variant}`),
+    );
+  }
   if (el.firstChild !== content) el.replaceChildren(content);
 
   /* Appended, measured and positioned in one synchronous run. The card sits at
@@ -598,6 +992,11 @@ function show(anchor: HTMLElement, content: HTMLElement): void {
 function hide(): void {
   clearTimeout(openTimer);
   pending = null;
+  /* A tap that opened a card is spent once the card is gone, whatever took it
+   * away — a scroll, a tap elsewhere, Escape. The next tap on the same link
+   * opens it again rather than navigating out from under a reader who never
+   * saw the card. */
+  armed = null;
   if (!shownFor) return;
   shownFor = null;
   // Removed rather than hidden, so a card can never survive a page transition
@@ -605,20 +1004,44 @@ function hide(): void {
   card?.remove();
 }
 
-function open(anchor: HTMLElement): void {
+/**
+ * The cache key and kind a marked anchor asks for, or null.
+ *
+ * Re-validated even though DFP wrote it. This is read back out of post
+ * content, and a post could contain the same attribute — Discourse's
+ * sanitiser is not something to bet a URL on. Digits only, same rule as
+ * everywhere above; an unknown kind is treated as a plain asset rather than
+ * trusted.
+ */
+function referenceOf(anchor: HTMLElement): (Reference & { key: string }) | null {
   const id = anchor.getAttribute(ASSET);
-  /* Re-validated even though DFP wrote it. This is read back out of post
-   * content, and a post could contain the same attribute — Discourse's
-   * sanitiser is not something to bet a URL on. Digits only, same rule as
-   * everywhere above. */
-  if (!id || !ID_ONLY.test(id)) return;
+  if (!id || !ID_ONLY.test(id)) return null;
+  const raw = anchor.getAttribute(KIND);
+  const kind: Kind = raw === "game" || raw === "group" || raw === "user" ? raw : "asset";
+  return { id, kind, key: kind === "asset" ? id : `${kind}:${id}` };
+}
 
-  const isGame = anchor.getAttribute(KIND) === "game";
-  pending = isGame ? `game:${id}` : id;
-  const content = isGame ? gameCard(id) : thumbnail(id);
+function contentFor(ref: Reference): HTMLElement | null {
+  switch (ref.kind) {
+    case "game":
+      return gameCard(ref.id);
+    case "group":
+    case "user":
+      return entityCard(ref.kind, ref.id);
+    default:
+      return assetCard(ref.id);
+  }
+}
+
+function open(anchor: HTMLElement): void {
+  const ref = referenceOf(anchor);
+  if (!ref) return;
+
+  pending = ref.key;
+  const content = contentFor(ref);
   // Known bad. The reference stays a link and nothing else happens, ever again.
   if (!content) return;
-  const img = content instanceof HTMLImageElement ? content : content.querySelector("img");
+  const img = content.querySelector("img");
   if (img?.complete && img.naturalWidth > 0) show(anchor, content);
   // Otherwise the `load` listener finishes the job — if the pointer is still
   // here by then.
@@ -638,16 +1061,56 @@ function target(node: EventTarget | null): HTMLElement | null {
  */
 let mounted = false;
 
+/**
+ * Touch, and the two taps.
+ *
+ * On `(hover: none)` there is no pointer to rest on a link, so the card would
+ * never open: `pointerover` fires at the start of a tap and the click follows
+ * inside `OPEN_DELAY`. So a first tap on a carded link opens the card at once
+ * and does not navigate; the second tap on the same link follows it. `armed`
+ * is that link, and is forgotten whenever the card goes away (see `hide`) so
+ * a tap after a scroll shows the card again instead of leaving.
+ *
+ * Capture phase on `document`, for the reason topic-preview.ts gives at
+ * length: Discourse's cooked-link tracker is bound on the post stream and
+ * runs first in the bubble, preventing default and opening the href itself,
+ * so a bubble listener here only ever saw a tap that had already navigated.
+ * In capture the first tap is taken whole — `preventDefault` plus
+ * `stopPropagation` so the tracker never sees it — and the second tap passes
+ * through untouched. On touch no timer is ever armed (see `enter`), so a tap
+ * that navigates leaves nothing behind to fire against a page on its way out;
+ * the `clearTimeout` calls below are for the hover-capable device that also
+ * reports `(hover: none)` for one gesture, which costs nothing to cover.
+ *
+ * The query is created in `mountHover`, not at import: `matchMedia` at module
+ * scope is what made op-pin.ts un-importable from Node, and this file is
+ * imported directly by entity-cards.test.ts.
+ */
+let touch: MediaQueryList | null = null;
+let armed: HTMLElement | null = null;
+
 function mountHover(): void {
   if (mounted) return;
   mounted = true;
+  touch = matchMedia("(hover: none)");
 
+  /* On touch the click handler below is the ONLY opener, and the timer is
+   * never armed. It used to be: a tap's `pointerover` armed it, and for a tap
+   * that was harmless because the click came first and cleared it. A
+   * long-press — the phone's copy-link / open-in-new-tab gesture — and a
+   * short drag that starts on a link are `pointerover` with no click, so the
+   * timer ran out at 220ms, spent the requests, and mounted a card nobody
+   * asked for; and with `pointerleave` ignored on touch (below) nothing took
+   * it away until the next tap or scroll. Worse, that path never set `armed`,
+   * so the next tap on the same link re-opened the card it could already see
+   * instead of following it: a third tap to leave. A list row outside
+   * `.cooked` gets no hover on a phone either way. */
   const enter = (node: EventTarget | null): void => {
     const anchor = target(node);
     if (anchor === hovered) return;
     hovered = anchor;
     hide();
-    if (anchor) openTimer = window.setTimeout(() => open(anchor), OPEN_DELAY);
+    if (anchor && !touch?.matches) openTimer = window.setTimeout(() => open(anchor), OPEN_DELAY);
   };
 
   document.addEventListener("pointerover", (e) => enter(e.target), { passive: true });
@@ -659,8 +1122,57 @@ function mountHover(): void {
 
   /* The pointer can leave through the top of the window without ever crossing
    * another element, and a scroll moves the post out from under a card that is
-   * fixed to the viewport. Both leave a card pointing at nothing. */
+   * fixed to the viewport. Both leave a card pointing at nothing.
+   *
+   * Not on touch: a touch pointer leaves the document at the end of EVERY tap
+   * — the spec fires `pointerleave` up to the root once the finger lifts — so
+   * this would close the card the same tap had just opened. */
   document.documentElement.addEventListener("pointerleave", () => {
+    if (touch?.matches) return;
+    hovered = null;
+    hide();
+  });
+  /* What `pointerleave` was covering on touch before it had to be ignored
+   * there: the browser fires `pointercancel` when it takes the gesture over —
+   * the long-press context menu, a scroll or a pinch — which are exactly the
+   * two cases where a finger came down on a link and no click will follow. */
+  document.addEventListener("pointercancel", () => {
+    hovered = null;
+    hide();
+  });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!touch?.matches || e.button !== 0) return;
+      const anchor = target(e.target);
+      if (!anchor) return;
+      // Second tap: the card was asked for; this one leaves.
+      if (armed === anchor) {
+        hovered = null;
+        hide();
+        return;
+      }
+      const ref = referenceOf(anchor);
+      // Nothing to show — known bad, or not a valid mark — so the tap is a click.
+      if (!ref || shots.get(ref.key) === null) {
+        clearTimeout(openTimer);
+        hovered = null;
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      clearTimeout(openTimer);
+      hovered = anchor;
+      armed = anchor;
+      open(anchor);
+    },
+    { capture: true },
+  );
+
+  // Escape closes the card, as it does every other overlay in the product.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
     hovered = null;
     hide();
   });

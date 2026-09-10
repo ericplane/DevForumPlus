@@ -1,9 +1,10 @@
 import { MainBridge } from "../core/bridge/main";
 import type { Diagnostics } from "../core/bridge/protocol";
-import { ModuleRegistry, type ModuleRecord } from "../core/registry";
+import { ModuleRegistry, resetRouteWork } from "../core/registry";
 import { isModuleEnabled, type DfpSettings, type ModuleId } from "../core/settings-schema";
 import { bootstrap } from "../discourse/boot";
 import { topicListSignals } from "../discourse/modules/topic-list-signals";
+import { topicExcerpts } from "../discourse/modules/topic-excerpts";
 import { chartTheme } from "../discourse/modules/chart-theme";
 import { profileInfo } from "../discourse/modules/profile-info";
 import { prefetch } from "../discourse/modules/prefetch";
@@ -15,6 +16,8 @@ import { categoryGate } from "../discourse/modules/category-gate";
 import { threadView } from "../discourse/modules/thread-view";
 import { opPin } from "../discourse/modules/op-pin";
 import { quietReplies } from "../discourse/modules/quiet-replies";
+import { timelineMarks } from "../discourse/modules/timeline-marks";
+import { postNumbers } from "../discourse/modules/post-numbers";
 import { assetPreview } from "../discourse/modules/asset-preview";
 import { topicPreview } from "../discourse/modules/topic-preview";
 import { docsLinks } from "../discourse/modules/docs-links";
@@ -93,16 +96,41 @@ async function installModules(
     return;
   }
 
-  const records: ModuleRecord[] = [];
+  /* Diagnostics are a snapshot of the registry, taken whenever the picture
+   * changes, rather than a list of records collected once at install.
+   *
+   * The install-time list was pushed exactly once, and install is the one
+   * moment nothing has happened yet: every module's install() returns in ~0ms
+   * and its real cost — decorator sweeps, DOM watchers — is charged later, as
+   * is any strike. So the popup showed "0.0 ms" and a green pill for a module
+   * that had struck minutes ago. `snapshot()` carries the work charged this
+   * route and the live strike count; it is re-pushed from the three places
+   * that change it, below. */
+  const pushDiagnostics = () =>
+    bridge.pushDiagnostics({
+      rung: outcome.rung,
+      pluginApiVersion: outcome.pluginApiVersion,
+      bootMs: outcome.bootMs,
+      modules: registry.snapshot(),
+      notes: outcome.notes,
+    });
+
   const registry = new ModuleRegistry({
     strikes,
     isEnabled: (id: ModuleId) => isModuleEnabled(settings as DfpSettings, id),
-    onStrike: (id, ms) => bridge.bumpStrike(id, ms),
+    onStrike: (id, ms) => {
+      bridge.bumpStrike(id, ms);
+      pushDiagnostics();
+    },
     onClearStrike: (id) => bridge.clearStrike(id),
-    onRecord: (record) => records.push(record),
   });
 
   registry.install(topicListSignals(api));
+  // Same registry, same value-transformer mechanism as topic-list-signals: one
+  // registration that asks Discourse to render the excerpt it already sent.
+  // An unknown-transformer throw is deliberately left to the registry, which
+  // records `failed` where the popup can show it.
+  registry.install(topicExcerpts(api));
   // Not a plugin-API module — it wraps the page's own Chart.js global, which is
   // only reachable from the main world. See discourse/modules/chart-theme.ts.
   registry.install(chartTheme());
@@ -118,6 +146,10 @@ async function installModules(
   registry.install(threadView(api));
   registry.install(opPin(api));
   registry.install(quietReplies(api));
+  // Topic-page modules on onPageChange / onDomChange / decorateCooked; no
+  // bridge messages, no chrome.*.
+  registry.install(timelineMarks(api));
+  registry.install(postNumbers(api));
   registry.install(assetPreview(api));
   registry.install(topicPreview(api));
   registry.install(docsLinks(api));
@@ -127,11 +159,29 @@ async function installModules(
   registry.install(facepile(api));
   registry.install(searchSignals(api));
 
-  bridge.pushDiagnostics({
-    rung: outcome.rung,
-    pluginApiVersion: outcome.pluginApiVersion,
-    bootMs: outcome.bootMs,
-    modules: records,
-    notes: outcome.notes,
-  });
+  pushDiagnostics();
+
+  /* Route boundaries. The registry budgets per route and settles the persisted
+   * strike counters when one ends, but it has no plugin API of its own — the
+   * api is in hand here, so this is where the boundary is wired. `onPageChange`
+   * does not fire for the load that brought us here (category-gate.ts), which
+   * is right: the initial load is the first route, and the first transition
+   * closes it.
+   *
+   * The push goes through `resetRouteWork`'s callback, which runs after the
+   * strike counters settle and before the meter clears, so it carries the
+   * closed route's totals. Calling pushDiagnostics() after resetRouteWork()
+   * returned — the previous shape — pushed a snapshot of an empty meter: a
+   * probe over the real registry showed the install push and every route-end
+   * push at workMs 0, so the popup and overlay read "0 / N ms" unless a module
+   * had struck since. What they show between routes is therefore the LAST
+   * route's work; a strike re-pushes mid-route with this one's so far.
+   *
+   * `pagehide` closes the last route. A hard navigation away does not promise
+   * to deliver a MessagePort task queued during unload, so the clear and the
+   * push this sends are best-effort; losing them leaves a strike on record one
+   * route longer than earned, which is the safe direction. */
+  const endRoute = () => resetRouteWork(pushDiagnostics);
+  api.onPageChange(endRoute);
+  window.addEventListener("pagehide", endRoute);
 }

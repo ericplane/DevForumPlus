@@ -1,0 +1,115 @@
+/* Timeline marks and byline post numbers.
+ *
+ * Two small modules that answer the same question from opposite ends — WHERE
+ * in a long topic is the post that matters — so their rules live together.
+ * timeline-marks.ts draws a tick on the scrubber for each staff reply and the
+ * accepted answer; post-numbers.ts stamps the number on each post's date link
+ * so a reference like "see #42" can be matched while scrolling.
+ *
+ * The two tick hues are the staff and solution rail hues from post.css, on
+ * purpose: a purple tick on the rail and a purple rail on the post are the
+ * same signal at two scales, and a reader who has learned one has learned the
+ * other. There is no OP tick — the module says why. */
+
+/* ── The scrubber ────────────────────────────────────────────────────────── */
+
+/* Restated, not assumed. Discourse declares this itself, but the layer below
+ * is positioned against it and its geometry must not depend on a declaration
+ * DFP does not own — interactive.css makes the same argument for the rail's
+ * `display: flex`, whose absence in the harness stub rendered the toggles at
+ * three different widths. */
+html[data-dfp] .topic-timeline .timeline-scrollarea {
+  position: relative;
+}
+
+/* The handle wins where a tick sits under it. Discourse leaves the scroller
+ * in flow, and an absolutely positioned tick paints and is hit above an
+ * in-flow sibling whatever the DOM order — so a staff opening post's tick,
+ * under the handle whenever the reader is at post 1, took the pointer in its
+ * 14×8px box: a mousedown there started no drag and a click routed instead of
+ * scrubbing. Positioning the scroller, with no offsets so its geometry is
+ * unchanged, makes it and the layer two positioned siblings at `z-index: auto`,
+ * which paint in DOM order; the module prepends the layer, so the scroller is
+ * later and on top. Declared here rather than assumed of Discourse, for the
+ * reason the rule above gives. */
+html[data-dfp] .topic-timeline .timeline-scroller {
+  position: relative;
+}
+
+/* The layer is inert. Only the ticks take the pointer back, and only over
+ * their own hit box, so the drag handle and the click-to-jump area beneath
+ * behave as they do without the layer. */
+html[data-dfp] .dfp-timeline-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Each tick is an <a> with `--dfp-tl-pct` (0..1) set inline by the module.
+ * The hit box is 14×8px and the visible mark is the 2px bar drawn inside it:
+ * a 2px target would be unhittable, and an 8px one is still a sliver of a
+ * 300px rail. It starts 2px into the track's own border so the mark reads as
+ * sitting ON the track, the way the handle does with its -1px margin.
+ *
+ * The box is centred on the position and clamped to the rail, so a tick at 0
+ * (a staff opening post) and a last-post tick at 1 stay inside the scrollarea
+ * rather than hanging off its ends. Percentages resolve against the
+ * scrollarea's inline height, which Discourse always sets (measured 300px). */
+html[data-dfp] .dfp-timeline-mark {
+  position: absolute;
+  inset-inline-start: -2px;
+  inset-block-start: clamp(0px, calc(var(--dfp-tl-pct, 0) * 100% - 4px), calc(100% - 8px));
+  inline-size: 14px;
+  block-size: 8px;
+  display: block;
+  pointer-events: auto;
+  color: var(--dfp-text-3);
+  border-radius: var(--dfp-r-xs);
+}
+
+html[data-dfp] .dfp-timeline-mark::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 3px;
+  block-size: 2px;
+  border-radius: var(--dfp-r-full);
+  background: currentColor;
+  transition:
+    block-size var(--dfp-dur-1) var(--dfp-ease),
+    inset-block-start var(--dfp-dur-1) var(--dfp-ease);
+}
+
+/* Thicker under the pointer, so the title that follows is visibly about this
+ * mark and not the one 3px below it. */
+html[data-dfp] .dfp-timeline-mark:hover::before,
+html[data-dfp] .dfp-timeline-mark:focus-visible::before {
+  inset-block-start: 2px;
+  block-size: 4px;
+}
+
+/* The same hues as the post rails, at full strength: a tick is 2px of colour
+ * against the rail and has no tint to fall back on. */
+html[data-dfp] .dfp-timeline-mark--staff {
+  color: var(--dfp-staff);
+}
+
+html[data-dfp] .dfp-timeline-mark--solved {
+  color: var(--dfp-solved);
+}
+
+/* ── Byline post number ──────────────────────────────────────────────────── */
+
+/* Rendered from the attribute post-numbers.ts stamps, inside the date link —
+ * never a second anchor (the module explains). Tabular figures for the same
+ * reason the date beside it has them (post.css): a column of "#9" / "#10" /
+ * "#11" down a thread must not shuffle. Tertiary text at rest, and it stays
+ * tertiary when the date brightens on hover: it is the post's label, not the
+ * link's text, and the link already says it is pressable. */
+html[data-dfp] .topic-post .post-infos a.post-date[data-dfp-n]::before {
+  content: "#" attr(data-dfp-n);
+  margin-inline-end: var(--dfp-s-1);
+  color: var(--dfp-text-3);
+  font-weight: var(--dfp-fw-normal);
+  font-variant-numeric: tabular-nums;
+}

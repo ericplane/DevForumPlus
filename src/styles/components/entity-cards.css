@@ -1,0 +1,193 @@
+/* ── Entity cards: what an id is, and who a link points at ──────────────────
+ *
+ * Extends the hover card media.css builds as `.dfp-asset-preview` with the
+ * three shapes it grew after shipping as a bare thumbnail:
+ *
+ *   __asset   the thumbnail with the asset's name and a kind chip under it;
+ *   __entity  a group or a user — icon or headshot beside name, owner or
+ *             handle, size or join year;
+ *   __badge--category   the category chip on the topic card, which lives in
+ *             interactive.css and gets the same treatment for the same reason.
+ *
+ * Every selector that has to beat a rule in media.css or interactive.css does
+ * it on specificity — a compound of the base class and the variant, or the
+ * host class prefixed — rather than on import order. This file is imported
+ * after media.css, but nothing here should stop working if it were not.
+ *
+ * Colour is confined to pairs scripts/build-tokens.ts measures: the chip and
+ * the category badge sit text-3 on surface-3 like the topic card's closed
+ * badge, and the verified mark is on-accent on accent-strong, the filled-button
+ * pair. A category's own hex reaches only the 8px dot, never text. */
+
+/* ── The layer both cards sit on ────────────────────────────────────────────
+ * media.css and interactive.css leave the two hosts at `z-index: auto`, and
+ * say why: they opened downward from a link in the post column, where nothing
+ * is stacked. That stopped being the whole story when the topic card became a
+ * contract — composer.ts marks its "Already asked?" rows with `data-dfp-topic`
+ * so a match shows its age, and those rows live inside `#reply-control`, which
+ * Discourse fixes at z-index 400. In the root stacking context every positive
+ * z-index paints above every z-auto positioned box, so the card that opened
+ * 6px under a dupes row was painted behind the composer it was built for.
+ *
+ * 990 is Discourse's own user-card layer: above the composer (400) and the
+ * timeline layer (100) the toggle cluster rides in touch.css, under the 1000
+ * header — so a card flipped upward near the top of the viewport still never
+ * covers the header. This is the stylesheet's only z-index: touch.css sets
+ * none, its cluster inheriting the timeline layer from
+ * `.topic-navigation.with-topic-progress`, and media.css leaves the host at
+ * auto and points here. */
+html[data-dfp] .dfp-topic-preview,
+html[data-dfp] .dfp-asset-preview {
+  z-index: 990;
+}
+
+/* The bare card kills its line box because it was exactly its image. These
+ * two have text in them and need leading back — the same two declarations
+ * media.css gives the game variant. */
+html[data-dfp] .dfp-asset-preview.dfp-asset-preview--asset,
+html[data-dfp] .dfp-asset-preview.dfp-asset-preview--entity {
+  line-height: var(--dfp-lh-body);
+  padding: 3px 3px var(--dfp-s-2);
+}
+
+/* ── The asset card ─────────────────────────────────────────────────────────
+ * 150px, the width of the picture above the text, so a long name ellipsises
+ * at the picture's edge instead of widening the card past it. Measured with
+ * the width left to the content: "Realistic Grass Mesh Pack v2" pushed the
+ * card to the title's 260px cap with the picture sitting alone on the left. */
+html[data-dfp] .dfp-asset-preview__asset {
+  inline-size: 150px;
+}
+
+/* Chip and creator on one line. `__meta` is nowrap and unclipped in media.css,
+ * which was fine for "337 playing · 45.2M visits" and is not for "by" plus a
+ * studio name in 150px. As a flex row the creator is the item that shrinks —
+ * it already carries overflow: hidden and an ellipsis — and the chip keeps its
+ * size. */
+html[data-dfp] .dfp-asset-preview__asset .dfp-asset-preview__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-1);
+  min-inline-size: 0;
+}
+
+/* The row already carries the inset; a `__by` inside it must not add a second
+ * one, and needs to be allowed to shrink below its content. */
+html[data-dfp] .dfp-asset-preview__meta .dfp-asset-preview__by {
+  padding-inline: 0;
+  min-inline-size: 0;
+}
+
+html[data-dfp] .dfp-asset-preview__chip {
+  flex: none;
+  padding: 0 var(--dfp-s-2);
+  border-radius: var(--dfp-r-full);
+  background: var(--dfp-surface-3);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* ── Group and user cards ───────────────────────────────────────────────────
+ * Picture beside text rather than above it: a 150px headshot over three lines
+ * of text is a poster, and the picture here is identification, not the point.
+ * 56px is where a headshot is still a face and a group icon still a logo.
+ * 260px wide, the game card's width, so the two cards with text read as one
+ * family. */
+html[data-dfp] .dfp-asset-preview__entity {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-3);
+  inline-size: 260px;
+  padding: var(--dfp-s-1) var(--dfp-s-1) 0;
+}
+
+html[data-dfp] .dfp-asset-preview .dfp-asset-preview__entity img {
+  flex: none;
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: var(--dfp-r-sm);
+}
+
+/* A person is a circle everywhere on Roblox; a group is a rounded square. */
+html[data-dfp] .dfp-asset-preview .dfp-asset-preview__entity--user img {
+  border-radius: 50%;
+}
+
+html[data-dfp] .dfp-asset-preview__text {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+/* The title becomes a row so the verified mark can sit beside the name as a
+ * sibling that never gets clipped: the name loses its tail to the ellipsis,
+ * the mark keeps its place. No top margin — the text column is centred on
+ * the picture, and the game card's gap above its title was for a picture
+ * ABOVE the text. */
+html[data-dfp] .dfp-asset-preview__entity .dfp-asset-preview__title {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-1);
+  margin-block-start: 0;
+}
+
+html[data-dfp] .dfp-asset-preview__name {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-dfp] .dfp-asset-preview__verified {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: 50%;
+  background: var(--dfp-accent-strong);
+  color: var(--dfp-on-accent);
+}
+
+html[data-dfp] .dfp-asset-preview__verified svg {
+  inline-size: 9px;
+  block-size: 9px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── The topic card's category badge ────────────────────────────────────────
+ * First in the badge row (topic-preview.ts `build`). Neutral like the closed
+ * badge; the category's colour is the dot and nothing else, because a hex
+ * value the server chose is outside the build-time contrast checks and would
+ * fail as text on somebody's theme. */
+html[data-dfp] .dfp-topic-card__badge.dfp-topic-card__badge--category {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--dfp-surface-3);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] .dfp-topic-card__dot {
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  /* The neutral token until the server's colour proves to be one — see
+   * site-data.ts `categoryColor`. */
+  background: var(--dfp-text-3);
+  /* A ring the dot keeps whatever it is filled with. The fill is the one
+   * colour on the card nothing measures, and Discourse's defaults include
+   * greys within a few steps of the light themes' surface-3 (#f0f2f8 on the
+   * lightest), while a near-black category vanishes on the dark ones. The
+   * hairline is what keeps an unlucky swatch reading as a swatch rather than
+   * as a missing one. Inset so it adds no size the badge's gap was not
+   * measured for. */
+  box-shadow: inset 0 0 0 1px var(--dfp-border);
+}

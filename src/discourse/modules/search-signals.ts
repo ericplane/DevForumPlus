@@ -1,6 +1,7 @@
 import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { onDomChange } from "../dom-watch";
+import { OLD_AFTER, ageLabel } from "../../core/age";
 
 /**
  * Age marks on full-page search results.
@@ -24,8 +25,11 @@ import { onDomChange } from "../dom-watch";
  */
 
 const MARK = "data-dfp-age";
-const YEAR = 365.25 * 24 * 60 * 60 * 1000;
-const OLD_AFTER = 2 * YEAR;
+
+/* The threshold and the label live in core/age.ts now, shared with the ⌘K
+ * palette's search rows; re-exported so nothing that imported it from here
+ * breaks. */
+export { ageLabel };
 
 /** `"Oct 2017 -"` → a Date; `"Jun 1"` / `"24d"` → null (both current-year). */
 export function dateFromLabel(label: string, now: number): Date | null {
@@ -40,11 +44,6 @@ export function dateFromLabel(label: string, now: number): Date | null {
   const month = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.exec(label);
   const parsed = new Date(`${month ? month[0] : "Jun"} 15, ${year}`);
   return Number.isFinite(parsed.getTime()) ? parsed : null;
-}
-
-export function ageLabel(ms: number): string {
-  const years = Math.floor(ms / YEAR);
-  return years >= 2 ? `${years} yrs old` : "";
 }
 
 function enhance(result: HTMLElement, now: number): void {

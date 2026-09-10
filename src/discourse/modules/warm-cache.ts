@@ -25,10 +25,25 @@ const DB_NAME = "dfp";
 const STORE = "topics";
 const DB_VERSION = 1;
 
-/** Short on purpose. Long enough to make back-navigation and reloads instant,
- *  short enough that a cold open is never meaningfully behind. */
-const TTL_MS = 90_000;
-const MAX_ENTRIES = 20;
+/**
+ * Short on purpose. Long enough to make back-navigation and reloads instant,
+ * short enough that a cold open is never meaningfully behind.
+ *
+ * Exported because prefetch.ts must use the same number. It used to keep its
+ * own 30s limit, so an entry this layer served at 45s was promoted into memory
+ * and then refused at the click, and Discourse's request went to the server
+ * anyway — the full 465ms median TTFB the prefetch exists to remove. For
+ * two-thirds of this window the cache suppressed the prefetch that would have
+ * worked. One number, checked through `isFresh`, on both sides.
+ */
+export const TTL_MS = 90_000;
+/** Also the cap on what prefetch.ts holds in memory — never more than disk. */
+export const MAX_ENTRIES = 20;
+
+/** The one freshness rule, for the disk read and the in-memory serve alike. */
+export function isFresh(at: number): boolean {
+  return Date.now() - at <= TTL_MS;
+}
 
 export interface CachedTopic {
   path: string;
@@ -74,7 +89,7 @@ export async function readTopic(path: string): Promise<CachedTopic | null> {
       req.onsuccess = () => {
         const v = req.result as CachedTopic | undefined;
         if (!v) return resolve(null);
-        resolve(Date.now() - v.at > TTL_MS ? null : v);
+        resolve(isFresh(v.at) ? v : null);
       };
       req.onerror = () => resolve(null);
     } catch {
@@ -134,7 +149,11 @@ export async function clearWarmCache(): Promise<void> {
 /**
  * The module itself only opens the database and prunes expired rows. Reads and
  * writes are driven by the prefetch transport, which is the only thing that
- * knows when a response is worth keeping.
+ * knows when a response is worth keeping — and it writes from both of its
+ * paths, the hover fetch and the XHR Discourse actually loads a topic with.
+ * Writing only from the hover was the reason "recently-read" meant
+ * "recently-hovered": a topic opened from a notification or a search hit was
+ * never here for the way back.
  */
 export function warmCache(): DfpModule {
   return {

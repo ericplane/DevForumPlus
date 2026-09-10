@@ -48,6 +48,34 @@ const cases: [string, string, number][] = [
   // Type position is still a real use.
   ["class in a type annotation", `local bv: BodyVelocity = nil`, 1],
   ["class in a cast", `local bv = x :: BodyVelocity`, 1],
+
+  // ── The docs' own deprecated flag ────────────────────────────────────────
+  // The curated index names nine globals; Creator Docs flag a dozen. The
+  // tokenizer meanwhile dimmed `time` and `tick`, which nothing flags —
+  // `time()` is current API — so Studio's linter and the forum disagreed in
+  // both directions. Both sets now come from the docs.
+  ["time() and tick() are current API", `time()\ntick()`, 0],
+  ["getfenv is docs-deprecated", `getfenv()`, 1],
+  ["setfenv is docs-deprecated", `setfenv(1, {})`, 1],
+  ["elapsedTime is docs-deprecated", `elapsedTime()`, 1],
+  ["collectgarbage is docs-deprecated", `collectgarbage("count")`, 1],
+  ["a docs-flagged global as a value, not a call", `local f = getfenv`, 0],
+  // Library members. `table` is not a class, so the receiver-type walk never
+  // reached these; the curated aliases match by bare name on ANY receiver,
+  // which would have made `queue.getn()` — somebody's own — a finding.
+  ["table.getn via the library", `table.getn(t)`, 1],
+  ["table.foreach via the library", `table.foreach(t, print)`, 1],
+  ["getn on someone's own table", `queue.getn(t)`, 0],
+  ["table shadowed by a local", `local table = require(m)\ntable.getn(t)`, 0],
+  ["table:getn is not the library call", `table:getn(t)`, 0],
+  ["table.insert is not deprecated", `table.insert(t, 1)`, 0],
+  // A name the block declared is the block's own wherever it is used. The old
+  // shadow test looked one token left for `local`, a place a call can never
+  // stand, so `local function version() end` produced two findings — one on
+  // the definition itself. `version` and `stats` are what people name things.
+  ["own local function named like a flagged global", `local function version() end\nversion()`, 0],
+  ["own global function named like a flagged global", `function stats() end\nstats()`, 0],
+  ["an aliased wait is the alias, not the global", `local wait = task.wait\nwait(1)`, 0],
 ];
 
 let pass = 0, fail = 0;
@@ -73,6 +101,22 @@ const hasContinue = kinds.some(t => t.kind === "keyword" && t.value === "continu
 const hasInterp = kinds.some(t => t.kind === "string" && t.value.startsWith("`"));
 console.log(`\n  Luau syntax: :: ${hasCast} | += ${hasCompound} | continue ${hasContinue} | \`interp\` ${hasInterp}`);
 if (!(hasCast && hasCompound && hasContinue && hasInterp)) fail++;
+
+// A docs-derived finding is plainly worded and `info`: the flag says "there is
+// a newer way", and inventing a replacement here would be the lie the curated
+// file exists to prevent. A curated entry keeps winning where one exists.
+const docsWhy = detect("getfenv()")[0]?.entry;
+const libWhy = detect("table.getn(t)")[0]?.entry;
+const curated = detect("wait(1)")[0]?.entry;
+const shapeOk =
+  docsWhy?.severity === "info" &&
+  docsWhy.replacement === null &&
+  docsWhy.why === "getfenv is marked deprecated in Creator Docs." &&
+  libWhy?.why === "table.getn is marked deprecated in Creator Docs." &&
+  curated?.severity === "warn" &&
+  curated.replacement === "task.wait()";
+console.log(`  docs-derived entries: ${shapeOk ? "ok" : "FAIL"}`);
+if (!shapeOk) fail++;
 
 console.log(`\n${fail === 0 ? "ALL PASS" : fail + " FAILING"} (${pass}/${cases.length} cases)`);
 process.exit(fail === 0 ? 0 : 1);

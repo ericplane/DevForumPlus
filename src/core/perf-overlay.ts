@@ -4,9 +4,10 @@ import type { Diagnostics } from "./bridge/protocol";
  * The `?dfp-perf=1` overlay.
  *
  * PLAN.md §4.1 sets budgets and §4.6 promises they are enforced rather than
- * asserted. This is the enforcement: a live readout of the numbers the
- * milestone claims, on the real forum, so nothing in the README has to be
- * taken on trust.
+ * asserted. This is the live half of that: a readout on the real forum of what
+ * the page and each module actually cost, so nothing in the README has to be
+ * taken on trust. The static half — bytes — is scripts/check-bundle.ts, run
+ * after every build.
  *
  * It lives in the isolated world because that is where DFP-rendered UI belongs,
  * and it can afford to: `performance` is per-document, and content scripts
@@ -17,14 +18,6 @@ import type { Diagnostics } from "./bridge/protocol";
  * Everything renders into a shadow root with `all: initial`, so the overlay
  * cannot inherit forum styles and cannot leak into them.
  */
-
-const BUDGETS = {
-  /** PLAN.md §4.1 */
-  cssGzipKB: 40,
-  contentScriptKB: 30,
-  memoryDeltaMB: 25,
-  moduleInstallMs: 4,
-} as const;
 
 interface Vitals {
   ttfb: number | null;
@@ -73,22 +66,6 @@ export function startVitals(): void {
   }
 }
 
-function resourceSummary() {
-  const res = performance.getEntriesByType("resource");
-  let dfpBytes = 0;
-  for (const e of res) {
-    if (e.name.startsWith("chrome-extension://")) dfpBytes += (e as PerformanceResourceTiming).transferSize || 0;
-  }
-  return { count: res.length, dfpKB: Math.round(dfpBytes / 1024) };
-}
-
-function dfpMeasures() {
-  return performance
-    .getEntriesByType("measure")
-    .filter((m) => m.name.startsWith("dfp:"))
-    .map((m) => ({ name: m.name.replace(/^dfp:/, ""), ms: +m.duration.toFixed(2) }));
-}
-
 const row = (label: string, value: string, state?: "ok" | "warn" | "bad") =>
   `<div class="row"><span class="k">${label}</span><span class="v ${state ?? ""}">${value}</span></div>`;
 
@@ -98,20 +75,43 @@ function verdict(actual: number, budget: number): "ok" | "warn" | "bad" {
 }
 
 function render(root: ShadowRoot, diag: Diagnostics | null): void {
-  const r = resourceSummary();
-  const measures = dfpMeasures();
-  const slowest = measures.reduce((a, b) => (b.ms > (a?.ms ?? 0) ? b : a), measures[0]);
+  /* No budget table of its own. Each module declares `budgetMs` and its record
+   * carries it over the bridge, so the rows below grade what the registry
+   * grades. The byte budgets that used to live here (`cssGzipKB`,
+   * `contentScriptKB`) were checked against resource-timing entries for
+   * `chrome-extension://`; content scripts are injected, not fetched, so that
+   * row read "0 KB" — a pass — on every load, and Firefox is `moz-extension://`
+   * besides. They moved to scripts/check-bundle.ts, where the build can fail on
+   * them. §4.1's memory budget is a delta against a page without DFP, which a
+   * script inside the page cannot measure, so the JS heap row is a readout, not
+   * a verdict. */
+  const subresources = performance.getEntriesByType("resource").length;
   const mem = (performance as { memory?: { usedJSHeapSize: number } }).memory;
+
+  /* Graded on `workMs`, the main-thread time charged to the module this route
+   * — the same number the registry strikes on. The overlay used to grade
+   * `installMs` against a 4ms budget, and every install is a ~0ms registration
+   * (registry.ts), so every module was "ok" whatever it cost. "Slowest module"
+   * came from the `dfp:install:*` performance measures for the same reason and
+   * meant as little. */
+  const installed = (diag?.modules ?? []).filter((m) => m.status === "installed");
+  const slowest = installed.reduce<(typeof installed)[number] | undefined>(
+    (a, b) => (b.workMs > (a?.workMs ?? -1) ? b : a),
+    undefined,
+  );
 
   const modules = (diag?.modules ?? [])
     .map((m) => {
       const state =
         m.status === "installed"
-          ? verdict(m.installMs, BUDGETS.moduleInstallMs)
+          ? verdict(m.workMs, m.budgetMs)
           : m.status === "failed" || m.status === "auto-disabled"
             ? "bad"
             : undefined;
-      const value = m.status === "installed" ? `${m.installMs.toFixed(2)} ms` : m.status;
+      const value =
+        m.status === "installed"
+          ? `${m.workMs.toFixed(1)} / ${m.budgetMs} ms${m.strikes > 0 ? ` · ${m.strikes}/3` : ""}`
+          : m.status;
       return row(m.id, value, state);
     })
     .join("");
@@ -129,17 +129,16 @@ function render(root: ShadowRoot, diag: Diagnostics | null): void {
       <div class="h">DFP cost</div>
       ${row("Integration", diag ? diag.rung : "—", diag?.rung === "pre-boot" ? "ok" : diag ? "warn" : undefined)}
       ${row("Boot", diag ? `${diag.bootMs.toFixed(0)} ms` : "—")}
-      ${row("Extension bytes", `${r.dfpKB} KB`, verdict(r.dfpKB, BUDGETS.cssGzipKB + BUDGETS.contentScriptKB))}
-      ${row("Slowest module", slowest ? `${slowest.name} ${slowest.ms} ms` : "—")}
+      ${row("Slowest module", slowest ? `${slowest.id} ${slowest.workMs.toFixed(1)} ms` : "—")}
       ${modules}
     </div>
     <div class="grp">
       <div class="h">Page</div>
-      ${row("Subresources", String(r.count))}
+      ${row("Subresources", String(subresources))}
       ${row("DOM nodes", String(document.getElementsByTagName("*").length))}
       ${row("JS heap", mem ? `${(mem.usedJSHeapSize / 1048576).toFixed(0)} MB` : "n/a")}
     </div>
-    <div class="note">Budgets from PLAN.md §4.1. Reload to re-measure load metrics.</div>
+    <div class="note">Module rows: work last route / budget; a strike re-pushes mid-route. Reload to re-measure load metrics.</div>
   `;
 }
 

@@ -19,6 +19,8 @@
  * a grammar. Doing both from one pass is smaller *and* more accurate here.
  */
 
+import { DOC_DEPRECATED_GLOBALS } from "./docs-names.generated";
+
 export type TokenKind =
   | "keyword"
   | "builtin"
@@ -85,19 +87,23 @@ const BUILTINS = new Set([
  *
  * These used to sit in BUILTINS, so `wait` and `task` rendered in the same
  * accent blue: the colour said "blessed stdlib" while a wavy underline said the
- * opposite, and `tick`/`time`/`elapsedTime` got the blue with no underline at
- * all. Dropping them from BUILTINS is not enough on its own — they fall to
- * `ident` and paint as plain text, which is exactly what `loadstring` and
- * `ypcall` already did wrong. They need a colour of their own, dimmed, and
- * nothing downstream ever promotes it.
+ * opposite. Dropping them from BUILTINS is not enough on its own — they fall to
+ * `ident` and paint as plain text, which is exactly what `ypcall` already did
+ * wrong. They need a colour of their own, dimmed, and nothing downstream ever
+ * promotes it.
+ *
+ * The set is the docs' own deprecated flag, not a list kept here. The hand
+ * list that preceded it dimmed `time` and `tick`, and neither is deprecated —
+ * `time()` is current API — while `elapsedTime`, `getfenv`, `setfenv` and
+ * `collectgarbage`, which Creator Docs DO flag, were never dimmed. So the
+ * colour said "legacy" on a correct call and "fine" on a flagged one, and the
+ * hover card, reading the shard, disagreed with both. One source, generated
+ * from the same YAML the card reads: scripts/build-docs-index.ts.
  *
  * Only as a *bare* word. `task.wait` is the replacement for `wait`, not a use
  * of it, so member position (below) never reaches this set.
  */
-const LEGACY_GLOBALS = new Set([
-  "wait", "spawn", "delay", "tick", "time", "elapsedTime",
-  "ypcall", "loadstring", "printidentity",
-]);
+const LEGACY_GLOBALS: ReadonlySet<string> = DOC_DEPRECATED_GLOBALS;
 
 const isDigit = (c: string) => c >= "0" && c <= "9";
 const isHex = (c: string) => isDigit(c) || (c >= "a" && c <= "f") || (c >= "A" && c <= "F");

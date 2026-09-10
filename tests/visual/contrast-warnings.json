@@ -1,0 +1,21 @@
+[
+  "aside.dfp-dupes > a.dfp-dupes__row > span.dfp-dupes__meta > span.dfp-dupes__solved|#008347|#e2edf6",
+  "aside.dfp-dupes > a.dfp-dupes__row > span.dfp-dupes__meta > span|#696c71|#e2edf6",
+  "div.dfp-topic-preview > div.dfp-topic-card > div.dfp-topic-card__badges > span.dfp-topic-card__badge.dfp-topic-card__badge--solved|#008347|#cee5e0",
+  "div.fps-topic > div.topic > a.search-link > span.topic-title|#0074ad|#ebeef3",
+  "div.harness-row > div.open.composer-action-createTopic.show-preview > aside.dfp-draft > button.dfp-draft__discard|#696c71|#eae9e4",
+  "div.harness-row > div.open.composer-action-createTopic.show-preview > aside.dfp-draft > button.dfp-draft__restore|#926200|#eae9e4",
+  "div.open.composer-action-createTopic.show-preview > aside.dfp-dupes > div.dfp-dupes__head > button.dfp-dupes__dismiss|#696c71|#e2edf6",
+  "div.open.composer-action-createTopic.show-preview > aside.dfp-dupes > div.dfp-dupes__head > span.dfp-dupes__label|#0074ad|#e2edf6",
+  "div.post-infos > div.post-info.edits > button.widget-button.btn-flat.btn-icon-text > span.d-button-label|#696c71|#ece6f9",
+  "div.topic-body.clearfix > div.topic-meta-data > div.names.trigger-user-card > span.user-title.user-title--developer-relations|#696c71|#ece6f9",
+  "div.topic-body.clearfix > div.topic-meta-data > div.names.trigger-user-card > span.user-title|#696c71|#e0ede4",
+  "div.topic-body.clearfix > section.post-menu-area.clearfix > nav.post-controls > button.btn.btn-flat.reply|#696c71|#e0ede4",
+  "div.topic-meta-data > div.post-infos > a.reply-to-tab > span|#696c71|#ece6f9",
+  "div.topic-meta-data > div.post-infos > div.post-info.post-date > a.widget-link.post-date::before|#696c71|#e0ede4",
+  "div.topic-meta-data > div.post-infos > div.post-info.post-date > a.widget-link.post-date::before|#696c71|#ece6f9",
+  "nav.post-controls.glimmer-post-menu.collapsed > div.actions > div.double-button > button.btn.no-text.post-action-menu__like-count.like-count.button-count.highlight-action.regular-likes.btn-flat|#696c71|#ece6f9",
+  "section.harness-block > div.topic-navigation.with-topic-progress > div.dfp-topic-toggles > button.dfp-thread-toggle.btn.btn-default|#0074ad|#dcf0ff",
+  "section.harness-block > div.topic-timeline > div.timeline-footer-controls > button.dfp-op-toggle.btn.btn-default|#0074ad|#dcf0ff",
+  "section.post-menu-area.clearfix > nav.post-controls.glimmer-post-menu.collapsed > button.btn.btn-text.show-replies > span.d-button-label|#696c71|#ece6f9"
+]

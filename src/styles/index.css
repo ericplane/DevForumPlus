@@ -20,6 +20,9 @@
 @import "./components/chrome.css";
 @import "./components/controls.css";
 @import "./components/code.css";
+/* Directly after code.css: the finding chips compose with .dfp-code-note and
+ * the flash with .dfp-dep, and must win on order where specificity ties. */
+@import "./components/code-marks.css";
 @import "./components/media.css";
 @import "./components/profile.css";
 /* After profile.css, which scopes its own `.directory-table` width rule to
@@ -33,6 +36,17 @@
 @import "./components/interactive.css";
 @import "./components/reading.css";
 @import "./components/quiet.css";
+/* After media.css and interactive.css, whose two hover-card hosts it extends
+ * and gives the only z-index either has. */
+@import "./components/entity-cards.css";
+/* After interactive.css: restates `.timeline-scrollarea { position: relative }`
+ * and positions the scroller so the handle paints over a tick beneath it. */
+@import "./components/timeline-marks.css";
+/* Last of the components. Several of its rules match code.css, reading.css,
+ * quiet.css and interactive.css selectors at equal specificity on purpose and
+ * win on order only (inline-code wrap under 720px, `.cooked pre` padding on
+ * touch, the toggle cluster's `.btn` rule via `:where()`). */
+@import "./components/touch.css";
 @import "./polish.css";
 
 /* Render-cost rules, after the components they apply to. */

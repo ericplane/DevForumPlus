@@ -1,6 +1,7 @@
 import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { decorateCooked } from "../decorate";
+import { GLOBAL_TYPES } from "../../luau/detect";
 import {
   DOC_BARE_GLOBALS,
   DOC_CLASSES,
@@ -10,28 +11,33 @@ import {
 } from "../../luau/docs-names.generated";
 
 /**
- * Creator Docs links in prose, given the card that code already gets.
+ * Creator Docs cards in prose, given the card that code already gets.
  *
  * `create.roblox.com/docs/reference/engine/classes/Humanoid#Health` is the most
  * common link on this forum after a topic link, and today it is a bare blue URL:
  * you cannot tell a class from a datatype from an enum, or a property from a
- * method, without opening it.
+ * method, without opening it. And the name written inline — `DataStoreService`,
+ * `Humanoid:TakeDamage()`, `task.wait()` in a sentence — is how most replies
+ * actually refer to an API, more often than by URL and more often than in a
+ * fenced block.
  *
- * ── Why this module is thirty lines ─────────────────────────────────────────
+ * ── Why this module is short ────────────────────────────────────────────────
  * The card already exists. code-intel marks API names inside code blocks with
  * `data-dfp-api="Owner"` or `"Owner.Member"`, and docs-card.ts in the isolated
  * world renders the hover from packaged docs shards. So this does not build a
- * fourth hover card — it translates a URL back into the same vocabulary and
- * lets the existing one answer.
+ * fourth hover card — it translates a URL, or an inline `<code>`, back into the
+ * same vocabulary and lets the existing one answer.
  *
  * That is also why it costs no request: the whole docs index is already in the
  * bundle. `docsUrl()` in code-intel.ts builds these URLs from an api string;
- * this is that function run backwards, and the two must keep agreeing.
+ * `apiFromUrl` is that function run backwards, and the two must keep agreeing.
  *
  * One interaction worth knowing: docs-card's confirm pass only touches
  * `a[data-dfp-api]:not([href])` — the inert member-level anchors code-intel
- * ships. Every anchor here already has the author's href, so it is never
- * rewritten, only read.
+ * ships. Every anchor here already has the author's href, and an inline
+ * `<code>` is not an anchor, so neither is ever rewritten, only read; a member
+ * the shard does not carry falls back to the owner's card in docs-card's own
+ * `resolve()`.
  *
  * ── Why unknown names are left alone ────────────────────────────────────────
  * Every name is checked against the packaged sets before the attribute goes on.
@@ -39,6 +45,14 @@ import {
  * guide rather than a reference page, a typo — and the honest answer there is an
  * ordinary link. Marking it would promise a card that then renders empty, which
  * is the one failure mode this codebase refuses everywhere else.
+ *
+ * ── Why inline code gets a card and nothing else ────────────────────────────
+ * No deprecation mark, no stale banner, no rewritten text. In prose a
+ * backticked `wait()` is usually a *mention* — "don't use `wait()`" — which is
+ * the crying-wolf case detect.ts exists to avoid, and a banner on a reply that
+ * is correcting the old API would be the extension arguing with the one person
+ * who is right. The card is different: it describes the API, and a description
+ * of `wait` is correct whether the sentence recommends it or warns against it.
  * ───────────────────────────────────────────────────────────────────────────
  */
 
@@ -110,6 +124,71 @@ function apiFromUrl(pathname: string, hash: string): string | null {
   return member ? `${name}.${member}` : name;
 }
 
+/**
+ * The one shape an inline `<code>` may take to earn a card:
+ *
+ *     Name            Owner.Member        Owner:Member()      Enum.KeyCode.Space
+ *     name()          Owner.Member()      Owner:Member
+ *
+ * One or two names, one separator, an optional empty call. Anything with
+ * arguments, whitespace, an assignment or a third hop is a *statement*, and a
+ * statement is not a reference — `game:GetService("Players")` names Players
+ * only to someone who reads Luau, and the card would open on GetService.
+ * `Enum.X.Y` is the single three-part form, handled below.
+ */
+const INLINE_REF = /^([A-Za-z_]\w*)(?:([.:])([A-Za-z_]\w*)(?:\.([A-Za-z_]\w*))?)?(\(\))?$/;
+
+/**
+ * Four or more digits is an asset id, or something shaped like one, and
+ * asset-preview.ts walks the same inline code. `Vector3` and `UDim2` carry a
+ * digit each and pass; `rbxassetid://1234567` and `Part1234` do not.
+ */
+const ID_LIKE = /\d{4}/;
+
+/**
+ * Inline `<code>` text → the api string docs-card speaks, or null.
+ *
+ * Exact membership only, never a heuristic: a name is a class because
+ * DOC_CLASSES says so, not because it is capitalised. Bare globals need the
+ * call parens — `print()` is unmistakable, a backticked `error` or `type` on
+ * its own is more often the English word. `game`, `workspace` and `script`
+ * resolve through GLOBAL_TYPES to the class they are, exactly as code-intel's
+ * `apiRefAt` does, so `game.Players` lands on the Players page and
+ * `script.Parent` on `Script.Parent`.
+ */
+export function apiFromInlineCode(text: string): string | null {
+  const t = text.trim();
+  if (t.length === 0 || t.length > 80 || ID_LIKE.test(t)) return null;
+  const m = INLINE_REF.exec(t);
+  if (!m) return null;
+  const head = m[1]!;
+  const sep = m[2];
+  const member = m[3];
+  const sub = m[4];
+  const call = m[5];
+
+  const isOwner = (n: string) =>
+    DOC_CLASSES.has(n) || DOC_DATATYPES.has(n) || DOC_NAMESPACES.has(n) || DOC_ENUMS.has(n);
+
+  if (!member) {
+    if (call) return DOC_BARE_GLOBALS.has(head) ? `globals.${head}` : null;
+    return isOwner(head) ? head : null;
+  }
+
+  /* `Enum.KeyCode` and `Enum.KeyCode.Space`: the enum is the page, the item is
+   * not marked — the same rule `apiFromUrl` applies to `enums/KeyCode#Space`,
+   * for the same reason. Any other third hop is a chain, not a reference. */
+  if (head === "Enum") return sep === "." && DOC_ENUMS.has(member) ? member : null;
+  if (sub) return null;
+
+  const owner = isOwner(head) ? head : GLOBAL_TYPES[head];
+  if (!owner || !isOwner(owner)) return null;
+  // `game.Players`: services are not DataModel members, but the name IS the
+  // service class, and that is the page a reader wants.
+  if (owner === "DataModel" && DOC_CLASSES.has(member)) return member;
+  return `${owner}.${member}`;
+}
+
 function mark(root: HTMLElement): number {
   let found = 0;
   for (const a of root.querySelectorAll<HTMLAnchorElement>("a[href]")) {
@@ -133,6 +212,19 @@ function mark(root: HTMLElement): number {
       a.setAttribute(PAGE, a.pathname);
       found++;
     }
+  }
+
+  /* Inline code. The attribute goes on the `<code>` itself, which is the
+   * element under the pointer; docs-card's delegated `closest()` finds it
+   * there. Inside an anchor the author already chose a destination, and inside
+   * a `<pre>` code-intel has already answered. */
+  for (const code of root.querySelectorAll<HTMLElement>("code")) {
+    if (code.hasAttribute(API)) continue;
+    if (code.closest("pre, a, aside.onebox")) continue;
+    const api = apiFromInlineCode(code.textContent ?? "");
+    if (!api) continue;
+    code.setAttribute(API, api);
+    found++;
   }
   return found;
 }

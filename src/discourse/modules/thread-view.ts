@@ -2,6 +2,7 @@ import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { getCurrentTopic, topicIdFromPath, type TopicPayload } from "../topic-data";
 import { onDomChange } from "../dom-watch";
+import { mountTopicToggle } from "../topic-toggles";
 
 /**
  * Thread view (PLAN.md §7.3 #13).
@@ -244,36 +245,19 @@ function syncButton(): void {
 }
 
 /**
- * The toggle lives in the timeline rail, not the topic footer.
+ * Where the toggle goes is topic-toggles.ts's decision, shared with op-pin and
+ * quiet-replies: the timeline rail while there is one, a DFP cluster beside
+ * the progress pill when the rail has collapsed, the footer last. The reason
+ * the footer is last — it does not exist until the end of the stream,
+ * verified at reply #122 of 9,163 — is written up there once rather than
+ * three times.
  *
- * It used to mount into `.topic-footer-main-buttons`, and that element does not
- * exist until you reach the end of the stream — verified on the live forum at
- * reply #122 of 9,163, where the query returned null. Discourse renders the
- * footer only once the last post is reached, so the control was unreachable on
- * exactly the long, tangled threads this feature exists for; the only way to
- * turn thread view on was to scroll to the bottom of the argument first.
- *
- * `.timeline-footer-controls` is the last child of the timeline rail, which is
- * present the whole way down at desktop widths. The footer stays as the
- * fallback for narrow viewports, where the rail itself collapses.
+ * `syncButton` runs on every pass, not only on creation, because the helper
+ * may have re-homed an existing button; its writes are compare-free attribute
+ * sets, which the childList observer behind `onDomChange` does not see.
  */
 function mountToggle(): void {
-  if (document.querySelector(".dfp-thread-toggle")) return;
-  const anchor =
-    document.querySelector(".timeline-footer-controls") ??
-    document.querySelector(".topic-footer-main-buttons") ??
-    document.querySelector("#topic-footer-buttons");
-  if (!anchor) return;
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "btn btn-default dfp-thread-toggle";
-  btn.textContent = "Thread view";
-  btn.addEventListener("click", () => setEnabled(!enabled));
-  /* Appended, so DFP's controls collect below Discourse's own rather than
-   * pushing them down the rail. `op-pin` mounts the same way, which keeps the
-   * two toggles adjacent instead of one above and one below the native pair. */
-  anchor.appendChild(btn);
+  mountTopicToggle("dfp-thread-toggle", "Thread view", () => setEnabled(!enabled));
   syncButton();
 }
 

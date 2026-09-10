@@ -1,0 +1,120 @@
+/* Deprecation marks, reachable.
+ *
+ * code.css draws the wavy underline and the findings note that caps a block.
+ * This file is what makes either of them something a reader can GET TO: the
+ * chips in the note that carry the marks' data for keyboard and touch, the
+ * flash that answers a chip by showing where its mark is, the "below the fold"
+ * count on a clipped block, and the dotted hint on an inline `<code>` in
+ * prose that now opens the same card a code block's names do.
+ *
+ * Imported after code.css: the chip rules compose with `.dfp-code-note` and
+ * the flash composes with `.dfp-dep`, and both have to win on order where the
+ * specificity ties.
+ */
+
+/* ── Findings chips ──────────────────────────────────────────────────────
+ * One `<button>` per distinct issue, inside the note. The note used to be
+ * inert text ending "hover for details", which on a phone means nothing and
+ * for a screen reader is a sentence about an affordance it cannot reach: a
+ * `title` on a non-interactive span is not announced. The chip is the DFP-owned
+ * element that CAN take focus, so the marks — spans in other people's <pre>s —
+ * stay as they are.
+ *
+ * Colour is the note's own --dfp-deprecated on --dfp-surface-2, which
+ * build-tokens.ts asserts at >= 4.5:1 as body text in every theme; the border
+ * is the same 40% tint docs-card.ts uses for its `.flag.dep` chip, so the two
+ * read as one family. The hover wash is the mark's own 14% (code.css), for the
+ * same reason. */
+
+html[data-dfp] .dfp-code-note {
+  /* The note is a flex row (code.css) and now holds several chips plus a
+   * trailing count; without wrapping, a block with three long labels pushed
+   * the last chip past the block's right edge. */
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+html[data-dfp] .dfp-code-finding {
+  appearance: none;
+  margin: 0;
+  padding: 0 7px;
+  border: 1px solid color-mix(in oklab, var(--dfp-deprecated) 40%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.6;
+  cursor: pointer;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .dfp-code-finding:hover {
+  background: color-mix(in oklab, var(--dfp-deprecated) 14%, transparent);
+  border-color: color-mix(in oklab, var(--dfp-deprecated) 65%, transparent);
+}
+
+/* Focus is the whole point of the chip existing, so it is not left to the
+ * browser default, which Discourse's reset dims on `.btn`-less buttons. */
+html[data-dfp] .dfp-code-finding:focus-visible {
+  outline: 2px solid var(--dfp-accent);
+  outline-offset: 2px;
+}
+
+/* "N below the fold" — measured on hover, so it may appear after the note
+ * has already painted; sitting at the row's end keeps the chips still. */
+html[data-dfp] .dfp-code-note__fold {
+  margin-inline-start: auto;
+  color: var(--dfp-text-3);
+  font-weight: var(--dfp-fw-normal);
+}
+
+/* ── Flash ───────────────────────────────────────────────────────────────
+ * The mark a chip just scrolled to. A wash, held and then released — not a
+ * pulse — so the eye is led to the underline rather than to the animation.
+ * The class is removed by code-intel.ts after 1.4s regardless, which is what
+ * makes the reduced-motion version below work with no animation at all: the
+ * wash simply appears and, on removal, goes. */
+html[data-dfp] .dfp-dep--flash {
+  background: color-mix(in oklab, var(--dfp-deprecated) 28%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-dfp] .dfp-dep--flash {
+    animation: dfp-dep-flash 1.4s var(--dfp-ease) both;
+  }
+
+  @keyframes dfp-dep-flash {
+    0% {
+      background-color: color-mix(in oklab, var(--dfp-deprecated) 42%, transparent);
+    }
+
+    60% {
+      background-color: color-mix(in oklab, var(--dfp-deprecated) 28%, transparent);
+    }
+
+    100% {
+      background-color: transparent;
+    }
+  }
+}
+
+/* ── Inline code with a card ─────────────────────────────────────────────
+ * `<code data-dfp-api>` in prose, set by docs-links.ts when the text is
+ * exactly a documented name. The same dotted underline `.dfp-doc-link` uses
+ * inside a block, so the affordance is one shape wherever it appears — and
+ * dotted rather than solid for the same reason it is there: a prose reply
+ * names four or five classes a paragraph, and a solid underline on each would
+ * read as a paragraph of links. `cursor: help` says "hover" without promising
+ * a navigation the element does not perform. */
+html[data-dfp] .cooked code[data-dfp-api]:not(pre code) {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in oklab, var(--dfp-text-3) 55%, transparent);
+  text-underline-offset: 2px;
+}
+
+html[data-dfp] .cooked code[data-dfp-api]:not(pre code):hover {
+  text-decoration-color: var(--dfp-accent);
+}

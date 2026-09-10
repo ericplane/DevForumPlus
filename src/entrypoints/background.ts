@@ -122,9 +122,9 @@ export default defineBackground(() => {
    * property is undefined, and calling it would throw synchronously — which a
    * trailing `.catch()` cannot see, so this would have taken the whole
    * background script down at startup rather than degrading. Firefox has no
-   * equivalent because its content scripts cannot read `storage.session` at
-   * all; diagnostics simply report unavailable there, which they already
-   * handle. */
+   * equivalent; there the isolated bridge hands diagnostics to the popup first
+   * and falls back to `storage.local` when `storage.session` refuses — see
+   * bridge/isolated.ts. */
 
   /* Docs page metadata for the isolated world's hover card. Returns `true` to
    * keep the message channel open for the async reply — omitting that is the

@@ -10,22 +10,36 @@
  * that needs: elements that answer `className` and `textContent`, a `document`
  * that makes nodes, and a serialiser.
  *
- * ~150 lines against jsdom's ~3 MB, and a dependency-free `npm test` is worth
+ * ~200 lines against jsdom's ~3 MB, and a dependency-free `npm test` is worth
  * keeping. It also has to serialise for `tests/visual/fixture.html`, which jsdom
  * would have needed anyway.
  *
  * This is not a general-purpose DOM. It implements exactly the calls
  * code-intel.ts makes; anything new it starts calling is `undefined` here and
  * throws, which is the intended failure — see the note on `renderCodeBlock`
- * about where those throws surface.
+ * about where those throws surface. The findings note grew listeners, a roving
+ * `tabIndex` and layout reads (`offsetTop`, `clientHeight`), so the stub grew
+ * the same: listeners are recorded and fired by hand, and the layout numbers
+ * are plain fields a test sets before it asks.
+ *
+ * `children` is elements only and `childNodes` is everything, as in the DOM.
+ * They were one array for a long time, and the preview guard's loop over
+ * `children` — whose whole point is that a text-only render has none — would
+ * have met a text node here and thrown on `.className`, testing the stub
+ * rather than the guard. The MutationObserver is likewise a recorder, not a
+ * no-op: what the preview path does with its observer (`takeRecords` after a
+ * pass, `disconnect` on detach) is the fix for a timer loop, and a stub that
+ * swallowed those calls could not say whether they were made.
  */
 
 import type { PluginApi } from "../../src/discourse/types";
 import { codeIntel } from "../../src/discourse/modules/code-intel";
 
 type Node = DElement | DText;
+type Listener = (event: Record<string, unknown>) => void;
 
-class DText {
+export class DText {
+  parentElement: DElement | null = null;
   constructor(public data: string) {}
   get textContent(): string {
     return this.data;
@@ -33,19 +47,36 @@ class DText {
 }
 
 class DFragment {
-  readonly children: Node[] = [];
+  readonly childNodes: Node[] = [];
   appendChild(n: Node): Node {
-    this.children.push(n);
+    this.childNodes.push(n);
     return n;
   }
 }
 
-class DElement {
+/** The element `focus()` was last called on; `null` until then. */
+let focused: DElement | null = null;
+export function activeElement(): DElement | null {
+  return focused;
+}
+
+export class DElement {
   readonly tagName: string;
   readonly attrs = new Map<string, string>();
   readonly dataset: Record<string, string> = {};
-  children: Node[] = [];
+  readonly listeners = new Map<string, Listener[]>();
+  childNodes: Node[] = [];
   parentElement: DElement | null = null;
+  /* Layout, for `syncFold`. A real browser answers from geometry; here a test
+   * writes the numbers it wants to reason about. Zero is what a decorator
+   * pass would read in a browser too. */
+  offsetTop = 0;
+  offsetHeight = 0;
+  clientHeight = 0;
+  /** Set by `scrollIntoView`, so a test can see a chip reached its mark. */
+  scrolled = false;
+  /** Writable, so a test can close the composer under a pending preview timer. */
+  isConnected = true;
 
   constructor(tag: string) {
     this.tagName = tag.toUpperCase();
@@ -58,26 +89,38 @@ class DElement {
     this.attrs.set("class", v);
   }
 
-  /* Only `add` and `contains`: the module adds `dfp-luau` and the tests ask
-   * whether it did, which is the whole of the gate's observable behaviour. */
   readonly classList = {
     add: (...names: string[]): void => {
       const have = this.className.split(/\s+/).filter(Boolean);
       for (const n of names) if (!have.includes(n)) have.push(n);
       this.className = have.join(" ");
     },
+    remove: (...names: string[]): void => {
+      this.className = this.className
+        .split(/\s+/)
+        .filter((c) => c && !names.includes(c))
+        .join(" ");
+    },
+    toggle: (name: string): boolean => {
+      if (this.classList.contains(name)) {
+        this.classList.remove(name);
+        return false;
+      }
+      this.classList.add(name);
+      return true;
+    },
     contains: (n: string): boolean => this.className.split(/\s+/).includes(n),
   };
 
   get textContent(): string {
-    return this.children.map((c) => c.textContent).join("");
+    return this.childNodes.map((c) => c.textContent).join("");
   }
   set textContent(v: string) {
-    this.children = v === "" ? [] : [new DText(v)];
+    this.childNodes = v === "" ? [] : [new DText(v)];
   }
 
-  // `href`/`target`/`rel`/`title` are set as properties by renderBlock but have
-  // to serialise as attributes, so they are the same storage.
+  // `href`/`target`/`rel`/`title`/`type`/`tabIndex` are set as properties but
+  // have to serialise as attributes, so they are the same storage.
   get href(): string { return this.attrs.get("href") ?? ""; }
   set href(v: string) { this.attrs.set("href", v); }
   get target(): string { return this.attrs.get("target") ?? ""; }
@@ -86,45 +129,70 @@ class DElement {
   set rel(v: string) { this.attrs.set("rel", v); }
   get title(): string { return this.attrs.get("title") ?? ""; }
   set title(v: string) { this.attrs.set("title", v); }
+  get type(): string { return this.attrs.get("type") ?? ""; }
+  set type(v: string) { this.attrs.set("type", v); }
+  get tabIndex(): number { return Number(this.attrs.get("tabindex") ?? -1); }
+  set tabIndex(v: number) { this.attrs.set("tabindex", String(v)); }
 
   setAttribute(k: string, v: string): void { this.attrs.set(k, v); }
   getAttribute(k: string): string | null { return this.attrs.get(k) ?? null; }
   hasAttribute(k: string): boolean { return this.attrs.has(k); }
 
+  /** Element children only — what `for (const c of el.children)` walks in a browser. */
+  get children(): DElement[] {
+    return this.childNodes.filter((c): c is DElement => c instanceof DElement);
+  }
+
+  get firstElementChild(): DElement | null {
+    return this.children[0] ?? null;
+  }
+
+  get nextElementSibling(): DElement | null {
+    const siblings = this.parentElement?.children ?? [];
+    const at = siblings.indexOf(this);
+    return at >= 0 ? (siblings[at + 1] ?? null) : null;
+  }
+
   appendChild(n: Node): Node {
-    this.children.push(n);
-    if (n instanceof DElement) n.parentElement = this;
+    this.childNodes.push(n);
+    n.parentElement = this;
     return n;
   }
 
   replaceChildren(...nodes: (Node | DFragment)[]): void {
-    this.children = [];
+    this.childNodes = [];
     for (const n of nodes) {
-      if (n instanceof DFragment) for (const c of n.children) this.appendChild(c);
+      if (n instanceof DFragment) for (const c of n.childNodes) this.appendChild(c);
       else this.appendChild(n);
     }
   }
 
   insertBefore(node: Node, ref: Node | null): Node {
-    const at = ref ? this.children.indexOf(ref) : -1;
+    const at = ref ? this.childNodes.indexOf(ref) : -1;
     if (at < 0) {
       this.appendChild(node);
     } else {
-      this.children.splice(at, 0, node);
-      if (node instanceof DElement) node.parentElement = this;
+      this.childNodes.splice(at, 0, node);
+      node.parentElement = this;
     }
     return node;
   }
 
+  remove(): void {
+    const p = this.parentElement;
+    if (!p) return;
+    p.childNodes = p.childNodes.filter((c) => c !== this);
+    this.parentElement = null;
+  }
+
   /** Tag and `.class` selectors with the `>` combinator — `pre > code` is the
-   *  only one code-intel.ts uses, and matching it honestly is three lines. */
+   *  only compound one code-intel.ts uses, and matching it honestly is three lines. */
   querySelectorAll(selector: string): DElement[] {
     const steps = selector.split(">").map((s) => s.trim());
     const last = steps[steps.length - 1]!;
     const out: DElement[] = [];
     const walk = (el: DElement): void => {
       for (const c of el.children) {
-        if (!(c instanceof DElement)) continue;
         if (matches(c, last)) {
           let cur: DElement | null = c;
           let ok = true;
@@ -140,12 +208,54 @@ class DElement {
     walk(this);
     return out;
   }
+
+  querySelector(selector: string): DElement | null {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+
+  /** Simple selectors and comma lists, walking up from this element inclusive. */
+  closest(selector: string): DElement | null {
+    const options = selector.split(",").map((s) => s.trim());
+    for (let cur: DElement | null = this; cur; cur = cur.parentElement) {
+      if (options.some((o) => matches(cur!, o))) return cur;
+    }
+    return null;
+  }
+
+  addEventListener(type: string, fn: Listener): void {
+    const list = this.listeners.get(type) ?? [];
+    list.push(fn);
+    this.listeners.set(type, list);
+  }
+
+  /** Deliver an event here and up the ancestor chain, `target` fixed on this
+   *  element — the note delegates its keydown to itself and reads `e.target`
+   *  to find the chip, so a stub that did not bubble would test nothing. */
+  fire(type: string, event: Record<string, unknown> = {}): void {
+    const ev = { type, target: this, preventDefault: () => undefined, ...event };
+    for (let cur: DElement | null = this; cur; cur = cur.parentElement) {
+      for (const fn of cur.listeners.get(type) ?? []) fn(ev);
+    }
+  }
+
+  click(): void {
+    this.fire("click");
+  }
+
+  focus(): void {
+    focused = this;
+  }
+
+  scrollIntoView(): void {
+    this.scrolled = true;
+  }
 }
 
+/** `tag`, `.class`, or `tag.class`. */
 function matches(el: DElement, step: string): boolean {
-  return step.startsWith(".")
-    ? el.classList.contains(step.slice(1))
-    : el.tagName === step.toUpperCase();
+  const [tag, ...classes] = step.split(".");
+  if (tag && el.tagName !== tag.toUpperCase()) return false;
+  return classes.every((c) => el.classList.contains(c));
 }
 
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
@@ -160,7 +270,7 @@ export function serialize(node: Node): string {
   for (const [k, v] of node.attrs) attrs.push(` ${k}="${escapeAttr(v)}"`);
   for (const [k, v] of Object.entries(node.dataset)) attrs.push(` data-${kebab(k)}="${escapeAttr(v)}"`);
   const tag = node.tagName.toLowerCase();
-  return `<${tag}${attrs.join("")}>${node.children.map(serialize).join("")}</${tag}>`;
+  return `<${tag}${attrs.join("")}>${node.childNodes.map(serialize).join("")}</${tag}>`;
 }
 
 function installDom(): void {
@@ -175,20 +285,71 @@ function installDom(): void {
     querySelectorAll: () => [] as DElement[],
   };
   g["requestAnimationFrame"] = () => 0;
+  /* The preview path watches its element for hljs's late rewrite, drains the
+   * observer after its own render and disconnects it once the preview is
+   * gone. Nothing mutates asynchronously here — the tests re-run the pass by
+   * hand where a mutation would have — so the observer only records what was
+   * asked of it, for the tests that check it was. */
+  g["MutationObserver"] = StubObserver;
 }
 
-let decorator: ((el: DElement) => void) | null = null;
+/** What the preview path did with its MutationObserver, per target. */
+export class StubObserver {
+  static readonly all: StubObserver[] = [];
+  target: unknown = null;
+  disconnected = false;
+  /** `takeRecords()` calls — one per pass, if the pass drains its own mutation. */
+  drained = 0;
 
-/** `codeIntel().install()` once, keeping the decorator it registers. */
-function getDecorator(): (el: DElement) => void {
-  if (decorator) return decorator;
+  constructor(readonly callback: () => void) {
+    StubObserver.all.push(this);
+  }
+  observe(target: unknown): void {
+    this.target = target;
+  }
+  disconnect(): void {
+    this.disconnected = true;
+  }
+  takeRecords(): unknown[] {
+    this.drained++;
+    return [];
+  }
+}
+
+/** The observer the preview path installed on `target`, if it installed one. */
+export function observerFor(target: DElement): StubObserver | undefined {
+  return StubObserver.all.find((o) => o.target === target);
+}
+
+const decorators = new Map<string, (el: DElement) => void>();
+
+/** `codeIntel().install()` once, keeping every decorator it registers by id. */
+function installOnce(): void {
+  if (decorators.size) return;
   installDom();
   const api = {
-    decorateCookedElement: (fn: (el: DElement) => void) => { decorator = fn; },
+    decorateCookedElement: (fn: (el: DElement) => void, opts?: { id?: string }) => {
+      decorators.set(opts?.id ?? "", fn);
+    },
   } as unknown as PluginApi;
   codeIntel(api).install();
-  if (!decorator) throw new Error("code-intel registered no decorator");
-  return decorator;
+  if (!decorators.size) throw new Error("code-intel registered no decorator");
+}
+
+/** The stream decorator — what runs over every `.cooked` post. */
+function getDecorator(): (el: DElement) => void {
+  installOnce();
+  const fn = decorators.get("dfp-code-intel");
+  if (!fn) throw new Error("code-intel registered no stream decorator");
+  return fn;
+}
+
+/** The composer-preview decorator, registered without `onlyStream`. */
+export function getPreviewDecorator(): (el: DElement) => void {
+  installOnce();
+  const fn = decorators.get("dfp-code-intel-preview");
+  if (!fn) throw new Error("code-intel registered no preview decorator");
+  return fn;
 }
 
 export interface Rendered {
@@ -196,8 +357,14 @@ export interface Rendered {
   luau: boolean;
   /** The `<code>` element's inner markup, exactly as the extension builds it. */
   html: string;
-  /** The `.dfp-code-note` summary line, or `null` when nothing was found. */
+  /** The `.dfp-code-note` summary line's text, or `null` when nothing was found. */
   note: string | null;
+  /** The note element serialised, or `null`. */
+  noteHtml: string | null;
+  /** The live nodes, for tests that fire events at the note. */
+  bar: DElement | null;
+  pre: DElement;
+  code: DElement;
 }
 
 /**
@@ -224,12 +391,16 @@ export function renderCodeBlock(source: string, className = ""): Rendered {
 
   decorate(cooked);
 
-  const note = cooked.children.find(
+  const bar = cooked.children.find(
     (c): c is DElement => c instanceof DElement && c.classList.contains("dfp-code-note"),
-  );
+  ) ?? null;
   return {
     luau: code.classList.contains("dfp-luau"),
-    html: code.children.map(serialize).join(""),
-    note: note ? note.textContent : null,
+    html: code.childNodes.map(serialize).join(""),
+    note: bar ? bar.textContent : null,
+    noteHtml: bar ? serialize(bar) : null,
+    bar,
+    pre,
+    code,
   };
 }

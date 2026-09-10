@@ -12,29 +12,61 @@
  */
 
 /* ── Disclosure (<details>) ──────────────────────────────────────────────
- * These sit inside a post card, and the card is surface-2. Rendering them at
- * surface-1 made them *darker* than their container, so they read as a hole
- * rather than a control — and with no hover rule at all, pointing at one did
- * nothing. They now sit one step above the card and lift again on hover. */
+ * What `[details]` cooks to: a summary line and whatever the author hid
+ * behind it — code, logs, screenshots. A Community Resource OP can hold a
+ * dozen, every one captioned "Click to expand".
+ *
+ * These sit inside a post card, which is surface-1 (post.css). The closed bar
+ * is surface-3, two steps up, so it reads as a control rather than as content,
+ * and the bar lifts again under the pointer like every other control here.
+ *
+ * Opening used to drop the whole block to surface-2 — the one open state in
+ * this file that moved AWAY from the viewer, against the rule at the top. (The
+ * docblock that shipped with it believed the card was surface-2, which is how
+ * "one step above the card" turned into "two steps up, then one down".) Now
+ * it takes the shape of a quote-reply (post.css, "Quotes"): the summary stays
+ * a surface-3 header bar and the revealed content sits in a surface-2 well
+ * under it, still a step above the card. Nothing gets darker; the bar the
+ * reader clicked is still the bar, with a rule under it and the content below.
+ *
+ * The bar paints itself rather than the block, which is what lets the two
+ * states share one geometry: a closed block IS its summary, so the block
+ * carries no padding and the summary carries all of it. Open, the well takes
+ * the padding and the summary pulls itself back out to the block's edges with
+ * negative margins. The summary's own radius — the block's minus its 1px
+ * border — keeps the corners clean without `overflow: hidden`, which would
+ * have clipped the focus ring base.css draws 2px outside the element.
+ *
+ * Preview parity via `:is()`, same as the prose rules in base.css: only the
+ * box rule had a preview twin, so the preview kept the native triangle and
+ * none of the hover, caret or open treatment. */
 
-html[data-dfp] .cooked details,
-html[data-dfp] .d-editor-preview details {
+html[data-dfp] :is(.cooked, .d-editor-preview) details {
   background: var(--dfp-surface-3);
   border: 1px solid var(--dfp-border);
   border-radius: var(--dfp-r-sm);
-  padding: var(--dfp-s-2) var(--dfp-s-3);
+  padding: 0;
   margin-block: var(--dfp-s-2);
-  transition:
-    background-color var(--dfp-dur-1) var(--dfp-ease),
-    border-color var(--dfp-dur-1) var(--dfp-ease);
+  transition: border-color var(--dfp-dur-1) var(--dfp-ease);
 }
 
-html[data-dfp] .cooked details:hover {
+html[data-dfp] :is(.cooked, .d-editor-preview) details:hover {
   border-color: var(--dfp-border-strong);
-  background: color-mix(in oklab, var(--dfp-surface-3) 80%, var(--dfp-text));
 }
 
-html[data-dfp] .cooked details > summary {
+/* A stack of closed blocks reads as one list of controls rather than a column
+ * of separate boxes: adjacent blocks close up to 4px. Both sides are set
+ * because block margins collapse to the larger one, so setting only the
+ * follower's top margin would change nothing. */
+html[data-dfp] :is(.cooked, .d-editor-preview) details + details {
+  margin-block-start: var(--dfp-s-1);
+}
+
+html[data-dfp] :is(.cooked, .d-editor-preview) details:has(+ details) {
+  margin-block-end: var(--dfp-s-1);
+}
+
+html[data-dfp] :is(.cooked, .d-editor-preview) details > summary {
   cursor: pointer;
   color: var(--dfp-text);
   font-weight: var(--dfp-fw-medium);
@@ -42,15 +74,24 @@ html[data-dfp] .cooked details > summary {
   display: flex;
   align-items: center;
   gap: var(--dfp-s-2);
-  border-radius: var(--dfp-r-xs);
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  background: var(--dfp-surface-3);
+  border-radius: calc(var(--dfp-r-sm) - 1px);
+  transition: background-color var(--dfp-dur-1) var(--dfp-ease);
 }
 
-html[data-dfp] .cooked details > summary::-webkit-details-marker {
+/* The bar is the control, so the bar is what lifts — not the well beneath it
+ * once the block is open. Same 80/20 text mix the closed block used to take. */
+html[data-dfp] :is(.cooked, .d-editor-preview) details > summary:hover {
+  background: color-mix(in oklab, var(--dfp-surface-3) 80%, var(--dfp-text));
+}
+
+html[data-dfp] :is(.cooked, .d-editor-preview) details > summary::-webkit-details-marker {
   display: none;
 }
 
 /* A caret we control, so it can animate with the open state. */
-html[data-dfp] .cooked details > summary::before {
+html[data-dfp] :is(.cooked, .d-editor-preview) details > summary::before {
   content: "";
   inline-size: 0;
   block-size: 0;
@@ -61,18 +102,35 @@ html[data-dfp] .cooked details > summary::before {
   flex: 0 0 auto;
 }
 
-html[data-dfp] .cooked details[open] > summary::before {
+html[data-dfp] :is(.cooked, .d-editor-preview) details[open] > summary::before {
   transform: rotate(90deg);
 }
 
-html[data-dfp] .cooked details[open] {
+/* Open: the well. The block becomes surface-2 with the well's inset as its
+ * padding; the summary above keeps its own surface, so the only thing that
+ * changed colour is the space that was not there before. */
+html[data-dfp] :is(.cooked, .d-editor-preview) details[open] {
   background: var(--dfp-surface-2);
+  border-color: var(--dfp-border-strong);
+  padding: 0 var(--dfp-s-3) var(--dfp-s-3);
 }
 
-html[data-dfp] .cooked details[open] > summary {
-  margin-block-end: var(--dfp-s-2);
-  padding-block-end: var(--dfp-s-2);
-  border-bottom: 1px solid var(--dfp-border);
+html[data-dfp] :is(.cooked, .d-editor-preview) details[open] > summary {
+  margin: 0 calc(var(--dfp-s-3) * -1) var(--dfp-s-3);
+  border-block-end: 1px solid var(--dfp-border);
+  border-radius: calc(var(--dfp-r-sm) - 1px) calc(var(--dfp-r-sm) - 1px) 0 0;
+}
+
+/* The first and last things in the well set their own margins — a <pre>
+ * brings --dfp-s-4 above and below, a <p> brings it below and nothing above —
+ * so the inset would vary with whatever the author happened to hide. Zeroed
+ * at the two edges; the summary's margin and the well's padding are the inset. */
+html[data-dfp] :is(.cooked, .d-editor-preview) details > summary + * {
+  margin-block-start: 0;
+}
+
+html[data-dfp] :is(.cooked, .d-editor-preview) details > :last-child {
+  margin-block-end: 0;
 }
 
 /* ── Topic timeline ──────────────────────────────────────────────────────
@@ -840,20 +898,49 @@ html[data-dfp] .user-menu .user-menu-tab .badge-notification {
 
 /* ── Panel footer ───────────────────────────────────────────────────────── */
 
+/* One row, always. Discourse renders one button here (the "view all" chevron)
+ * until there are unread notifications, when a "Dismiss" button joins it on
+ * the same wrapping flex row with a 7.5px left margin to space the pair.
+ * This footer used to give every `.btn` `inline-size: 100%`, written when
+ * only the chevron had been seen: with Dismiss present each button claimed
+ * the full row, the second wrapped underneath, and stock's row-spacing
+ * margin became an 8px indent on a button that now touched the one above
+ * it — 32px over 36px, no gap, offset left edge. Measured with both present:
+ * `flex-wrap: nowrap`, an 8px gap and a fixed 32px height put them side by
+ * side at 189px + 107px, the same proportion stock draws. */
 html[data-dfp] .user-menu .panel-body-bottom {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--dfp-s-2);
   padding-block-start: var(--dfp-s-2);
   margin-block-start: var(--dfp-s-1);
   border-top: 1px solid var(--dfp-border);
 }
 
 html[data-dfp] .user-menu .panel-body-bottom .btn {
-  inline-size: 100%;
+  flex: 1 1 auto;
+  inline-size: auto;
+  min-inline-size: 0;
+  margin: 0;
   justify-content: center;
   background: var(--dfp-surface-3);
   border: 1px solid var(--dfp-border);
   border-radius: var(--dfp-r-sm);
   color: var(--dfp-text-2);
+  /* Fixed rather than min: a text button pads out to 36px on its own line
+   * height and the icon-only chevron stops at 32px, so the pair disagreed. */
+  block-size: 32px;
   min-block-size: 32px;
+  padding-block: 0;
+  padding-inline: var(--dfp-s-3);
+}
+
+/* The second button is the labelled action; it takes its content width and
+ * leaves the chevron the rest, as stock does. */
+html[data-dfp] .user-menu .panel-body-bottom .btn + .btn {
+  flex: 0 0 auto;
+  padding-inline: var(--dfp-s-4);
 }
 
 html[data-dfp] .user-menu .panel-body-bottom .btn:hover {

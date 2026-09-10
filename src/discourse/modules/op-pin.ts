@@ -2,6 +2,7 @@ import type { DfpModule } from "../../core/registry";
 import type { PluginApi } from "../types";
 import { getCurrentTopic, topicIdFromPath } from "../topic-data";
 import { onDomChange } from "../dom-watch";
+import { mountTopicToggle, unmountTopicToggle } from "../topic-toggles";
 
 /**
  * Pinned original post.
@@ -73,6 +74,34 @@ const LEFT_VAR = "--dfp-op-left";
  */
 const MIN_POSTS = 8;
 
+/**
+ * Twin of the `@media (min-width: 1280px)` block in reading.css — every panel
+ * rule lives inside it, so below this width the root attribute changes nothing
+ * on screen. The two numbers have to move together; the reason 1280 is the
+ * number is measured and written up beside that block.
+ *
+ * Without this the 925-1279px band — any un-maximised window on a 1366 or 1440
+ * laptop — had a live button that turned accent-"on" when clicked (the pressed
+ * colours sit outside the media block), wrote `enabled` to localStorage, and
+ * pinned nothing. `sync` refuses the attribute here and `syncButton` disables
+ * the control with the reason, the same shape as the unloaded-post case.
+ *
+ * Created in `install`, not at import. At module scope this was the only DOM
+ * call anywhere in the MAIN world's import graph, and it made the file
+ * un-importable from Node — `matchMedia is not defined` at import — which the
+ * stale-answer.test.ts pattern of importing a module directly would hit, and
+ * which linkedom's window in WXT's build-time environment does not define
+ * either. The build only survived it because WXT strips the `opPin` import
+ * before evaluating options on the Node side: an accident, not a guarantee.
+ * Nothing reads the query before `install` runs, so `isWide` answering true
+ * until then is never observed.
+ */
+let WIDE: MediaQueryList | null = null;
+
+function isWide(): boolean {
+  return WIDE?.matches ?? true;
+}
+
 let enabled = false;
 
 /** The topic whose `posts_count` `worthPinning` currently describes. */
@@ -97,7 +126,7 @@ function opIsLive(): boolean {
 
 function sync(): void {
   const onTopic = topicIdFromPath(location.pathname) !== null;
-  const on = enabled && onTopic && worthPinning && opIsLive();
+  const on = enabled && onTopic && worthPinning && isWide() && opIsLive();
   document.documentElement.toggleAttribute(ROOT_FLAG, on);
 
   syncAnchor(on);
@@ -191,52 +220,67 @@ function setEnabled(on: boolean): void {
  * `#post_1`, no gap marker. The stream is a contiguous window around where you
  * are, and the only route back is `prependMore()` about 290 times. So the
  * honest answer is to say why, and say where the feature lives.
+ *
+ * A narrow window is the same shape with a different reason, and it is named
+ * first: scrolling to the top does nothing for a reader whose window cannot fit
+ * the panel, so that is the condition to fix before the other one matters.
+ * `enabled` is kept as it was — widening the window brings the pin back on its
+ * own through the `change` listener in `install`. The one place the control
+ * does vanish is a narrow window with no rail to dim in; `mountToggle` says
+ * why.
  */
 function syncButton(): void {
   const btn = document.querySelector<HTMLButtonElement>(".dfp-op-toggle");
   if (!btn) return;
   const live = opIsLive();
+  const wide = isWide();
   const on = document.documentElement.hasAttribute(ROOT_FLAG);
 
-  btn.disabled = !live;
+  btn.disabled = !live || !wide;
   btn.setAttribute("aria-pressed", String(on));
-  btn.title = !live
-    ? "The opening post is not loaded this far down the topic — scroll to the top to pin it"
-    : enabled
-      ? "Unpin the opening post"
-      : "Keep the opening post beside the replies";
+  btn.title = !wide
+    ? "Needs a window at least 1280px wide to pin"
+    : !live
+      ? "The opening post is not loaded this far down the topic — scroll to the top to pin it"
+      : enabled
+        ? "Unpin the opening post"
+        : "Keep the opening post beside the replies";
 }
 
 /**
- * Mount the toggle in the timeline, not the topic footer.
+ * Where the toggle goes is topic-toggles.ts's decision, shared with thread-view
+ * and quiet-replies: the timeline rail while there is one, a DFP cluster
+ * beside the progress pill when the rail has collapsed, the footer last — and
+ * the footer is last because verified live at reply #122 of 9,163 it does not
+ * exist until the end of the stream. The chain is written up there once.
  *
- * `.topic-footer-main-buttons` is where thread-view puts its own toggle, and
- * verified live at reply #122 of 9,163 that element does not exist — Discourse
- * does not render the footer until you reach the end of the stream. So a
- * control mounted there is unreachable on exactly the long topics these
- * features are for. `.timeline-footer-controls` is the last child of the
- * always-present timeline rail; the footer is kept only as the narrow-viewport
- * fallback, where the rail itself collapses.
+ * This control alone skips the cluster while the window is narrow. The pinned
+ * panel is entirely inside reading.css's `min-width: 1280px` block and the
+ * rail goes at 924px, so in the cluster's main case — any window under 925px
+ * — the button could only ever be the dimmed "needs a window at least 1280px
+ * wide" one, and in a tray built for the corner of a phone a permanently
+ * disabled control costs the two live ones their room. In the rail, at
+ * 925-1279px, it stays and dims with that reason exactly as before: a desktop
+ * reader can widen the window, and a control that says why it is off beats
+ * one that vanished. The cluster gets it only when the window IS wide — the
+ * composer preview open in a short window drops the rail on desktop too
+ * (topic-toggles.ts) — and there it works. `unmountTopicToggle` on the way
+ * out, because the window narrows under an existing button and the gate has
+ * to take it down, not merely decline to build it; on a pass that finds no
+ * button that is one query and no write.
+ *
+ * Gated on the topic being worth pinning, but NOT on post 1 being loaded —
+ * that is a property of where you are scrolled, and a control that comes and
+ * goes as you scroll is worse than one that dims. `syncButton` disables it
+ * and explains.
  */
 function mountToggle(): void {
-  if (document.querySelector(".dfp-op-toggle")) return;
-  const anchor =
-    document.querySelector(".timeline-footer-controls") ??
-    document.querySelector(".topic-footer-main-buttons") ??
-    document.querySelector("#topic-footer-buttons");
-  if (!anchor) return;
-  /* Gated on the topic being worth pinning, but NOT on post 1 being loaded —
-   * that is a property of where you are scrolled, and a control that comes and
-   * goes as you scroll is worse than one that dims. `syncButton` disables it
-   * and explains. */
   if (!worthPinning) return;
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "btn btn-default dfp-op-toggle";
-  btn.textContent = "Pin post";
-  btn.addEventListener("click", () => setEnabled(!enabled));
-  anchor.appendChild(btn);
+  if (!isWide() && !document.querySelector(".timeline-footer-controls")) {
+    unmountTopicToggle("dfp-op-toggle");
+    return;
+  }
+  mountTopicToggle("dfp-op-toggle", "Pin post", () => setEnabled(!enabled));
   syncButton();
 }
 
@@ -246,6 +290,9 @@ export function opPin(api: PluginApi): DfpModule {
     budgetMs: 80,
 
     install() {
+      const wide = matchMedia("(min-width: 1280px)");
+      WIDE = wide;
+
       try {
         enabled = localStorage.getItem(STORAGE_KEY) === "1";
       } catch {
@@ -263,10 +310,24 @@ export function opPin(api: PluginApi): DfpModule {
        * mutates the DOM constantly and answering the same question dozens of
        * times a frame would burn the budget doing nothing.
        *
-       * `childList` only, and safe from self-triggering for a stronger reason
-       * than thread-view's: the only write here is an attribute on <html>,
-       * which this observer does not watch at all. */
+       * `childList` only. `sync` writes an attribute on <html>, which this
+       * observer does not watch; `mountToggle` CAN write children — it builds
+       * the cluster, moves the button between homes, takes it down — and is
+       * safe from triggering itself only because topic-toggles.ts is
+       * idempotent on the steady state: a pass that finds the button under
+       * the best anchor, or no button where the gate says none, writes
+       * nothing. tests/unit/topic-toggles.test.ts counts the writes to keep
+       * that true. */
       onDomChange(() => {
+        mountToggle();
+        sync();
+      });
+
+      /* Crossing 1280px in either direction is not a DOM change, so the
+       * observer above never sees it; the media query itself says when the
+       * panel can and cannot exist — and, with no rail to dim in, whether the
+       * button exists at all. */
+      wide.addEventListener("change", () => {
         mountToggle();
         sync();
       });

@@ -1,0 +1,295 @@
+/* Touch and narrow-viewport rules.
+ *
+ * The one file that asks about the pointer. Every other stylesheet assumes a
+ * mouse and a wide window: controls reveal on `:hover`, targets are sized for
+ * a cursor, inline code never wraps because a 1100px column never needs it to.
+ * Those are the right defaults for a desktop extension and nothing here argues
+ * with them; this adds the branch they were missing. It is grounded in the
+ * stylesheet rather than a device — mobile was not observed live, Chrome on
+ * Android runs no extensions, and the audience is tablets, touch laptops and a
+ * phone browser that does load extensions. Small, and worth the file.
+ *
+ * Three media features, kept apart because they answer different questions:
+ *
+ *   (hover: none) and (pointer: coarse)  — a finger. What only ever appeared
+ *       under a pointer has to be there at rest.
+ *   (pointer: coarse)                    — an imprecise primary pointer, hover
+ *       or not. Targets grow, through --dfp-tap-min.
+ *   (max-width: 720px)                   — a narrow window, whatever the
+ *       pointer: a phone, a half-screen beside Studio, 400% zoom. Reflow.
+ *
+ * --dfp-tap-min is a token for the same reason density is (tokens.css: "no
+ * component may special-case it"): the pointer axis is one fact about the
+ * device, and the six controls that consume it should not each carry a media
+ * query. It is declared here rather than in tokens.css only because this file
+ * arrived in a phase that could not edit tokens.css; moving the two
+ * declarations there beside the motion block changes nothing.
+ */
+
+html[data-dfp] {
+  --dfp-tap-min: 0px;
+}
+
+/* ── A finger: reveal what hover used to ─────────────────────────────────── */
+
+@media (hover: none) and (pointer: coarse) {
+  /* code.css keeps the whole cluster — Discourse's copy and fullscreen buttons
+   * as well as DFP's wrap, copy-without-comments and copy-with-N-fixes — at
+   * opacity 0 until `pre:hover` or `:focus-visible`. A tap sticks a hover
+   * state on most touch browsers, so the cluster was discoverable by accident
+   * rather than by design, and a stray tap in the top-right corner of a block
+   * copied it with no visible cause. 0.75 is the resting opacity the language
+   * label used to ship at (code.css records why it no longer does): present,
+   * not shouting. The `pre:hover` rule at (0,5,2) still takes it to 1 for as
+   * long as the tap's hover state lasts.
+   *
+   * `.dfp-code-lang` stays hidden at rest everywhere. The decision recorded
+   * against it in code.css — a caption repeated down the whole thread — is
+   * about noise, not about pointers, and a finger does not change it. */
+  html[data-dfp] .codeblock-button-wrapper .btn {
+    opacity: 0.75;
+  }
+
+  /* Visible at rest, that wrapper — absolute at the top-right of the <pre>,
+   * 8px of its own padding (code.css) around buttons the coarse-pointer block
+   * below holds at 32px — is a 48px box over the first two code lines at the
+   * right edge of every block. Under a pointer nothing had to care: it only
+   * appeared on hover, over code the reader had already seen. Reserve the
+   * space instead. code.css pads the block 16px all round; this lifts the top
+   * to the wrapper's height plus 4px, so the controls sit above the code
+   * rather than on it. Same selector shape as code.css's `pre` rule, so it
+   * wins on order alone. */
+  html[data-dfp] .cooked pre {
+    padding-block-start: calc(var(--dfp-s-6) + 2 * var(--dfp-s-2) + var(--dfp-s-1));
+  }
+}
+
+/* ── A coarse pointer: tap-sized targets ─────────────────────────────────── */
+
+@media (pointer: coarse) {
+  html[data-dfp] {
+    /* 44px: the platform target (44pt on iOS, 48dp on Android), against the
+     * 24px WCAG 2.5.8 floor these controls sat under. Discourse's own action
+     * bar under DFP already gets a 32px floor (post.css); DFP's additions were
+     * the smallest targets on the page, from the padding and type size in
+     * their files: .dfp-code-btn ~25px, .dfp-stale-post__dismiss ~18px,
+     * .dfp-dupes__dismiss and .dfp-draft__discard unpadded, .dfp-face-more
+     * ~23px, .dfp-group-chip--more ~20px, .dfp-quiet-fold ~27px. */
+    --dfp-tap-min: 44px;
+  }
+
+  /* Standalone controls grow their box. `min-block-size` rather than padding
+   * so the type and the border stay where they are; a <button> centres its
+   * content in the taller box on its own. The dismiss buttons sit in
+   * `align-items: baseline` rows (reading.css) — the row grows to the button
+   * and the text beside it stays on its baseline, which is the point of that
+   * alignment. `min-inline-size` too: "wrap" and "×" are narrower than they
+   * are tall. */
+  html[data-dfp] .dfp-stale-post__dismiss,
+  html[data-dfp] .dfp-dupes__dismiss,
+  html[data-dfp] .dfp-draft__discard,
+  html[data-dfp] .dfp-topic-toggles .btn {
+    min-block-size: var(--dfp-tap-min);
+    min-inline-size: var(--dfp-tap-min);
+  }
+
+  /* The code buttons stop at 32px — the floor Discourse's action bar already
+   * gets under DFP (post.css), and the number the spec asked for. They are the
+   * one set that floats OVER content: their wrapper is absolute at the top of
+   * the block, so every pixel of their height is a pixel of code covered, or,
+   * on a finger, of padding the reveal block above has to reserve. 44px there
+   * was a 60px box over the first three lines of every block. */
+  html[data-dfp] .dfp-code-btn {
+    min-block-size: var(--dfp-s-6);
+    min-inline-size: var(--dfp-s-6);
+  }
+
+  /* The fold line is a full-width row, so only the floor is needed — but its
+   * two spans are baseline-aligned (quiet.css), which packs them at the top of
+   * a taller box. They share a size, so centring them is the same alignment
+   * with the height honoured. */
+  html[data-dfp] .dfp-quiet-fold {
+    min-block-size: var(--dfp-tap-min);
+    align-items: center;
+  }
+
+  /* Two controls sit inline among chips and faces sized by their neighbours,
+   * and growing their box would make the one DFP chip a different height from
+   * the row it is in. They keep their box and gain a hit area instead: a
+   * pseudo-element centred on the control and extended to the tap minimum in
+   * whichever axis falls short (`min(0px, …)` never pulls it inside). It
+   * overlaps the neighbouring chip by up to 12px on the axis it grows —
+   * the neighbour's edge, where a tap was a guess anyway. */
+  html[data-dfp] .dfp-face-more,
+  html[data-dfp] .dfp-group-chip--more {
+    position: relative;
+  }
+
+  html[data-dfp] .dfp-face-more::before,
+  html[data-dfp] .dfp-group-chip--more::before {
+    content: "";
+    position: absolute;
+    inset-block: min(0px, calc((100% - var(--dfp-tap-min)) / 2));
+    inset-inline: min(0px, calc((100% - var(--dfp-tap-min)) / 2));
+  }
+}
+
+/* ── A narrow window: reflow ─────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  /* code.css sets inline code to `white-space: nowrap`, and that is DFP's own
+   * addition over stock Discourse. A Scripting Support post is full of
+   * `game:GetService("ReplicatedStorage"):WaitForChild("Modules"):…` spans
+   * that are wider than a 375–720px column, and an unbreakable run inside
+   * `.cooked` becomes the page-level horizontal scroll code.css itself says
+   * the page must never have; `.topic-body { min-width: 0 }` (post.css) frees
+   * the flex item, not the run. Only `<pre>` and tables have a scroll box of
+   * their own. So below 720px — and at 400% zoom, where the CSS viewport is
+   * that narrow — the pill wraps. Both properties have to change together:
+   * `overflow-wrap` is a no-op under `nowrap`. `box-decoration-break: clone`
+   * so each fragment keeps the pill's border and padding rather than the
+   * first line ending in an open box — prefixed as well, because Safari still
+   * reads only the `-webkit-` form and Chromium unprefixed it in 130 (October
+   * 2024); on either, the unprefixed line alone leaves exactly the open box it
+   * is here to prevent. Selector matches code.css exactly, so this wins on
+   * order and nothing else. */
+  html[data-dfp] :is(.cooked, .d-editor-preview) code:not(pre code) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  /* The page-level cards can never be wider than the window they float in.
+   * Discourse's user and group cards are the ones that need saying so, in a
+   * desktop-view window narrower than their own width. DFP's two are left out
+   * on purpose: the topic card clamps itself to this same 32px
+   * (interactive.css), and the asset card is its 150px picture or its 260px
+   * entity row (entity-cards.css) — under this width in any window that can
+   * show a card, and sized by fixed-width children a clamp on the host would
+   * not shrink anyway. The docs card lives in a shadow root
+   * (isolated/docs-card.ts) and is out of this stylesheet's reach — its clamp
+   * belongs there. */
+  html[data-dfp] .user-card,
+  html[data-dfp] .group-card {
+    max-inline-size: calc(100vw - 2 * var(--dfp-s-4));
+  }
+}
+
+/* ── The toggle cluster ──────────────────────────────────────────────────────
+ * Built by discourse/topic-toggles.ts as the previous sibling of
+ * `#topic-progress-wrapper` — the "82 / 83" progress pill — once Discourse
+ * has dropped the timeline rail. That is not only a narrow window:
+ * topic-navigation.gjs's `#fitsTimeline` also drops the rail whenever the
+ * composer preview is open and `innerHeight < 325 + composerHeight +
+ * headerOffset()`, so a reply with the preview showing on a 1366x768 laptop
+ * builds this too. Before it existed the three topic toggles lived only in
+ * the rail's footer controls, which without the rail exist inside the
+ * fullscreen timeline the pill opens and nowhere else: in a half-width window
+ * beside Studio, mid thread, thread view, pin post and quiet were simply
+ * absent. Not gated on a media query on purpose: the DOM says when the rail
+ * is gone, and the module only builds this when it is.
+ *
+ * The geometry is checked against discourse/discourse main rather than
+ * measured in a narrow window on the live forum:
+ *
+ *   - `#topic-progress-wrapper` itself is `display: flex; justify-content:
+ *     flex-end; overflow: hidden` (topic-footer.scss). Nothing about where the
+ *     pill sits is decided there.
+ *   - Its parent, `.topic-navigation.with-topic-progress`, is `position:
+ *     sticky; bottom: calc(env(safe-area-inset-bottom) + var(--composer-height,
+ *     0px)); z-index: z("timeline")` — 100 in `$z-layers`, under the composer's
+ *     400 — with `pointer-events: none` and `> * { pointer-events: auto }`.
+ *   - At 924px and below `.container.posts .topic-navigation` is `display:
+ *     flex; justify-content: flex-end; align-items: center`, in the posts grid
+ *     area on row 3. Above that it is a block in the timeline column.
+ *   - topic-progress.gjs never assigns a `docked` class on this build. There
+ *     is no docked state to handle.
+ *
+ * So the cluster is an ordinary child of that wrapper and re-derives none of
+ * it: lifted with the composer, inset for the safe area, on the timeline
+ * layer (which already beats every `position: relative` <pre> in the stream,
+ * code.css), scrolled away with the wrapper at the end of the stream, and
+ * taking taps. The first draft was `position: fixed` in the viewport's
+ * bottom-end corner with a z-index of its own — a no-op inside the wrapper's
+ * stacking context — which sat behind the composer in exactly the desktop
+ * case above, and floated over the footer and suggested topics after the
+ * pill had gone.
+ *
+ * A column of buttons, not a row, in both of the wrapper's layouts. Above
+ * 924px the wrapper is a block in a grid column sized by its content, and the
+ * only other content is the pill: a row of three buttons is ~250px and would
+ * widen that column into a post stream DFP already stretches to 985px
+ * (reading.css). A column is as wide as its widest button — "Thread view" at
+ * this type size, ~90px, the width the rail was sized for and narrower than
+ * the pill. At 924px and below the same column stands beside the pill in
+ * Discourse's flex row, packed to the end of it as the pill is. `fit-content`
+ * with the auto start margin is what right-aligns it in the block layout; in
+ * the row the margin only absorbs space the row was already sending there. */
+html[data-dfp] .dfp-topic-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dfp-s-1);
+  inline-size: fit-content;
+  margin-inline-start: auto;
+  padding: var(--dfp-s-1);
+  background: var(--dfp-surface-1);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-md);
+  box-shadow: var(--dfp-e-2);
+}
+
+/* The cluster never moves the pill. The row centres its items, so a cluster
+ * taller than the pill would float the pill up by half the difference — 29px
+ * on a phone, where the buttons are 44px — and a next sibling would have
+ * pushed it inward by the cluster's width the moment it appeared, which is
+ * why the module inserts before it. Bottom-aligning the row keeps the pill in
+ * its corner; `gap` is the space between the two there and inert in the block
+ * layout, where the pill's own top margin is the gap instead (and, in the
+ * row, only makes its margin box taller than it needs to be). */
+html[data-dfp] .with-topic-progress:has(> .dfp-topic-toggles) {
+  align-items: flex-end;
+  gap: var(--dfp-s-2);
+}
+
+html[data-dfp] .dfp-topic-toggles + #topic-progress-wrapper {
+  margin-block-start: var(--dfp-s-2);
+}
+
+/* The module removes an emptied cluster; this covers the frame before it does. */
+html[data-dfp] .dfp-topic-toggles:empty {
+  display: none;
+}
+
+/* The rail's buttons (interactive.css) at the rail's type size, on a tray one
+ * surface down so the row reads as buttons on a tray the way the rail reads
+ * as buttons on the page. `:where()` keeps both rules at (0,2,1) — the hover
+ * one through `:where(:hover)` — so the pressed and disabled rules the three
+ * toggles already carry — `.dfp-thread-toggle[aria-pressed="true"]` in
+ * reading.css, `.dfp-op-toggle:disabled` beside it, quiet.css's twin — still
+ * win at (0,3,1) exactly as they do in the rail. A plain descendant selector
+ * here would have tied them and, coming later, silently repainted every "on"
+ * state grey. A plain `:hover` was worse: at (0,3,1) and last in the cascade
+ * it beat all four, so hovering an "on" toggle in the cluster painted it off
+ * and hovering the disabled pin lit it up under a not-allowed cursor. The
+ * rail never had that problem only because interactive.css's
+ * `.topic-timeline .btn:hover` is imported before reading.css and quiet.css.
+ * The hover rule follows the base rule, which is all that lets it win. */
+html[data-dfp] :where(.dfp-topic-toggles) .btn {
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: var(--dfp-s-1) var(--dfp-s-3);
+  background: var(--dfp-surface-2);
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+html[data-dfp] :where(.dfp-topic-toggles) .btn:where(:hover) {
+  background: var(--dfp-surface-3);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}

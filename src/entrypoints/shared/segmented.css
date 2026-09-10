@@ -1,0 +1,78 @@
+/* The segmented control (Segmented.tsx), shared by the popup and the Options
+ * page.
+ *
+ * Both pages own a private copy of the design tokens rather than importing the
+ * content theme's — see the notes at the top of popup.css and options.css — so
+ * this file declares nothing and reads only what both of them define:
+ *
+ *   --surface-2   the track
+ *   --surface-3   the pressed segment
+ *   --border      the track's edge
+ *   --text-3      an idle segment's text, and the row label
+ *   --text        a hovered or pressed segment's text
+ *   --accent      the focus ring
+ *   --r-sm        the track's corner radius
+ *
+ * A page that imports this without one of those gets the browser's initial
+ * value for that property, which is how a missing token shows up: as an
+ * unstyled patch, on the first look, rather than as a fallback that hides it. */
+
+.seg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seg-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+
+.seg {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.seg button {
+  flex: 1;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  border-radius: 6px;
+  padding: 5px 4px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.seg button:hover {
+  color: var(--text);
+}
+
+.seg button[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.seg button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg button {
+    transition: none;
+  }
+}

@@ -15,8 +15,7 @@ html[data-dfp] {
     Menlo, Consolas, monospace;
 }
 
-html[data-dfp] .cooked pre,
-html[data-dfp] .d-editor-preview pre {
+html[data-dfp] :is(.cooked, .d-editor-preview) pre {
   background: var(--dfp-surface-2);
   border: 1px solid var(--dfp-border);
   border-radius: var(--dfp-r-md);
@@ -28,8 +27,7 @@ html[data-dfp] .d-editor-preview pre {
   tab-size: 4;
 }
 
-html[data-dfp] .cooked pre code,
-html[data-dfp] .d-editor-preview pre code {
+html[data-dfp] :is(.cooked, .d-editor-preview) pre code {
   font-family: var(--dfp-mono);
   font-size: var(--dfp-fs-sm);
   line-height: 1.6;
@@ -40,8 +38,10 @@ html[data-dfp] .d-editor-preview pre code {
 }
 
 /* Inline code sits inside running prose, so it needs to be distinguishable
- * without breaking the line rhythm. */
-html[data-dfp] .cooked code:not(pre code) {
+ * without breaking the line rhythm. The preview is in the selector for the
+ * reason base.css gives on its prose rules: this was a chip in the post and
+ * bare text in the preview of the same markdown. */
+html[data-dfp] :is(.cooked, .d-editor-preview) code:not(pre code) {
   font-family: var(--dfp-mono);
   font-size: 0.9em;
   background: var(--dfp-surface-3);

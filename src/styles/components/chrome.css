@@ -59,6 +59,68 @@ html[data-dfp] .d-header img.avatar {
   border-radius: var(--dfp-r-full);
 }
 
+/* ── Palette trigger ──────────────────────────────────────────────────────
+ * The ⌘K palette had no affordance on the page at all: its only exposure was
+ * the once-ever onboarding card, which Escape can dismiss unread. This is a
+ * DFP-owned button the palette mounts before Discourse's search icon
+ * (command-palette.ts), labelled with the shortcut so it reads as a hint and
+ * is honest about what it opens. Discourse's own search button is left alone —
+ * decorating IT with "Ctrl K" would have claimed the two do the same thing,
+ * and they do not (its menu has recent searches and in-topic context).
+ *
+ * A real button rather than a ::after, so a touch device — no keyboard to
+ * press the chord on — gets a way in; there the palette renders a word in
+ * place of the keys. Not hidden at any width for the same reason. */
+html[data-dfp] .dfp-palette-item {
+  display: flex;
+  align-items: center;
+  margin-inline-end: var(--dfp-s-1);
+}
+
+html[data-dfp] .dfp-palette-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 24px;
+  padding: 2px 7px;
+  border: 1px solid var(--dfp-border);
+  border-radius: var(--dfp-r-sm);
+  background: transparent;
+  color: var(--dfp-text-3);
+  font: inherit;
+  font-size: var(--dfp-fs-xs);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    border-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] .dfp-palette-btn:hover {
+  background: var(--dfp-surface-3);
+  border-color: var(--dfp-border-strong);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] .dfp-palette-btn:focus-visible {
+  outline: 2px solid var(--dfp-accent);
+  outline-offset: 2px;
+}
+
+/* Two keys inside one chip, so "Ctrl K" reads as a single shortcut rather
+ * than two buttons: the chip is the border, and the keys carry none of their
+ * own. */
+html[data-dfp] .dfp-palette-btn kbd {
+  font-family: var(--dfp-mono, ui-monospace, monospace);
+  font-size: var(--dfp-fs-xs);
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
 /* ── Navigation menu ──────────────────────────────────────────────────────
  * VERIFIED, and the finding is worth recording: this forum sets
  * `navigation_menu: "header dropdown"`, so it has NO sidebar. `.sidebar-wrapper`
