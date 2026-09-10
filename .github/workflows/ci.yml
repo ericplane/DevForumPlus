@@ -80,13 +80,15 @@ jobs:
       - name: Check
         run: npm run check
 
-      # Cached on the generator, so a re-run does not re-download the 4.6 MB
-      # tarball. Same key as release.yml.
+      # Cached on the generator and on the pinned upstream commit
+      # (scripts/creator-docs.lock.json), so a re-run does not re-download the
+      # 4.6 MB tarball and moving the pin cannot reuse a stale one. Same key as
+      # release.yml.
       - name: Cache Creator Docs source
         uses: actions/cache@v4
         with:
           path: node_modules/.cache
-          key: creator-docs-${{ hashFiles('scripts/build-docs-index.ts') }}
+          key: creator-docs-${{ hashFiles('scripts/build-docs-index.ts', 'scripts/creator-docs.lock.json') }}
 
       # `public/docs/` is gitignored, so a fresh checkout has none of it.
       #
@@ -99,8 +101,9 @@ jobs:
       # build what actually ships or it is gating a different artifact.
       #
       # Deliberately NOT paired with release.yml's "generated sources are
-      # current" check: that one fails when Roblox moves upstream, which is
-      # correct for a release and pure noise on every push.
+      # current" check: that one fails when the pin or the generator changed
+      # without a regeneration, which is a release-time question and pure
+      # noise on every push.
       - name: Generate bundled data
         run: npm run docs-index
 

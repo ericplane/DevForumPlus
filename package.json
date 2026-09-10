@@ -28,6 +28,7 @@
     "rules": "tsx scripts/build-rules.ts",
     "api-index": "tsx scripts/build-api-index.ts",
     "docs-index": "tsx scripts/build-docs-index.ts",
+    "docs-index:update": "tsx scripts/build-docs-index.ts --update",
     "icons": "tsx scripts/build-icons.ts"
   },
   "devDependencies": {
