@@ -39,13 +39,66 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { parse } from "yaml";
 
-const TARBALL =
-  "https://codeload.github.com/Roblox/creator-docs/tar.gz/refs/heads/main";
-
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const cacheTar = resolve(root, "node_modules/.cache/creator-docs.tar.gz");
-const cacheDir = resolve(root, "node_modules/.cache/creator-docs");
+
+/* ── The upstream snapshot ─────────────────────────────────────────────────
+ *
+ * Pinned to one commit of Roblox/creator-docs, recorded in
+ * creator-docs.lock.json beside this file.
+ *
+ * It used to fetch `refs/heads/main`, and that made the release gate —
+ * "regenerate in CI, fail if src/luau differs from the commit" — compare two
+ * different inputs. CI regenerated from whatever `main` was the moment its
+ * cache key last changed; the maintainer regenerated from whatever it was
+ * when they ran this locally; the two could be hours or weeks apart, and the
+ * gate had no way to tell "upstream moved" from "you forgot to regenerate".
+ * v1.3.0 failed that gate twice, the second time on a file regenerated and
+ * committed an hour earlier — CI was still holding the snapshot from the
+ * first failure. With the snapshot pinned, the generated sources are a
+ * function of this script and the lock file and nothing else, so the gate can
+ * only fail when one of those changed without a regeneration, which is the
+ * one thing it should catch.
+ *
+ * Move the pin with `npm run docs-index:update`: it resolves the current
+ * `main`, rewrites the lock and regenerates. Review the diff and commit both. */
+const lockFile = resolve(root, "scripts/creator-docs.lock.json");
+
+interface Lock {
+  sha: string;
+  pinned: string;
+}
+
+function readLock(): Lock {
+  const raw = JSON.parse(readFileSync(lockFile, "utf8")) as Partial<Lock>;
+  if (!/^[0-9a-f]{40}$/.test(raw.sha ?? "")) {
+    throw new Error(`${lockFile}: expected a 40-character commit "sha"`);
+  }
+  return { sha: raw.sha!, pinned: raw.pinned ?? "" };
+}
+
+function updateLock(): Lock {
+  const out = execFileSync(
+    "git",
+    ["ls-remote", "https://github.com/Roblox/creator-docs.git", "refs/heads/main"],
+    { encoding: "utf8" },
+  );
+  const sha = out.split(/\s+/)[0] ?? "";
+  if (!/^[0-9a-f]{40}$/.test(sha)) {
+    throw new Error(`could not resolve Roblox/creator-docs main: ${out.trim() || "(empty)"}`);
+  }
+  const lock: Lock = { sha, pinned: new Date().toISOString().slice(0, 10) };
+  writeFileSync(lockFile, JSON.stringify(lock, null, 2) + "\n", "utf8");
+  console.log(`  docs-index: pinned Roblox/creator-docs@${sha.slice(0, 7)} (${lock.pinned})`);
+  return lock;
+}
+
+const lock = process.argv.includes("--update") ? updateLock() : readLock();
+const SHA = lock.sha;
+const TARBALL = `https://codeload.github.com/Roblox/creator-docs/tar.gz/${SHA}`;
+/* Cache paths carry the pin, so moving it can never reuse a stale extraction. */
+const cacheTar = resolve(root, `node_modules/.cache/creator-docs-${SHA.slice(0, 12)}.tar.gz`);
+const cacheDir = resolve(root, `node_modules/.cache/creator-docs-${SHA.slice(0, 12)}`);
 const outDir = resolve(root, "public/docs");
 const namesOut = resolve(root, "src/luau/docs-names.generated.ts");
 
@@ -104,12 +157,23 @@ function ensureSource(): string {
     return cacheDir;
   }
   if (!existsSync(cacheTar)) {
-    console.log("  docs-index: downloading creator-docs…");
+    console.log(`  docs-index: downloading creator-docs@${SHA.slice(0, 7)}…`);
     mkdirSync(dirname(cacheTar), { recursive: true });
-    execFileSync("curl", ["-sL", TARBALL, "-o", cacheTar]);
+    execFileSync("curl", ["-sfL", TARBALL, "-o", cacheTar]);
   }
   console.log("  docs-index: extracting…");
   mkdirSync(cacheDir, { recursive: true });
+  /* GitHub names the archive's root directory after what was asked for —
+   * `creator-docs-main` for a branch, `creator-docs-<sha>` for a commit — so it
+   * is read off the archive rather than assumed. */
+  const rootDir = execFileSync("tar", ["-tzf", basename(cacheTar)], {
+    cwd: dirname(cacheTar),
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  })
+    .split("\n")[0]
+    ?.split("/")[0];
+  if (!rootDir) throw new Error(`${cacheTar}: empty archive`);
   /* Extracted from the cache directory with RELATIVE paths, which is the whole
    * trick and is not cosmetic.
    *
@@ -131,7 +195,7 @@ function ensureSource(): string {
   execFileSync(
     "tar",
     ["-xzf", basename(cacheTar), "-C", basename(cacheDir), "--strip-components=1",
-     "creator-docs-main/content/en-us/reference/engine"],
+     `${rootDir}/content/en-us/reference/engine`],
     { cwd: dirname(cacheTar), stdio: "pipe" },
   );
   return cacheDir;

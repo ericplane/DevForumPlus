@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules/.cache
-          key: creator-docs-${{ hashFiles('scripts/build-docs-index.ts') }}
+          key: creator-docs-${{ hashFiles('scripts/build-docs-index.ts', 'scripts/creator-docs.lock.json') }}
 
       # `public/docs/` and `public/rules/` are both gitignored build outputs, so
       # a fresh checkout has neither. Without this step the extension builds
@@ -56,7 +56,8 @@ jobs:
         run: |
           if ! git diff --quiet -- src/luau; then
             echo "::error::Generated sources under src/luau/ drifted from the commit."
-            echo "Creator Docs upstream has changed. Run 'npm run docs-index' locally,"
+            echo "The generator or the pinned upstream (scripts/creator-docs.lock.json)"
+            echo "changed without a regeneration. Run 'npm run docs-index' locally,"
             echo "review the diff, commit it, and re-cut the release."
             git diff --stat -- src/luau
             exit 1
