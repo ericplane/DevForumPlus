@@ -93,3 +93,15 @@ html[data-dfp] .user-card .badge-section button {
   border-radius: var(--dfp-r-full) !important;
   background: transparent !important;
 }
+
+/* 10. The composer with its preview hidden. Discourse narrows the panel and
+ * pins its left margin so the editor does not move under a typing hand —
+ * measured: composer left 733 against a column left of 733, 757px wide in a
+ * 1080px column, i.e. hugging the column's left edge. Centred here, because
+ * everything else in the column is. Verified live that a plain rule loses
+ * (`margin-inline: auto` at (1,2,1) left the margin at 0 1055 0 732) and the
+ * same declaration with !important wins (0 894 both sides), so Discourse sets
+ * that margin with !important. See controls.css "Preview hidden". */
+html[data-dfp] #reply-control.hide-preview {
+  margin-inline: auto !important;
+}

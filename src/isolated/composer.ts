@@ -267,6 +267,7 @@ function readSettings(): void {
 function teardown(): void {
   clearTimeout(dupeTimer);
   clearTimeout(draftTimer);
+  uninlineToolbarMenu();
   dismissFenceNote();
   for (const n of document.querySelectorAll(
     `[${DUPES_MARK}], .dfp-draft, .dfp-luau-btn, .dfp-fence-note`,
@@ -639,24 +640,43 @@ export function luauFence(
  *
  * It sits right after that generic code button, which it specialises, rather
  * than at the end of the bar after the gear where it first landed — and it is
- * a text button, so it no longer carries Discourse's `no-text` class. With it
- * the button took the icon-only colour rule in controls.css and read as a lone
- * word in a row of icons; the toolbar's own sizing rule applies to every
- * `.btn` in the bar and needs nothing from that class.
+ * a labelled button, so it does not carry Discourse's `no-text` class.
+ *
+ * It is an icon-only button like every other one in the bar, and it took four
+ * tries to accept that. The bar is a CSS grid of 36.5px columns (measured:
+ * `display: grid`, `grid-template-columns: 36.5px 36.5px …`, 2px gap), one
+ * cell per button, and nothing with a label fits: "```Luau" measured 64px of
+ * content in a 37px cell and spilled over both neighbours; spanning two cells
+ * with Discourse's `</>` icon plus the word put two identical `</>` glyphs
+ * side by side, which read as one button twice; a bordered "Luau" tag in the
+ * same two cells read as a form control dropped into an icon row. So: one
+ * cell, one glyph, and the tooltip carries the words.
+ *
+ * The glyph is Discourse's `cube` sprite symbol — the Roblox part, the mark
+ * this forum already uses for the engine — sitting right after the generic
+ * `</>`: "code, the Roblox kind". The sprite ships it on this site (292
+ * symbols measured; `cube`, `scroll`, `file-lines` were the candidates, and
+ * at 15px the other two read as a document and as the upload button).
  */
 function addLuauButton(): void {
   const bar = composer()?.querySelector(".d-editor-button-bar");
   if (!bar || bar.querySelector(".dfp-luau-btn")) return;
 
-  const b = el("button", "btn btn-flat dfp-luau-btn") as HTMLButtonElement;
+  /* Discourse's own toolbar classes, so its sizing applies unchanged: the
+   * zero-width-space span is what gives every icon button its 37px line. */
+  const b = el("button", "btn no-text btn-icon dfp-luau-btn") as HTMLButtonElement;
   b.type = "button";
   b.title = "Insert a Luau code block";
   b.setAttribute("aria-label", "Insert a Luau code block");
-  /* The fence it types, as its glyph: three ticks in the mono face. It is
-   * decorative — the accessible name is the label above. */
-  const glyph = el("span", "dfp-luau-btn__glyph", "```");
-  glyph.setAttribute("aria-hidden", "true");
-  b.append(glyph, "Luau");
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("class", "fa d-icon d-icon-cube svg-icon svg-string");
+  icon.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", "#cube");
+  icon.append(use);
+  const spacer = el("span", undefined, "​");
+  spacer.setAttribute("aria-hidden", "true");
+  b.append(icon, spacer);
   b.addEventListener("click", () => {
     const ta = bodyInput();
     if (!ta) return;
@@ -674,6 +694,191 @@ function addLuauButton(): void {
   const code = bar.querySelector(".code");
   if (code) code.after(b);
   else bar.appendChild(b);
+}
+
+// ── The gear menu, as buttons ───────────────────────────────────────────────
+
+/** On the bar once its menu items have been copied out as buttons. */
+const INLINED = "data-dfp-inlined";
+/** On the gear while it is expanded on DFP's behalf; reading.css hides it. */
+const SILENT = "data-dfp-silent";
+const MENU_BTN = "dfp-menu-btn";
+
+/**
+ * Names Discourse leaves untranslated in the menu. `toggle-spreadsheet` is
+ * the table builder's id showing through — the row itself reads that way.
+ */
+const MENU_LABELS: Readonly<Record<string, string>> = {
+  "toggle-spreadsheet": "Insert table",
+};
+
+/** A menu row's name as a button title: known ids mapped, the rest humanised. */
+export function menuLabel(name: string): string {
+  const known = MENU_LABELS[name];
+  if (known) return known;
+  const words = name.replace(/[-_]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+interface MenuRow {
+  name: string;
+  label: string;
+  icon: string | null;
+}
+
+/**
+ * Discourse's toolbar ends in a gear: a select-kit dropdown holding the
+ * "popup menu" options — on this forum, Insert table, Hide details and Build
+ * poll. Three items behind a click, in the one control in the bar with a
+ * surface and a border (it is a form widget wearing button classes), and
+ * nothing about a gear says "table". The bar has the room, so the items
+ * become buttons at its end and the gear steps aside.
+ *
+ * The buttons are read off the menu rather than hard-coded. The rows exist
+ * only while the select-kit is expanded, so it is expanded once, silently
+ * (reading.css hides its body under `data-dfp-silent`), the rows are copied —
+ * icon and name — and it is collapsed again with focus put back where it was.
+ * Each button works the same way in reverse: expand, click the row carrying
+ * its name, collapse. Discourse then runs the row's own action, so a table
+ * still opens the table builder and a poll the poll builder, and an option a
+ * plugin adds tomorrow turns up as a button rather than vanishing with the
+ * gear. If the menu cannot be read, nothing is hidden: the gear stays.
+ */
+/**
+ * Not on the first mutation. Measured 57ms after the composer opened, the
+ * select-kit's `<details>` still carried `open` with no `is-expanded` — a
+ * transient of its first render — and a click at that instant toggled it shut
+ * and rendered nothing; the settled state (no `open`, no `is-expanded`)
+ * arrives a moment later, and from there one click renders the rows
+ * synchronously. So the first try waits, and a try that finds no rows books
+ * another with the gap doubling, five in all (~6s), after which the gear is
+ * simply left as Discourse drew it.
+ */
+const MENU_TRIES = [200, 400, 800, 1600, 3200];
+const menuTries = new WeakMap<HTMLElement, number>();
+
+function inlineToolbarMenu(bar: HTMLElement | null | undefined): void {
+  if (!bar || bar.hasAttribute(INLINED) || bar.dataset.dfpInlining) return;
+  const gear = bar.querySelector<HTMLElement>(".toolbar-popup-menu-options");
+  const header = gear?.querySelector<HTMLElement>(".select-kit-header");
+  if (!gear || !header) return;
+
+  const attempt = menuTries.get(bar) ?? 0;
+  const delay = MENU_TRIES[attempt];
+  if (delay === undefined) return;
+  menuTries.set(bar, attempt + 1);
+  bar.dataset.dfpInlining = "1";
+
+  setTimeout(() => {
+    if (!bar.isConnected || bar.hasAttribute(INLINED)) {
+      delete bar.dataset.dfpInlining;
+      return;
+    }
+    // Mid-render: `open` without `is-expanded`. Clicking now shuts it. Retry.
+    if (gear.hasAttribute("open") && !gear.classList.contains("is-expanded")) {
+      delete bar.dataset.dfpInlining;
+      inlineToolbarMenu(bar);
+      return;
+    }
+    void withMenuOpen(gear, header, () => readMenuRows(gear))
+      .then((rows) => {
+        if (!bar.isConnected || bar.hasAttribute(INLINED)) return;
+        if (rows.length === 0) {
+          delete bar.dataset.dfpInlining;
+          inlineToolbarMenu(bar);
+          return;
+        }
+        rows.forEach((row, i) => bar.append(menuButton(row, gear, header, i === 0)));
+        bar.setAttribute(INLINED, "1");
+      })
+      .finally(() => {
+        delete bar.dataset.dfpInlining;
+      });
+  }, delay);
+}
+
+function readMenuRows(gear: HTMLElement): MenuRow[] {
+  return [...gear.querySelectorAll<HTMLElement>(".select-kit-row")].flatMap((row) => {
+    const name = row.dataset.name?.trim() ?? "";
+    if (!name) return [];
+    return [{ name, label: menuLabel(name), icon: row.querySelector("svg use")?.getAttribute("href") ?? null }];
+  });
+}
+
+function menuButton(row: MenuRow, gear: HTMLElement, header: HTMLElement, first: boolean): HTMLButtonElement {
+  const b = el("button", `btn no-text btn-icon ${MENU_BTN}`) as HTMLButtonElement;
+  if (first) b.classList.add(`${MENU_BTN}--first`);
+  b.type = "button";
+  b.title = row.label;
+  b.setAttribute("aria-label", row.label);
+  b.dataset.dfpMenu = row.name;
+  if (row.icon) {
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("class", `fa d-icon d-icon-${row.icon.replace(/^#/, "")} svg-icon svg-string`);
+    icon.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", row.icon);
+    icon.append(use);
+    b.append(icon);
+  }
+  const spacer = el("span", undefined, "​");
+  spacer.setAttribute("aria-hidden", "true");
+  b.append(spacer);
+  b.addEventListener("click", () => {
+    void withMenuOpen(gear, header, () => {
+      const target = [...gear.querySelectorAll<HTMLElement>(".select-kit-row")].find(
+        (r) => r.dataset.name === row.name,
+      );
+      target?.click();
+      return !!target;
+    });
+  });
+  return b;
+}
+
+/**
+ * Expand the gear's select-kit without showing it, run `fn` against its rows,
+ * and collapse it again. Selecting a row collapses the menu on its own, so the
+ * collapse is checked a tick later rather than assumed — a second click on an
+ * already-closed header would open it for real.
+ */
+async function withMenuOpen<T>(gear: HTMLElement, header: HTMLElement, fn: () => T): Promise<T> {
+  const focus = document.activeElement as HTMLElement | null;
+  gear.setAttribute(SILENT, "1");
+  try {
+    if (!gear.classList.contains("is-expanded")) header.click();
+    await rowsRendered(gear);
+    return fn();
+  } finally {
+    await new Promise((r) => setTimeout(r, 0));
+    if (gear.classList.contains("is-expanded")) header.click();
+    gear.removeAttribute(SILENT);
+    if (focus && focus !== document.activeElement && focus.isConnected) focus.focus();
+  }
+}
+
+/**
+ * The rows render on the click in practice (measured: 3 rows, 0 waits), but
+ * this waits for them anyway, bounded at ~800ms — on a timer, not
+ * `requestAnimationFrame`, which never fires in a background tab and left a
+ * composer opened there waiting forever.
+ */
+function rowsRendered(gear: HTMLElement): Promise<void> {
+  return new Promise((resolve) => {
+    let tries = 0;
+    const tick = () => {
+      if (gear.querySelector(".select-kit-row") || ++tries > 40) resolve();
+      else setTimeout(tick, 20);
+    };
+    tick();
+  });
+}
+
+function uninlineToolbarMenu(): void {
+  const bar = composer()?.querySelector<HTMLElement>(".d-editor-button-bar");
+  if (!bar) return;
+  bar.querySelectorAll(`.${MENU_BTN}`).forEach((b) => b.remove());
+  bar.removeAttribute(INLINED);
 }
 
 // ── Paste-to-fence ──────────────────────────────────────────────────────────
@@ -906,6 +1111,7 @@ function wire(): void {
   const b = bodyInput();
   if (!b) return;
   addLuauButton();
+  inlineToolbarMenu(host.querySelector<HTMLElement>(".d-editor-button-bar"));
   const t = titleInput();
 
   if (t && !t.dataset.dfpWired) {

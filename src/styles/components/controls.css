@@ -428,6 +428,35 @@ html[data-dfp] #reply-control.draft {
   border-start-end-radius: var(--dfp-r-lg);
 }
 
+/* ── Preview hidden ───────────────────────────────────────────────────────
+ * Discourse keeps the editor exactly where it was and lets the right half of
+ * the panel go, so the narrowed composer hugs the left edge of the column —
+ * measured: composer left 733, column left 733, 757px wide under a 1080px
+ * column. It is centred instead, but Discourse sets that margin with
+ * `!important`, so the rule lives in overrides/hard.css (entry 10) with the
+ * other quarantined ones. */
+
+/* ── Fullscreen ───────────────────────────────────────────────────────────
+ * Discourse zeroes the header's bottom margin here and gives the preview a
+ * `margin-top: 1%`, so the header's divider ran straight into the top of the
+ * editor frame while the preview started lower than the editor beside it
+ * (measured: `.reply-to` margin-bottom 0, preview margin 1% 0 0 16px). Both
+ * panes now share the editor's top edge, with the same breathing room under
+ * the header as the docked panel; and a panel that fills the screen has no
+ * corners to round. */
+html[data-dfp] #reply-control.fullscreen {
+  border-radius: 0;
+}
+
+html[data-dfp] #reply-control.fullscreen .reply-to {
+  padding-block-end: var(--dfp-s-3);
+  margin-block-end: var(--dfp-s-3);
+}
+
+html[data-dfp] #reply-control.fullscreen .d-editor-preview-wrapper {
+  margin-block-start: 0;
+}
+
 /* ── Collapsed states ─────────────────────────────────────────────────────
  *
  * Two of them. While a post is being sent (`.saving`) and while the composer
@@ -561,24 +590,185 @@ html[data-dfp] #reply-control .d-editor-preview-wrapper {
   line-height: var(--dfp-lh-body);
 }
 
-/* ── Header and footer ────────────────────────────────────────────────────
- * The title bar earns a little room and a rule under it, so the panel opens
- * with a clear "what am I replying to" line rather than text floating above
- * the editor. */
+/* ── Header ───────────────────────────────────────────────────────────────
+ *
+ * Stock is a row of three things that do not know each other: the topic title
+ * as a link in the accent blue (the loudest colour on the panel, on the one
+ * line that is context rather than an action), a reply-type chooser wearing
+ * DFP's form-widget surface as a small bordered circle, and two bare chevrons
+ * at the far end. Measured on a reply: title link rgb(55,179,255) at 13px,
+ * chooser 24px with a 1px border, the whole row 38px tall.
+ *
+ * Now it reads as a title bar. A muted uppercase label says what the panel is
+ * doing — "REPLYING TO" is drawn here, since Discourse renders nothing for a
+ * reply beyond the title; for a new topic, message or edit Discourse's own
+ * `.action-title` text is kept and takes the same treatment — the topic title
+ * follows in the text colour at semibold, and the controls become the quiet
+ * 28px icon buttons every other DFP bar uses. */
 
 html[data-dfp] #reply-control .reply-to {
   align-items: center;
-  gap: var(--dfp-s-2);
-  padding-block-end: var(--dfp-s-2);
-  margin-block-end: var(--dfp-s-2);
+  gap: var(--dfp-s-3);
+  padding-block: 2px var(--dfp-s-3);
+  margin-block-end: var(--dfp-s-3);
   border-block-end: 1px solid var(--dfp-border);
   color: var(--dfp-text-2);
   font-size: var(--dfp-fs-sm);
 }
 
+html[data-dfp] #reply-control .reply-details {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* `.action-title` is the label only when it holds words. On a reply it holds
+ * the topic link instead (measured: the whole title went uppercase the first
+ * time this rule was not scoped), so there the label is drawn and the element
+ * is just the link's flex container. */
+html[data-dfp] #reply-control .reply-details::before,
+html[data-dfp] #reply-control:not(.composer-action-reply) .reply-details .action-title {
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+html[data-dfp] #reply-control.composer-action-reply .reply-details::before {
+  content: "Replying to";
+}
+
+html[data-dfp] #reply-control.composer-action-reply .reply-details .action-title {
+  display: flex;
+  align-items: center;
+  gap: var(--dfp-s-2);
+  min-inline-size: 0;
+}
+
+/* The stock reply icon that sat before the title: the label says it now. */
+html[data-dfp] #reply-control .reply-details > .d-icon {
+  display: none;
+}
+
+html[data-dfp] #reply-control .reply-details .topic-link,
+html[data-dfp] #reply-control .reply-details a:not(.btn) {
+  color: var(--dfp-text);
+  font-weight: var(--dfp-fw-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] #reply-control .reply-details .topic-link:hover,
+html[data-dfp] #reply-control .reply-details a:not(.btn):hover {
+  color: var(--dfp-accent);
+}
+
+/* The reply-type chooser (reply / new linked topic / message) is a select-kit,
+ * so the generic form-widget surface reached it. A control in a title bar is
+ * a quiet icon, not a bordered circle. */
+html[data-dfp] #reply-control .composer-action-title .select-kit-header {
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  justify-content: center;
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] #reply-control .composer-action-title .select-kit-header:hover {
+  background: color-mix(in oklab, var(--dfp-text) 9%, transparent);
+  color: var(--dfp-text);
+}
+
+html[data-dfp] #reply-control .composer-controls {
+  gap: 2px;
+  margin: 0;
+}
+
+html[data-dfp] #reply-control .composer-controls .btn {
+  inline-size: 28px;
+  block-size: 28px;
+  padding: 0;
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+  transition:
+    background-color var(--dfp-dur-1) var(--dfp-ease),
+    color var(--dfp-dur-1) var(--dfp-ease);
+}
+
+html[data-dfp] #reply-control .composer-controls .btn:hover {
+  background: color-mix(in oklab, var(--dfp-text) 9%, transparent);
+  color: var(--dfp-text);
+}
+
+/* ── New-topic fields ─────────────────────────────────────────────────────
+ * The title is the most consequential thing typed into the composer and it
+ * was the smallest-looking: a 36px field at 4px radius beside two 36px
+ * choosers at 8px, the three of them in three different rhythms. One
+ * radius, one gap, and the title carries weight. */
+
+html[data-dfp] #reply-control .title-and-category {
+  gap: var(--dfp-s-2);
+}
+
+html[data-dfp] #reply-control #reply-title {
+  block-size: 40px;
+  padding: var(--dfp-s-2) var(--dfp-s-3);
+  border-radius: var(--dfp-r-md);
+  font-size: var(--dfp-fs-md);
+  font-weight: var(--dfp-fw-semibold);
+}
+
+html[data-dfp] #reply-control #reply-title::placeholder {
+  font-weight: var(--dfp-fw-normal);
+}
+
+html[data-dfp] #reply-control .category-chooser .select-kit-header,
+html[data-dfp] #reply-control .mini-tag-chooser .select-kit-header {
+  block-size: 36px;
+}
+
+/* ── Preview ──────────────────────────────────────────────────────────────
+ * The right-hand pane is blank until the first keystroke, and blank it is
+ * just a second dark rectangle. One word in the corner names it, and goes
+ * the moment there is anything to preview. */
+html[data-dfp] #reply-control .d-editor-preview:empty::before {
+  content: "Preview";
+  color: var(--dfp-text-3);
+  font-size: var(--dfp-fs-xs);
+  font-weight: var(--dfp-fw-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
 html[data-dfp] #reply-control .submit-panel {
   gap: var(--dfp-s-3);
   padding-block-start: var(--dfp-s-2);
+}
+
+/* Hide-preview, at the far right: the same quiet square as the header's
+ * controls, instead of a stock button with its own padding and colour. */
+html[data-dfp] #reply-control .submit-panel .toggle-preview {
+  inline-size: 32px;
+  block-size: 32px;
+  padding: 0;
+  border-radius: var(--dfp-r-xs);
+  color: var(--dfp-text-3);
+}
+
+html[data-dfp] #reply-control .submit-panel .toggle-preview:hover {
+  background: color-mix(in oklab, var(--dfp-text) 9%, transparent);
+  color: var(--dfp-text);
 }
 
 html[data-dfp] #reply-control .submit-panel .save-or-cancel {
@@ -604,14 +794,28 @@ html[data-dfp] #reply-control .submit-panel .cancel:hover {
  * --dfp-accent bar 11px tall running the full width of the composer, easily the
  * loudest thing on screen, while the pill itself was transparent and therefore
  * invisible. The retargeting that gives Discourse its colours reaches this one
- * badly, so both ends are stated here: quiet track, visible handle. */
+ * badly, so both ends are stated here: no track at all, a visible handle.
+ *
+ * "No track" is a correction of an earlier "quiet track": the track carried a
+ * full-width hairline under it, and the panel's own top edge is a 1px border
+ * that turns the 16px corners while a child's border runs straight and stops
+ * short of them (measured: grippie 1475px wide with a 1px bottom border,
+ * `.reply-to` below it 1460px with another). Two lines of different lengths
+ * eight pixels apart, and the corners looked cut. One edge — the panel's —
+ * and one inset divider — the header's — is the whole rhythm now.
+ *
+ * The pill also drops Discourse's `border-top: 3px double` in the tertiary
+ * blue, which sat on top of the pill's own fill as a two-tone smear. */
 html[data-dfp] #reply-control .grippie {
-  background: var(--dfp-surface-1);
-  border-block-end: 1px solid var(--dfp-border);
+  background: transparent;
+  border: 0;
   cursor: row-resize;
 }
 
 html[data-dfp] #reply-control .grippie::before {
+  border: 0;
+  inline-size: 28px;
+  block-size: 3px;
   background: var(--dfp-border-strong);
   border-radius: var(--dfp-r-pill, 999px);
   transition: background-color var(--dfp-dur-1) var(--dfp-ease);

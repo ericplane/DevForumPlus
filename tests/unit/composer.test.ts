@@ -6,6 +6,7 @@ import {
   foldLegacyDraft,
   insideFence,
   luauFence,
+  menuLabel,
   pruneDrafts,
   settleSubmit,
   topicOf,
@@ -258,6 +259,13 @@ eq(run("pm", ["closed"]).spent, "pm", "a close that never showed saving still sp
 // Steady states are no-ops; the step is safe to run on every mutation.
 eq(run(null, ["open", "open", "closed", "closed", "saving", "open"]).spent, "", "nothing named, nothing spent");
 eq(run(null, ["saving", "open"]).inFlight, false, "an unnamed save still settles");
+
+// ── menuLabel ───────────────────────────────────────────────────────────────
+
+console.log("── menuLabel ─────────────────────────────────────────────────────");
+eq(menuLabel("toggle-spreadsheet"), "Insert table", "the table builder's id, mapped");
+eq(menuLabel("Hide Details"), "Hide Details", "a translated name passes through");
+eq(menuLabel("insert_footnote"), "Insert footnote", "an untranslated id is humanised");
 
 console.log("");
 if (fail > 0) {

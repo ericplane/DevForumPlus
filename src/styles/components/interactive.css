@@ -253,6 +253,22 @@ html[data-dfp] .topic-timeline .timeline-footer-controls :is(
   padding: var(--dfp-s-2) var(--dfp-s-3);
   font-size: var(--dfp-fs-xs);
   line-height: 1.35;
+  /* 36px, the height of the icon pair above; on their own these came out at
+   * 34 (8+8 padding, a 16px line, 2px of border) and the rows disagreed. */
+  min-block-size: 36px;
+}
+
+/* Discourse's own pair — reply and the notification-level menu — are two
+ * 37px squares centred in the 93px rail, so the row was 82px wide with 5px of
+ * slack each side under toggles that fill the full 93. Measured. They share
+ * the row now: 42 + 8 + 42. The notification control is a menu trigger
+ * button inside a `display: contents` wrapper, so the button itself is the
+ * flex item. */
+html[data-dfp] .topic-timeline .timeline-footer-controls > .reply-to-post,
+html[data-dfp] .topic-timeline .timeline-footer-controls .topic-notifications-button > .btn {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  justify-content: center;
 }
 
 html[data-dfp] .topic-timeline .btn {

@@ -252,31 +252,127 @@ html[data-dfp] .dfp-draft__restore:hover {
   background: color-mix(in oklab, var(--dfp-warning) 16%, transparent);
 }
 
-/* ── Composer toolbar: the Luau button and the paste note ───────────────────
+/* ── Composer toolbar ───────────────────────────────────────────────────────
  *
- * A text button in a row of icons. controls.css sizes every `.btn` in the bar
- * (square minimum, --dfp-s-2 padding, inline-flex), so this only adds what a
- * label needs: a gap between the glyph and the word. It used to carry
- * Discourse's `no-text` class as well, which took the icon-only colour rule
- * and left a lone word at the far end of the bar; composer.ts now places it
- * beside the generic code button and drops the class. */
-html[data-dfp] .d-editor-button-bar .dfp-luau-btn {
-  gap: var(--dfp-s-1);
-  font-size: var(--dfp-fs-xs);
-  font-weight: var(--dfp-fw-medium);
-  color: var(--dfp-text-3);
+ * Discourse's order is quote, bold, italic, link, blockquote, code, upload,
+ * bullets, numbered, emoji, date, gear: the two lists split from the
+ * blockquote by code and upload, and no grouping at all — twelve identical
+ * cells in a grid of 36.5px columns (measured). The grid is replaced by a
+ * wrapping flex row so the buttons can be reordered with `order` alone, and
+ * they fall into six groups with a hairline between each:
+ *
+ *   quote | bold italic link | blockquote bullets numbered | code luau |
+ *   upload emoji date | the gear's items
+ *
+ * Everything keeps its Discourse class, so a button a plugin adds and this
+ * file has never heard of lands in the insert group (the `.btn` default
+ * below) rather than in front of everything. */
+html[data-dfp] #reply-control .d-editor-button-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+html[data-dfp] .d-editor-button-bar > .btn { order: 45; position: relative; }
+html[data-dfp] .d-editor-button-bar > .quote { order: 0; }
+html[data-dfp] .d-editor-button-bar > .bold { order: 10; }
+html[data-dfp] .d-editor-button-bar > .italic { order: 11; }
+html[data-dfp] .d-editor-button-bar > .link { order: 12; }
+html[data-dfp] .d-editor-button-bar > .blockquote { order: 20; }
+html[data-dfp] .d-editor-button-bar > .bullet { order: 21; }
+html[data-dfp] .d-editor-button-bar > .list { order: 22; }
+html[data-dfp] .d-editor-button-bar > .code { order: 30; }
+html[data-dfp] .d-editor-button-bar > .dfp-luau-btn { order: 31; }
+html[data-dfp] .d-editor-button-bar > .upload { order: 40; }
+html[data-dfp] .d-editor-button-bar > .emoji { order: 41; }
+html[data-dfp] .d-editor-button-bar > .local-dates { order: 42; }
+html[data-dfp] .d-editor-button-bar > .dfp-menu-btn { order: 50; }
+html[data-dfp] .d-editor-button-bar > .dfp-fence-note { order: 60; }
+html[data-dfp] .d-editor-button-bar > .options { order: 70; }
+
+/* The first button of each group carries the divider: a 1px line drawn 8px
+ * to its left, inside the 14px it steps away from the previous group. */
+html[data-dfp] .d-editor-button-bar > .bold,
+html[data-dfp] .d-editor-button-bar > .blockquote,
+html[data-dfp] .d-editor-button-bar > .code,
+html[data-dfp] .d-editor-button-bar > .upload,
+html[data-dfp] .d-editor-button-bar > .dfp-menu-btn--first {
+  margin-inline-start: 14px;
+}
+
+html[data-dfp] .d-editor-button-bar > .bold::before,
+html[data-dfp] .d-editor-button-bar > .blockquote::before,
+html[data-dfp] .d-editor-button-bar > .code::before,
+html[data-dfp] .d-editor-button-bar > .upload::before,
+html[data-dfp] .d-editor-button-bar > .dfp-menu-btn--first::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -8px;
+  inset-block: 9px;
+  inline-size: 1px;
+  background: var(--dfp-border);
+}
+
+/* ── The code pair ──────────────────────────────────────────────────────────
+ *
+ * Discourse's `</>` (preformatted text: backticks, or an untagged fence) and
+ * DFP's Luau button (a ```lua fence, so highlighting and deprecation marks
+ * fire) are one family, and read as one: a shared tint, outer corners only,
+ * edges touching. The Luau button is icon-only like every other button
+ * because nothing labelled fits a 37px cell — the shapes tried and rejected
+ * are recorded in composer.ts `addLuauButton`. Its glyph is the Roblox cube:
+ * "code, the Roblox kind", right after the generic one. */
+html[data-dfp] .d-editor-button-bar > .code,
+html[data-dfp] .d-editor-button-bar > .dfp-luau-btn {
+  background: color-mix(in oklab, var(--dfp-text) 6%, transparent);
+}
+
+html[data-dfp] .d-editor-button-bar > .code {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+html[data-dfp] .d-editor-button-bar > .dfp-luau-btn {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  /* Closes the bar's 2px gap so the pair is one pill. */
+  margin-inline-start: -2px;
+}
+
+html[data-dfp] .d-editor-button-bar > .code:hover,
+html[data-dfp] .d-editor-button-bar > .dfp-luau-btn:hover {
+  background: color-mix(in oklab, var(--dfp-text) 13%, transparent);
 }
 
 html[data-dfp] .d-editor-button-bar .dfp-luau-btn:hover {
   color: var(--dfp-accent);
 }
 
-/* The three ticks of the fence it inserts, in the mono face. Tightened,
- * because at this size the ticks otherwise read as three separate marks. */
-html[data-dfp] .dfp-luau-btn__glyph {
-  font-family: var(--dfp-mono);
-  font-weight: var(--dfp-fw-normal);
-  letter-spacing: -0.08em;
+/* ── The gear, once its items are buttons ───────────────────────────────────
+ *
+ * composer.ts copies the gear's menu rows out as `.dfp-menu-btn` buttons and
+ * marks the bar `data-dfp-inlined`. The gear is then parked, not removed: the
+ * buttons still work through it (expand, click the row, collapse), so it has
+ * to stay rendered and clickable — `visibility: hidden` and no cell of its
+ * own, rather than `display: none`, which would also break the dropdown's
+ * positioning maths. While DFP has it expanded on a button's behalf the body
+ * is hidden too, so nothing flashes. Until the rows have been read the gear
+ * is left exactly as Discourse drew it, minus the form-widget surface. */
+html[data-dfp] .d-editor-button-bar > .toolbar-popup-menu-options .select-kit-header {
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-dfp] .d-editor-button-bar[data-dfp-inlined] > .options {
+  position: absolute;
+  inset-inline-end: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+html[data-dfp] .toolbar-popup-menu-options[data-dfp-silent] .select-kit-body {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* "Fenced as Luau — undo", after a paste, until the author types again (five

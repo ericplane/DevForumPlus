@@ -635,6 +635,13 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
       </div>
     </div>
     <div class="timeline-footer-controls">
+      <!-- Discourse's own pair, transcribed live: the reply button and the
+           notification-level menu trigger inside a `display: contents`
+           wrapper. Two 37px squares that sat centred with slack on either side
+           under toggles filling the rail; interactive.css now shares the row
+           between them so every row in the cluster is the same width. -->
+      <button class="btn no-text btn-icon btn-default create reply-to-post" type="button" title="Reply"><svg class="fa d-icon d-icon-reply svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
+      <div class="topic-notifications-button" style="display: contents"><button class="btn btn-default no-text fk-d-menu__trigger notifications-tracking-trigger" type="button" title="Notifications"><svg class="fa d-icon d-icon-bell svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button></div>
       <button type="button" class="btn btn-default dfp-thread-toggle" aria-pressed="false">Thread view</button>
       <button type="button" class="btn btn-default dfp-op-toggle" aria-pressed="true">Pin post</button>
       <button type="button" class="btn btn-default dfp-quiet-toggle" aria-pressed="false">Quiet (3)</button>
@@ -696,8 +703,32 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
        coverage check reads. -->
   <div class="harness-row">
     <div class="open composer-action-createTopic show-preview ember-view">
+      <!-- The title bar, transcribed from the live DOM: the reply-type chooser
+           is a select-kit (a bordered circle until controls.css quiets it),
+           then Discourse's action text, which for a reply is the topic title
+           as a link and for a new topic the words below; the expand and
+           minimise controls sit at the end. `.composer-action-reply` gets a
+           drawn "Replying to" label; this block is a new topic, so the label
+           is Discourse's own `.action-title`. -->
+      <div class="reply-to">
+        <div class="reply-details">
+          <div class="composer-action-title ember-view">
+            <details class="select-kit single-select dropdown-select-box composer-actions"><summary class="select-kit-header single-select-header dropdown-select-box-header btn no-text btn-icon" role="listbox" tabindex="-1"><div class="select-kit-header-wrapper"><svg class="fa d-icon d-icon-plus svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></div></summary></details>
+            <span class="action-title">Create a new Topic</span>
+          </div>
+          <a class="topic-link" href="#">DataStore keeps returning nil after a server restart</a>
+        </div>
+        <div class="composer-controls">
+          <button class="btn no-text btn-icon btn-transparent toggle-fullscreen btn-mini-toggle" type="button" title="open the composer panel"><svg class="fa d-icon d-icon-angles-up svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
+          <button class="btn no-text btn-icon btn-transparent toggler toggle-minimize btn-mini-toggle" type="button" title="minimise the composer panel"><svg class="fa d-icon d-icon-angles-down svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
+        </div>
+      </div>
       <div class="composer-fields">
-        <input id="reply-title" type="text" placeholder="Type title, or paste a link here" value="DataStore keeps returning nil after a server restart">
+        <div class="title-and-category">
+          <div class="title-input"><input id="reply-title" type="text" placeholder="Type title, or paste a link here" value="DataStore keeps returning nil after a server restart"></div>
+          <div class="category-input"><details class="select-kit single-select combobox combo-box category-chooser"><summary class="select-kit-header single-select-header combobox-header combo-box-header btn" role="listbox" tabindex="-1"><div class="select-kit-header-wrapper"><span class="selected-name">Scripting Support</span><svg class="fa d-icon d-icon-angle-down svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></div></summary></details></div>
+          <div class="tags-input"><details class="select-kit multi-select mini-tag-chooser"><summary class="select-kit-header multi-select-header btn" role="listbox" tabindex="-1"><div class="select-kit-header-wrapper"><span class="selected-name">optional tags</span><svg class="fa d-icon d-icon-plus svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></div></summary></details></div>
+        </div>
       </div>
       <aside class="dfp-dupes" data-dfp-dupes="1">
         <div class="dfp-dupes__head">
@@ -720,11 +751,27 @@ killbrick<span class="dfp-tok-op">.</span><span class="dfp-tok-prop">Touched</sp
       </aside>
       <div class="d-editor">
         <div class="d-editor-textarea-wrapper">
-          <div class="d-editor-button-bar" role="toolbar">
-            <button class="btn no-text btn-icon btn-flat bold" type="button" title="Strong">B</button>
-            <button class="btn no-text btn-icon btn-flat italic" type="button" title="Emphasis">I</button>
-            <button class="btn no-text btn-icon btn-flat code" type="button" title="Preformatted text">&lt;/&gt;</button>
-            <button class="btn btn-flat dfp-luau-btn" type="button" title="Insert a Luau code block" aria-label="Insert a Luau code block"><span class="dfp-luau-btn__glyph" aria-hidden="true">```</span>Luau</button>
+          <div class="d-editor-button-bar" role="toolbar" data-dfp-inlined="1">
+            <!-- Discourse's own twelve, in Discourse's own order; reading.css
+                 regroups them with `order` and draws a divider before the first
+                 button of each group. The gear is a select-kit, parked once its
+                 rows have been copied out as the three `.dfp-menu-btn` at the end. -->
+            <button class="btn no-text btn-icon quote" type="button" title="Quote whole post"><svg class="fa d-icon d-icon-far-comment svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon bold" type="button" title="Strong (Ctrl+b)"><svg class="fa d-icon d-icon-bold svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon italic" type="button" title="Emphasis (Ctrl+i)"><svg class="fa d-icon d-icon-italic svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon link" type="button" title="Hyperlink (Ctrl+k)"><svg class="fa d-icon d-icon-link svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon blockquote" type="button" title="Blockquote"><svg class="fa d-icon d-icon-quote-right svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon code" type="button" title="Preformatted text (Ctrl+e)"><svg class="fa d-icon d-icon-code svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon dfp-luau-btn" type="button" title="Insert a Luau code block" aria-label="Insert a Luau code block"><svg class="fa d-icon d-icon-cube svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon upload" type="button" title="Upload"><svg class="fa d-icon d-icon-upload svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon bullet" type="button" title="Bulleted List"><svg class="fa d-icon d-icon-list-ul svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon list" type="button" title="Numbered List"><svg class="fa d-icon d-icon-list-ol svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon emoji insert-composer-emoji" type="button" title="Emoji :)"><svg class="fa d-icon d-icon-face-smile svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon local-dates" type="button" title="Insert date / time"><svg class="fa d-icon d-icon-calendar-days svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <details class="select-kit single-select dropdown-select-box toolbar-popup-menu-options options"><summary class="select-kit-header single-select-header dropdown-select-box-header btn no-text btn-icon" role="listbox" tabindex="-1"><div class="select-kit-header-wrapper"><svg class="fa d-icon d-icon-gear svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></div></summary></details>
+            <button class="btn no-text btn-icon dfp-menu-btn dfp-menu-btn--first" type="button" title="Insert table" aria-label="Insert table" data-dfp-menu="toggle-spreadsheet"><svg class="fa d-icon d-icon-table svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon dfp-menu-btn" type="button" title="Hide Details" aria-label="Hide Details" data-dfp-menu="Hide Details"><svg class="fa d-icon d-icon-caret-right svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
+            <button class="btn no-text btn-icon dfp-menu-btn" type="button" title="Build Poll" aria-label="Build Poll" data-dfp-menu="Build Poll"><svg class="fa d-icon d-icon-chart-bar svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span aria-hidden="true">&#8203;</span></button>
             <span class="dfp-fence-note" role="status">Fenced as Luau — <button type="button" class="dfp-fence-note__undo">undo</button></span>
           </div>
           <textarea class="d-editor-input" rows="6">```lua
@@ -732,6 +779,15 @@ local Players = game:GetService("Players")
 ```
 </textarea>
         </div>
+        <!-- Empty until the first keystroke; controls.css names it then. -->
+        <div class="d-editor-preview-wrapper"><div class="d-editor-preview"></div></div>
+      </div>
+      <div class="submit-panel">
+        <div class="save-or-cancel">
+          <button class="btn btn-icon-text btn-primary create" type="button"><svg class="fa d-icon d-icon-plus svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg><span class="d-button-label">Create Topic</span></button>
+          <button class="btn btn-text cancel btn-transparent" type="button"><span class="d-button-label">Close</span></button>
+        </div>
+        <button class="btn no-text btn-icon btn-transparent toggle-preview" type="button" title="hide preview"><svg class="fa d-icon d-icon-angles-left svg-icon svg-string" aria-hidden="true"><use href="#hx-dot"></use></svg></button>
       </div>
     </div>
   </div>
